@@ -267,9 +267,42 @@ baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
 });
+// Fallback Filter config chỉ gồm các Filter chính chủ của Locket (phòng khi Firebase trả NO_CHANGE nên không có liveFilterCfg)
+const nativeGroups = (dvFilterCfg.sheet_filters || []).filter(g => !["group_hot_ai_3d", "group_photobooth", "group_frames"].includes(g.id));
+const nativeIds = [];
+for (const g of nativeGroups) {
+    for (const id of (g.filter_ids || [])) {
+        if (!nativeIds.includes(id)) nativeIds.push(id);
+    }
+}
+const fallbackFilterCfg = {
+    allows_custom_filters: true,
+    show_filter_button: true,
+    sheet_enabled: true,
+    open_sheet_immediately: true,
+    sheet_filters: nativeGroups,
+    filter_groups: dvFilterCfg.filter_groups || [],
+    picker_filters: nativeIds,
+    remote_filters: []
+};
+
 // Không ghi đè cứng overlay_items & camera_filter_config để giữ nguyên 100% Caption ngày lễ mới nhất & Filter chính chủ của Locket!
 delete baseRcEntries["overlay_items"];
 delete baseRcEntries["camera_filter_config"];
+try {
+    const fg = JSON.parse(baseRcEntries["feature_gates"] || "{}");
+    fg.camera_filter_sheet = "enabled";
+    fg.camera_filters = "enabled";
+    fg.ai_filters = "enabled";
+    fg.camera_filter_button = "enabled";
+    fg.custom_filters = "enabled";
+    baseRcEntries["feature_gates"] = JSON.stringify(fg);
+} catch (_) {}
+baseRcEntries["show_filter_button"] = "true";
+baseRcEntries["camera_filters_enabled"] = "true";
+baseRcEntries["ai_filters_enabled"] = "true";
+baseRcEntries["camera_filter_button_enabled"] = "true";
+baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 var obj = {};
@@ -278,15 +311,31 @@ if (!obj || typeof obj !== "object") obj = {};
 obj.state = "UPDATE";
 obj.entries = obj.entries || {};
 
-// 1. Lưu lại overlay_items và camera_filter_config CHÍNH CHỦ mới nhất từ server Locket (để luôn có Caption lễ mới & Filter chạy không lỗi)
+// 1. Lưu lại overlay_items và camera_filter_config CHÍNH CHỦ mới nhất từ server Locket (và cache vào $persistentStore phòng khi Firebase trả NO_CHANGE)
 var liveOverlayItems = [];
 try {
-    if (obj.entries["overlay_items"]) liveOverlayItems = JSON.parse(obj.entries["overlay_items"]);
+    if (obj.entries["overlay_items"]) {
+        liveOverlayItems = JSON.parse(obj.entries["overlay_items"]);
+        if (typeof $persistentStore !== "undefined" && Array.isArray(liveOverlayItems) && liveOverlayItems.length > 0) {
+            $persistentStore.write(obj.entries["overlay_items"], "tommm_live_overlays");
+        }
+    } else if (typeof $persistentStore !== "undefined") {
+        var cachedOverlays = $persistentStore.read("tommm_live_overlays");
+        if (cachedOverlays) liveOverlayItems = JSON.parse(cachedOverlays);
+    }
 } catch (_) { liveOverlayItems = []; }
 
 var liveFilterCfg = null;
 try {
-    if (obj.entries["camera_filter_config"]) liveFilterCfg = JSON.parse(obj.entries["camera_filter_config"]);
+    if (obj.entries["camera_filter_config"]) {
+        liveFilterCfg = JSON.parse(obj.entries["camera_filter_config"]);
+        if (typeof $persistentStore !== "undefined" && liveFilterCfg && typeof liveFilterCfg === "object") {
+            $persistentStore.write(obj.entries["camera_filter_config"], "tommm_live_filter_cfg");
+        }
+    } else if (typeof $persistentStore !== "undefined") {
+        var cachedFilter = $persistentStore.read("tommm_live_filter_cfg");
+        if (cachedFilter) liveFilterCfg = JSON.parse(cachedFilter);
+    }
 } catch (_) { liveFilterCfg = null; }
 
 // 2. Áp dụng toàn bộ cấu hình Locket Gold (Video dài, Rollcall Strip, Tắt quảng cáo, Popup chào mừng Tommm)
@@ -319,13 +368,13 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
 }
 obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
 
-// 4. Mở khóa toàn bộ Filter CHÍNH CHỦ của Locket (không chèn ID giả để không bao giờ bị lỗi "Không thể áp dụng bộ lọc")
-if (liveFilterCfg && typeof liveFilterCfg === "object") {
-    liveFilterCfg.allows_custom_filters = true;
-    liveFilterCfg.show_filter_button = true;
-    liveFilterCfg.sheet_enabled = true;
-    obj.entries["camera_filter_config"] = JSON.stringify(liveFilterCfg);
-}
+// 4. Luôn bật nút AI / Filter CHÍNH CHỦ của Locket (dùng liveFilterCfg nếu có, hoặc fallbackFilterCfg nếu Firebase trả NO_CHANGE)
+var activeFilterCfg = (liveFilterCfg && typeof liveFilterCfg === "object") ? liveFilterCfg : ${JSON.stringify(fallbackFilterCfg)};
+activeFilterCfg.allows_custom_filters = true;
+activeFilterCfg.show_filter_button = true;
+activeFilterCfg.sheet_enabled = true;
+if (typeof activeFilterCfg.open_sheet_immediately === "undefined") activeFilterCfg.open_sheet_immediately = true;
+obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 
 $done({ body: JSON.stringify(obj) });
 `;
@@ -378,7 +427,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=13, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=14, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
@@ -443,7 +492,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 [Script]
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=13, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=14, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
