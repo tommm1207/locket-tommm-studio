@@ -293,13 +293,28 @@ try {
 var TOMMM_ENTRIES = ${JSON.stringify(baseRcEntries)};
 Object.assign(obj.entries, TOMMM_ENTRIES);
 
-// 3. Merge thông minh: Giữ nguyên 100% Caption mới & Caption ngày lễ chính chủ của Locket ở đầu, sau đó nối thêm bộ Caption mở rộng!
+// 3. Merge thông minh & LỌC TRÙNG TUYỆT ĐỐI theo từng overlay_id (tránh Swift Identifiable crash khi trùng ID!)
 var EXTRA_SECTIONS = ${JSON.stringify(customExtraSections)};
 var mergedOverlays = Array.isArray(liveOverlayItems) && liveOverlayItems.length > 0 ? liveOverlayItems.slice() : ${JSON.stringify(dvOverlays.slice(0, 1))};
-var existingSecNames = new Set(mergedOverlays.map(function(s) { return s.section; }));
+var seenOverlayIds = {};
+for (var a = 0; a < mergedOverlays.length; a++) {
+    var secItems = mergedOverlays[a].items || [];
+    for (var b = 0; b < secItems.length; b++) {
+        if (secItems[b] && secItems[b].overlay_id) seenOverlayIds[secItems[b].overlay_id] = true;
+    }
+}
 for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
-    if (!existingSecNames.has(EXTRA_SECTIONS[i].section)) {
-        mergedOverlays.push(EXTRA_SECTIONS[i]);
+    var rawItems = EXTRA_SECTIONS[i].items || [];
+    var cleanItems = [];
+    for (var j = 0; j < rawItems.length; j++) {
+        var it = rawItems[j];
+        if (it && it.overlay_id && !seenOverlayIds[it.overlay_id]) {
+            seenOverlayIds[it.overlay_id] = true;
+            cleanItems.push(it);
+        }
+    }
+    if (cleanItems.length > 0) {
+        mergedOverlays.push({ section: EXTRA_SECTIONS[i].section, items: cleanItems });
     }
 }
 obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
