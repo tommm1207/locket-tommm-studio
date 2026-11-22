@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>DNSSettings</key>
+            <dict>
+                <key>DNSProtocol</key>
+                <string>HTTPS</string>
+                <key>ServerAddresses</key>
+                <array>
+                    <string>0.0.0.0</string>
+                </array>
+                <key>ServerURL</key>
+                <string>https://0.0.0.0/dns-query</string>
+                <key>SupplementalMatchDomains</key>
+                <array>
+                    <string>api.revenuecat.com</string>
+                    <string>rc-backup.revenuecat.com</string>
+                    <string>api.rc-backup.com</string>
+                    <string>api2.amplitude.com</string>
+                    <string>appsflyersdk.com</string>
+                    <string>ingest.sentry.io</string>
+                </array>
+            </dict>
+            <key>OnDemandRules</key>
+            <array>
+                <dict>
+                    <key>Action</key>
+                    <string>Connect</string>
+                </dict>
+            </array>
+            <key>PayloadDescription</key>
+            <string>Chặn thu hồi Locket Gold khi tắt Shadowrocket - 100% Private (Không qua DNS trung gian)</string>
+            <key>PayloadDisplayName</key>
+            <string>Tommm Locket Gold Shield</string>
+            <key>PayloadIdentifier</key>
+            <string>com.tommm.locketgold.dns</string>
+            <key>PayloadOrganization</key>
+            <string>Tommm Private Studio</string>
+            <key>PayloadType</key>
+            <string>com.apple.dnsSettings.managed</string>
+            <key>PayloadUUID</key>
+            <string>88A1B2C3-D4E5-4F60-9A11-TOMMM8888881</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+        </dict>
+    </array>
+    <key>PayloadDescription</key>
+    <string>Hồ sơ giữ Locket Gold vĩnh viễn của riêng Tommm (Chặn thu hồi cục bộ, không gửi DNS cho bất kỳ ai, không lag app ngân hàng).</string>
+    <key>PayloadDisplayName</key>
+    <string>Locket Gold • Tommm Shield 🛡️</string>
+    <key>PayloadIdentifier</key>
+    <string>com.tommm.locketgold.profile</string>
+    <key>PayloadOrganization</key>
+    <string>Tommm</string>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>88A1B2C3-D4E5-4F60-9A11-TOMMM8888882</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>

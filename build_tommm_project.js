@@ -1,0 +1,658 @@
+const fs = require('fs');
+const path = require('path');
+
+const baseDir = 'D:\\Locket_Gold_Tommm';
+const dataDir = path.join(baseDir, 'data');
+const serverBase = 'http://192.168.50.72:8899';
+
+const dvRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'duyvinh_rc_output.json'), 'utf8')).entries;
+const vpsRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'vps_firebase.json'), 'utf8')).entries;
+
+// 1. Build Tommm's exclusive Caption sets + 324 merged captions (zero Duy Vinh / MPhong watermarks)
+const dvOverlays = JSON.parse(dvRc.overlay_items);
+const vpsOverlays = JSON.parse(vpsRc.overlay_items);
+
+const tommmExclusiveSection = {
+    section: "👑 Tommm VIP Exclusive ✨",
+    items: [
+        {
+            overlay_id: "caption:tommm_welcome",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "Welcome to Tommm's Locket ✨",
+                max_lines: 1,
+                text_color: "#0F172A",
+                icon: { type: "emoji", data: "👑" },
+                background: { colors: ["#FDE047", "#F59E0B"] }
+            }
+        },
+        {
+            overlay_id: "caption:tommm_signature",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "Tommm Gold Edition 💛",
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "emoji", data: "⚡" },
+                background: { colors: ["#1E3A8A", "#3B82F6"] }
+            }
+        },
+        {
+            overlay_id: "caption:tommm_vibe",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "Tommm đang rất chill 🎧",
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "emoji", data: "🌙" },
+                background: { colors: ["#311042", "#8B5CF6"] }
+            }
+        },
+        {
+            overlay_id: "caption:tommm_study",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "KTX Vibe with Tommm 🏢",
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "emoji", data: "☕" },
+                background: { colors: ["#0F766E", "#14B8A6"] }
+            }
+        },
+        {
+            overlay_id: "caption:tommm_love",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "Gửi ngàn yêu thương từ Tommm 💌",
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "emoji", data: "💖" },
+                background: { colors: ["#EC4899", "#F43F5E"] }
+            }
+        },
+        {
+            overlay_id: "caption:tommm_flex",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "Đẹp trai chuẩn Tommm 😎",
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "emoji", data: "🔥" },
+                background: { colors: ["#EA580C", "#FACC15"] }
+            }
+        },
+        {
+            overlay_id: "caption:tommm_private",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: "100% Private • By Tommm 🛡️",
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "emoji", data: "🔒" },
+                background: { colors: ["#0F172A", "#334155"] }
+            }
+        }
+    ]
+};
+
+const existingTexts = new Set();
+for (const sec of dvOverlays) {
+    if (sec.section.includes("Duy Vinh")) {
+        sec.section = "🎨 Decorative VIP ✨";
+    }
+    for (const item of (sec.items || [])) {
+        if (item.caption && item.caption.text) {
+            // Scrub any duyvinh mention if present
+            item.caption.text = item.caption.text.replace(/duyvinh/gi, "Tommm");
+            existingTexts.add(item.caption.text.trim().toLowerCase());
+        }
+        if (item.overlay_id) existingTexts.add(item.overlay_id);
+    }
+}
+
+for (const sec of vpsOverlays) {
+    if (sec.section === "General" || sec.section === "Decorative") continue;
+    const uniqueItems = [];
+    for (const item of (sec.items || [])) {
+        const txt = (item.caption && item.caption.text) ? item.caption.text.trim().toLowerCase() : "";
+        if (txt && !existingTexts.has(txt) && !existingTexts.has(item.overlay_id)) {
+            uniqueItems.push(item);
+            existingTexts.add(txt);
+            existingTexts.add(item.overlay_id);
+        }
+    }
+    if (uniqueItems.length > 0) {
+        dvOverlays.push({
+            section: "🎨 " + sec.section,
+            items: uniqueItems
+        });
+    }
+}
+
+// Put Tommm VIP Exclusive right after General!
+dvOverlays.splice(1, 0, tommmExclusiveSection);
+
+// 2. Build 100% Self-Hosted Camera Filter Config pointing to Tommm's local assets!
+const mergedFilterCfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'merged_camera_filter_config.json'), 'utf8'));
+const removeIds = new Set(["frame_ba_khi", "sticker_binh_luan_minh_tue", "cmt_locket", "frame_tommm_gold"]);
+
+const cleanRemoteFilters = [];
+for (const rf of (mergedFilterCfg.remote_filters || [])) {
+    const fid = rf.id || rf.uid;
+    if (!fid || removeIds.has(fid)) continue;
+    const isAi = fs.existsSync(path.join(baseDir, 'assets', 'ai', `${fid}.png`));
+    const sub = isAi ? 'ai' : 'frames';
+    const localUrl = `${serverBase}/assets/${sub}/${fid}.png`;
+    rf.imageUrl = localUrl;
+    rf.iconUrl = localUrl;
+    rf.overlayImageUrl = localUrl;
+    rf.overlayImageURL = localUrl;
+    if (rf.icon && typeof rf.icon === 'object') {
+        rf.icon.url = localUrl;
+        rf.icon.iconUrl = localUrl;
+        rf.icon.remoteImage = localUrl;
+    }
+    rf.requires_gold = false;
+    rf.requiresGold = false;
+    rf.is_gold = false;
+    rf.isGold = false;
+    rf.unlocked = true;
+    rf.is_unlocked = true;
+    rf.isUnlocked = true;
+    rf.free = true;
+    rf.allowsTryFilter = true;
+    rf.allows_try_filter = true;
+    rf.tryButtonEnabled = true;
+    rf.try_button_enabled = true;
+    cleanRemoteFilters.push(rf);
+}
+
+mergedFilterCfg.remote_filters = cleanRemoteFilters;
+mergedFilterCfg.picker_filters = (mergedFilterCfg.picker_filters || []).filter(id => !removeIds.has(id));
+
+for (const sec of (mergedFilterCfg.sheet_filters || [])) {
+    sec.filter_ids = (sec.filter_ids || []).filter(id => !removeIds.has(id));
+}
+
+delete mergedFilterCfg.remoteFilters;
+delete mergedFilterCfg.filters;
+delete mergedFilterCfg.sheetFilters;
+delete mergedFilterCfg.pickerFilters;
+
+// 3. Build Locket_Tommm_Private.js (Clean Native iOS text-only greeting, NO custom banner image!)
+const tommmPopup = {
+    tag: "LOCKET GOLD • TOMMM",
+    tag_gradient: true,
+    tag_style: "gold_gradient",
+    title: "Chào mừng Tommm đến với Locket Gold ✨",
+    feature_set: [{
+        title: "Welcome back, Tommm",
+        body: "Đã kích hoạt đầy đủ tính năng Locket Gold, Caption & Photobooth riêng của bạn."
+    }],
+    primary_button_title: "Tiếp tục",
+    campaign: "locket_gold_welcome_tommm_clean",
+    start_at: "2020-01-01T00:00:00",
+    end_at: "2099-12-31T23:59:59",
+    use_local_time_zone: true
+};
+
+const fullEntitlementList = [
+    "Gold", "gold", "locket_gold", "locket_gold_annual", "premium", "Premium",
+    "pro", "Pro", "camera_filters", "camera_filter", "filters", "filter",
+    "ai_filters", "ai_filter", "photobooth", "holiday_effects", "holiday_filters",
+    "custom_filters", "effect_pack_20", "vip"
+];
+
+const jsContent = `// =========================================================================
+// Locket_Tommm_Private.js - Hệ thống Locket Gold Độc Lập 100% của Tommm
+// Chủ sở hữu: Tommm (Chạy cục bộ tại D:\\Locket_Gold_Tommm - Bảo mật 100%)
+// Không qua bất kỳ VPS hay máy chủ bên thứ 3 nào!
+// =========================================================================
+
+(function() {
+    const hasResponse = typeof $response !== "undefined" && $response !== null;
+    const hasRequest = typeof $request !== "undefined" && $request !== null;
+    const url = (hasRequest && $request.url) ? $request.url : (hasResponse && $response.url ? $response.url : "");
+
+    const TOMMM_POPUP_CONFIG = ${JSON.stringify(tommmPopup)};
+    const CUSTOM_CAMERA_FILTER_CONFIG = ${JSON.stringify(mergedFilterCfg)};
+    CUSTOM_CAMERA_FILTER_CONFIG.remoteFilters = CUSTOM_CAMERA_FILTER_CONFIG.remote_filters;
+    CUSTOM_CAMERA_FILTER_CONFIG.filters = CUSTOM_CAMERA_FILTER_CONFIG.remote_filters;
+    CUSTOM_CAMERA_FILTER_CONFIG.sheetFilters = CUSTOM_CAMERA_FILTER_CONFIG.sheet_filters;
+    CUSTOM_CAMERA_FILTER_CONFIG.pickerFilters = CUSTOM_CAMERA_FILTER_CONFIG.picker_filters;
+
+    const CUSTOM_OVERLAY_ITEMS = ${JSON.stringify(dvOverlays)};
+    const CUSTOM_DYNAMIC_CAPTIONS = ${dvRc.overlay_dynamic_captions};
+
+    // CHỈ chuyển tiếp 2 hàm xử lý Filter (getFilters & generateFilteredImage) về Server riêng của Tommm trên mạng nội bộ
+    // Còn hàm đăng ảnh thật (postMomentV2) ĐI THẲNG 100% LÊN SERVER GỐC CỦA LOCKET để ẩn danh tuyệt đối và không lộ ảnh!
+    if (!hasResponse && url.includes("cloudfunctions.net")) {
+        if (url.includes("generateFilteredImage") || url.includes("getFilters") || url.includes("createFilter") || url.includes("applyFilter") || url.includes("createOverlay") || url.includes("ai-filters")) {
+            const newUrl = url.replace(/https?:\\/\\/us-central1-locket-4252a\\.cloudfunctions\\.net/i, "${serverBase}");
+            $done({ url: newUrl });
+            return;
+        }
+        $done({});
+        return;
+    }
+
+    // =========================================================================
+    // 1. CHIỀU RESPONSE (Xử lý ngay trên iPhone của Tommm)
+    // =========================================================================
+    if (hasResponse) {
+        let body = $response.body;
+
+        // 1.1 Phản hồi từ Tommm Local Photobooth & Filter Engine
+        if (url.includes("generateFilteredImage") || url.includes("createOverlay") || url.includes("generateFilter") || url.includes("applyFilter")) {
+            try {
+                let resObj = JSON.parse(body || "{}");
+                delete resObj.error;
+                delete resObj.errors;
+                if (resObj.result) {
+                    delete resObj.result.error;
+                    delete resObj.result.errors;
+                }
+                $done({
+                    status: 200,
+                    headers: {
+                        "Content-Type": "application/json; charset=utf-8",
+                        "Access-Control-Allow-Origin": "*"
+                    },
+                    body: JSON.stringify(resObj)
+                });
+                return;
+            } catch (_) {
+                $done({});
+                return;
+            }
+        }
+
+        // 1.2 Mở khóa toàn diện RevenueCat Gold VIP + Tất cả Filter Lễ hội / AI / Photobooth
+        if (url.includes("revenuecat.com") || url.includes("rc-backup.com")) {
+            try {
+                const allEntNames = ${JSON.stringify(fullEntitlementList)};
+
+                if (url.includes("/offerings")) {
+                    let offObj = {};
+                    try { offObj = JSON.parse(body || "{}"); } catch (_) { offObj = {}; }
+                    offObj.current_offering_id = "default";
+                    offObj.offerings = [{
+                        "description": "Locket Gold Tommm VIP",
+                        "identifier": "default",
+                        "packages": [
+                            { "identifier": "$rc_annual", "platform_product_identifier": "locket_3600_1y" },
+                            { "identifier": "$rc_monthly", "platform_product_identifier": "locket_1600_1y" }
+                        ]
+                    }];
+                    $done({
+                        status: 200,
+                        headers: { "Content-Type": "application/json; charset=utf-8" },
+                        body: JSON.stringify(offObj)
+                    });
+                    return;
+                }
+
+                if (url.includes("product_entitlement_mapping")) {
+                    $done({
+                        status: 200,
+                        headers: { "Content-Type": "application/json; charset=utf-8" },
+                        body: JSON.stringify({
+                            "product_entitlement_mapping": {
+                                "locket_1600_1y": { "product_identifier": "locket_1600_1y", "entitlements": allEntNames },
+                                "locket_3600_1y": { "product_identifier": "locket_3600_1y", "entitlements": allEntNames },
+                                "locket_gold_annual": { "product_identifier": "locket_gold_annual", "entitlements": allEntNames },
+                                "com.locket.Locket.FilterPack_20Photos_500": { "product_identifier": "com.locket.Locket.FilterPack_20Photos_500", "entitlements": allEntNames }
+                            }
+                        })
+                    });
+                    return;
+                }
+
+                let obj = {};
+                try { obj = JSON.parse(body || "{}"); } catch (_) { obj = {}; }
+                if (!obj || typeof obj !== "object") obj = {};
+                if (!obj.subscriber) obj.subscriber = {};
+
+                let appUid = obj.subscriber.original_app_user_id || "";
+                const m = url.match(/\\/subscribers\\/([^\\/\\?]+)/);
+                if (m && m[1]) appUid = decodeURIComponent(m[1]);
+
+                const purchaseDate = "2024-01-01T00:00:00Z";
+                const expiresDate = "2099-12-31T23:59:59Z";
+
+                const makeEnt = (prodId) => ({
+                    "expires_date": expiresDate,
+                    "grace_period_expires_date": null,
+                    "product_identifier": prodId,
+                    "purchase_date": purchaseDate,
+                    "is_active": true,
+                    "will_renew": true,
+                    "period_type": "normal",
+                    "latest_purchase_date": purchaseDate,
+                    "original_purchase_date": purchaseDate,
+                    "store": "app_store",
+                    "ownership_type": "PURCHASED",
+                    "product_plan_identifier": null
+                });
+
+                const makeSub = (prodId) => ({
+                    "auto_resume_date": null,
+                    "billing_issues_detected_at": null,
+                    "display_name": prodId,
+                    "expires_date": expiresDate,
+                    "grace_period_expires_date": null,
+                    "is_sandbox": false,
+                    "management_url": "https://apps.apple.com/account/subscriptions",
+                    "original_purchase_date": purchaseDate,
+                    "ownership_type": "PURCHASED",
+                    "period_type": "normal",
+                    "product_plan_identifier": null,
+                    "purchase_date": purchaseDate,
+                    "refunded_at": null,
+                    "store": "app_store",
+                    "store_transaction_id": "2000001108724193",
+                    "unsubscribe_detected_at": null
+                });
+
+                obj.request_date = new Date().toISOString();
+                obj.request_date_ms = Date.now();
+                obj.subscriber.entitlements = {};
+                for (const ename of allEntNames) {
+                    obj.subscriber.entitlements[ename] = makeEnt(ename === "effect_pack_20" ? "com.locket.Locket.FilterPack_20Photos_500" : "locket_1600_1y");
+                }
+                obj.subscriber.subscriptions = {
+                    "locket_1600_1y": makeSub("locket_1600_1y"),
+                    "locket_3600_1y": makeSub("locket_3600_1y"),
+                    "locket_gold_annual": makeSub("locket_gold_annual"),
+                    "com.locket.gold.annual": makeSub("com.locket.gold.annual"),
+                    "com.locket.Locket.FilterPack_20Photos_500": makeSub("com.locket.Locket.FilterPack_20Photos_500")
+                };
+                obj.subscriber.original_purchase_date = purchaseDate;
+                obj.subscriber.first_seen = purchaseDate;
+                if (appUid) obj.subscriber.original_app_user_id = appUid;
+
+                let respHeaders = Object.assign({}, $response.headers || {});
+                for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding", "X-RevenueCat-ETag", "x-revenuecat-etag", "ETag", "etag"]) {
+                    delete respHeaders[h];
+                }
+                respHeaders["Content-Type"] = "application/json; charset=utf-8";
+
+                $done({
+                    status: 200,
+                    headers: respHeaders,
+                    body: JSON.stringify(obj)
+                });
+                return;
+            } catch (e) {
+                $done({});
+                return;
+            }
+        }
+
+        // 1.3 Mở khóa Firebase Remote Config (Tommm Private Edition)
+        if (url.includes("firebaseremoteconfig")) {
+            try {
+                let obj = {};
+                try { obj = JSON.parse(body || "{}"); } catch (_) { obj = {}; }
+                if (!obj || typeof obj !== "object") obj = {};
+
+                obj.state = "UPDATE";
+                obj.templateVersion = String(Date.now());
+                obj.appName = "com.locket.Locket";
+
+                let entries = obj.entries || {};
+                entries["cache_ttl_seconds"] = "0";
+                entries["client_cache_ttl_sec"] = "0";
+
+                // Bật toàn diện 39 Feature Gates
+                let fg = {};
+                try { fg = JSON.parse(entries["feature_gates"] || "{}"); } catch (_) { fg = {}; }
+                const gatesToEnable = [
+                    "app_icon_picker", "camera_roll", "camera_roll_video", "camera_roll_video_30s",
+                    "camera_roll_video_upload", "camera_theme", "locket_views", "long_captions",
+                    "longer_video", "longer_video_30s", "photo_library_video", "can_upload_30s_video",
+                    "can_record_30s_video", "unlimited_friends", "priority_support", "profile_badge",
+                    "profileBadge", "remove_ads", "video", "video_30s", "video_60s", "custom_widget_frames",
+                    "streaks", "groups", "camera_filter_sheet", "camera_filters", "camera_filter",
+                    "filter", "filters", "photo_filters", "ai_filters", "holiday_effects",
+                    "holiday_filters", "ar_filters", "face_filters", "camera_filter_button",
+                    "custom_filters", "create_filter", "extended_video_30s"
+                ];
+                for (const g of gatesToEnable) fg[g] = "enabled";
+                entries["feature_gates"] = JSON.stringify(fg);
+
+                // Quay & Up Video 60s + Chất lượng ảnh nét cao
+                entries["video_duration"] = "60";
+                entries["video_max_duration"] = "60.0";
+                entries["gold_max_duration"] = "60.0";
+                entries["goldMaxDuration"] = "60.0";
+                entries["max_video_duration"] = "60";
+                entries["max_video_length"] = "60";
+                entries["max_video_length_seconds"] = "60";
+                entries["video_length_seconds"] = "60";
+                entries["video_duration_seconds"] = "60";
+                entries["max_video_duration_seconds"] = "60";
+                entries["video_recording_duration_seconds"] = "60";
+                entries["can_record_video_duration_seconds"] = "60";
+                entries["extended_video_length_seconds"] = "60";
+                entries["longer_video_duration_seconds"] = "60";
+                entries["longer_videos_enabled"] = "true";
+                entries["longer_video_enabled"] = "true";
+                entries["can_record_long_video"] = "true";
+                entries["long_video_enabled"] = "true";
+                entries["longer_video_max_duration"] = "60";
+                entries["camera_roll_max_duration"] = "60.0";
+                entries["camera_roll_video_max_duration"] = "60.0";
+                entries["camera_roll_duration"] = "60.0";
+                entries["video_trim_max_duration"] = "60.0";
+                entries["trim_max_duration"] = "60.0";
+                entries["longer_camera_roll_videos_enabled"] = "true";
+                entries["camera_roll_video_upload_enabled"] = "true";
+                entries["camera_roll_video_enabled"] = "true";
+                entries["camera_roll_preview_enabled"] = "true";
+                entries["internal_camera_roll_video_upload_enabled"] = "true";
+                entries["camera_volume_button_enabled"] = "true";
+                entries["camera_microphone_enabled"] = "true";
+                entries["video_sound_enabled"] = "true";
+                entries["upload_main_image_quality"] = "0.85";
+                entries["upload_main_image_size"] = "1440";
+                entries["upload_thumbnail_image_quality"] = "0.85";
+                entries["upload_thumbnail_image_size"] = "1020";
+
+                entries["camera_roll"] = JSON.stringify({
+                    "gold_max_duration": 60.0,
+                    "max_duration": 60.0,
+                    "video_max_duration": 60.0,
+                    "trim_max_duration": 60.0,
+                    "camera_roll_max_duration": 60.0,
+                    "video_length": 60.0,
+                    "quality_mbps": 0.8,
+                    "video": true,
+                    "video_enabled": true,
+                    "upload_enabled": true,
+                    "allow_video": true
+                });
+                entries["camera"] = JSON.stringify({
+                    "gold_max_duration": 60.0,
+                    "max_duration": 60.0,
+                    "ultra_wide": true,
+                    "volume_button": true,
+                    "flash_button": true,
+                    "telephoto": true,
+                    "video_max_duration": 60.0,
+                    "video_duration": 60.0
+                });
+                entries["camera_config"] = entries["camera"];
+
+                // Không giới hạn bạn bè & Bảo vệ xem ai đã xem Locket
+                entries["max_friends_count"] = "999999999";
+                entries["signup_max_friends_count"] = "999999999";
+                entries["unlimited_max_friend_count"] = "999999999";
+                entries["soft_friend_limit_threshold_count"] = "999999999";
+                entries["unlimited_friends_prompt_config"] = JSON.stringify({"minimum_friends_count": 0, "show": false});
+                entries["get_moment_views_as_cloud_function"] = "false";
+                entries["moment_views_enabled"] = "true";
+                entries["moment_views_v2"] = "true";
+                entries["record_moment_views"] = "true";
+                entries["notify_moment_views"] = "true";
+                entries["moment_reactions_v2"] = "true";
+                entries["fetch_moments_in_conversation"] = "true";
+                entries["chat_read_receipts"] = "true";
+                entries["get_latest_moment_v2"] = "true";
+
+                // Cờ kích hoạt Gold trực tiếp trong Remote Config (Giúp không bao giờ hiện nút Unlock khi chụp Filter!)
+                entries["gold_subscription_override"] = "true";
+                entries["android_gold_subscription_override"] = "true";
+                entries["is_gold"] = "true";
+                entries["has_gold"] = "true";
+                entries["gold_active"] = "true";
+                entries["v2_refresh"] = "true";
+                entries["profile_badge_visible"] = "true";
+                entries["lunar_new_year_app_icon_enabled"] = "true";
+
+                // Tắt toàn bộ Telemetry / Sentry / Ads của Locket để tàng hình 100%
+                entries["sentry_sample_rate"] = "0";
+                entries["sentry_network_tracing"] = "false";
+                entries["sentry_performance_tracking"] = "false";
+                entries["sentry_trace_sample_rate"] = "0";
+                entries["sentry_profiles_sample_rate"] = "0";
+                entries["history_ads_mode"] = "off";
+                entries["history_ads_prefetch_count"] = "0";
+                entries["history_ads_prefetch_immediate"] = "false";
+                entries["history_ads_dynamic_insertion"] = "false";
+
+                // Xóa sạch khung viền watermark ngoài màn hình chính & Gắn lời chào mừng Tommm!
+                delete entries["widget_frame_event"];
+                delete entries["synced_widget_frame"];
+                delete entries["last_synced_widget_frame_event"];
+                entries["feature_discovery_popup_config"] = JSON.stringify(TOMMM_POPUP_CONFIG);
+
+                // Tắt toàn bộ Paywall / Upsell chặn chụp ảnh Filter
+                delete entries["paywall_config"];
+                entries["paywall_presentation_config"] = JSON.stringify({
+                    "uid": "paywall_testflight",
+                    "onboarding": false,
+                    "after_sent_moment": false,
+                    "after_moment": false,
+                    "after_capture": false,
+                    "on_foreground": false,
+                    "holiday_effects": false,
+                    "camera_filters": false,
+                    "camera_filter": false,
+                    "filters": false,
+                    "filter": false,
+                    "ai_filter": false,
+                    "ai_filters": false,
+                    "filtered_image": false,
+                    "filtered_images": false,
+                    "generate_filtered_image": false,
+                    "interval": 2592000,
+                    "profile_banner": false
+                });
+                entries["upsell_features"] = JSON.stringify({
+                    "app_icon_picker": false,
+                    "camera_roll": false,
+                    "camera_theme": false,
+                    "locket_views": false,
+                    "remove_ads": false,
+                    "custom_widget_frames": false,
+                    "filter": false,
+                    "filters": false,
+                    "camera_filter": false,
+                    "camera_filters": false,
+                    "holiday_filter": false,
+                    "holiday_filters": false,
+                    "ai_filter": false,
+                    "ai_filters": false
+                });
+
+                // Gắn 330+ Captions (có mục Tommm VIP Exclusive) & 79 Filters Photobooth/Frames/AI
+                entries["camera_filter_config"] = JSON.stringify(CUSTOM_CAMERA_FILTER_CONFIG);
+                entries["camera_filter_fetch_cache_max_age_seconds"] = "0";
+                entries["camera_filter_storage_bucket"] = "gs://locket-filters";
+                entries["overlay_items"] = JSON.stringify(CUSTOM_OVERLAY_ITEMS);
+                entries["overlay_dynamic_captions"] = JSON.stringify(CUSTOM_DYNAMIC_CAPTIONS);
+                entries["overlay_navigator_enabled"] = "true";
+                entries["overlays_v2_config"] = JSON.stringify({"suggestions_enabled": true});
+                entries["captions_enabled"] = "true";
+                entries["music_caption_enabled"] = "true";
+                entries["music_caption_song_preview_enabled"] = "true";
+                entries["link_caption_link_enabled"] = "true";
+                entries["star_sign_caption_image_url"] = "https://storage.googleapis.com/locket-public/overlays/star_signs";
+                entries["live_photos"] = JSON.stringify({"capture":true,"video":true,"viewing":true,"catch_up":true,"widget_playback":true,"widget_looping_mode":"unseen"});
+                entries["capture_classification_config"] = JSON.stringify({"detection":true,"debug_caption":false,"expanded_sheet_legacy_support":true,"display_reaction_suggestions":true});
+                entries["custom_profile_pics"] = "true";
+                entries["rollcall_enabled"] = "true";
+                entries["time_travel_rewind_v2_enabled"] = "true";
+                entries["calendar_delete_moment_enabled"] = "true";
+
+                obj.entries = entries;
+
+                let respHeaders = Object.assign({}, $response.headers || {});
+                for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding", "ETag", "etag"]) {
+                    delete respHeaders[h];
+                }
+                respHeaders["Content-Type"] = "application/json; charset=utf-8";
+
+                $done({
+                    status: 200,
+                    headers: respHeaders,
+                    body: JSON.stringify(obj)
+                });
+                return;
+            } catch (e) {
+                $done({});
+                return;
+            }
+        }
+
+        $done({});
+        return;
+    }
+
+    // =========================================================================
+    // 2. CHIỀU REQUEST (Xóa Cache ETag để luôn nhận Gold & Captions mới nhất)
+    // =========================================================================
+    const reqUrl = (hasRequest && $request.url) ? $request.url : "";
+    let reqHeaders = Object.assign({}, ($request && $request.headers) || {});
+
+    if (reqUrl.includes("revenuecat.com") || reqUrl.includes("rc-backup.com") || reqUrl.includes("firebaseremoteconfig")) {
+        for (const h of ["If-None-Match", "if-none-match", "If-Modified-Since", "if-modified-since", "X-RevenueCat-ETag", "x-revenuecat-etag", "ETag", "etag", "x-goog-if-none-match"]) {
+            delete reqHeaders[h];
+        }
+        $done({ headers: reqHeaders });
+        return;
+    }
+
+    if (reqUrl.includes("getFilters") || reqUrl.includes("createFilter")) {
+        const filterList = CUSTOM_CAMERA_FILTER_CONFIG.picker_filters || [];
+        $done({
+            response: {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({
+                    "result": { "data": { "filters": filterList }, "status": 200 },
+                    "data": { "filters": filterList },
+                    "status": 200
+                })
+            }
+        });
+        return;
+    }
+
+    $done({});
+})();
+`;
+
+fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.js'), jsContent, 'utf8');
+console.log("Created Locket_Tommm_Private.js, size:", fs.statSync(path.join(baseDir, 'Locket_Tommm_Private.js')).size);

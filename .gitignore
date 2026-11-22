@@ -1,0 +1,5 @@
+data/All_In_One.db
+Locket_Tommm_Private.conf
+output/
+*.pyc
+__pycache__/
