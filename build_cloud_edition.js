@@ -183,7 +183,7 @@ for (const sec of dvOverlays) {
     if (sec.section.includes("Duy Vinh")) sec.section = "🎨 Decorative VIP ✨";
     for (const item of (sec.items || [])) {
         if (item.caption && item.caption.text) {
-            item.caption.text = item.caption.text.replace(/duyvinh09|duyvinh\.09|duyvinh|tommm09/gi, "tommm1207");
+            item.caption.text = item.caption.text.replace(/duyvinh09|duyvinh\.09|duyvinh|tommm09|tommm1207/gi, "Tommm");
             existingTexts.add(item.caption.text.trim().toLowerCase());
         }
         if (item.overlay_id) existingTexts.add(item.overlay_id);
@@ -241,13 +241,17 @@ baseRcEntries["camera_roll"] = JSON.stringify({ "gold_max_duration": 60, "video_
 baseRcEntries["rollcall_share_templates"] = JSON.stringify({ "templates": ["bold", "pop_off", "stacking", "full_screen", "shadow_box", "collage", "pop_collage"], "random_order": false });
 baseRcEntries["time_travel_rewind_v2_share_templates"] = JSON.stringify({ "templates": ["rounded_square", "grid_collage", "cutout_collage", "rounded_square_bold", "wall_calendar"], "random_order": false });
 baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
-    "tag": "LOCKET GOLD • TOMMM1207",
+    "tag": "LOCKET GOLD • TOMMM",
     "tag_gradient": true,
     "tag_style": "gold_gradient",
-    "title": "Chào mừng Tommm đến với Locket Gold ✨",
-    "feature_set": [{ "title": "Welcome back, tommm1207", "body": "Đã kích hoạt đầy đủ Locket Gold, Captions & Rollcall riêng của bạn." }],
-    "primary_button_title": "Tiếp tục",
-    "campaign": "locket_gold_welcome_tommm1207_v5",
+    "title": "Locket Gold ✨",
+    "feature_set": [{
+        "title": "Chào mừng Tommm 💛",
+        "body": "Chúc bạn sử dụng vui vẻ và lưu giữ thật nhiều khoảnh khắc đẹp cùng Locket Gold!",
+        "imageURL": "https://public.locketcamera.com/locket-public/journal_calendar_assets/holiday_indicators/valentines_indicator%403x.png"
+    }],
+    "primary_button_title": "Vào dùng ngay",
+    "campaign": "locket_gold_welcome_tommm_v6",
     "start_at": "2020-01-01T00:00:00",
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
