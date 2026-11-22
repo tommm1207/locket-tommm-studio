@@ -1,0 +1,10 @@
+name = "locket-tommm-studio"
+main = "cloudflare-worker/worker.js"
+compatibility_date = "2026-01-01"
+
+[ai]
+binding = "AI"
+
+[vars]
+GEMINI_MODEL = "gemini-3.1-flash-lite-image"
+GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets"
