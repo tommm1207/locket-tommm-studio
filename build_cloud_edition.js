@@ -183,7 +183,7 @@ for (const sec of dvOverlays) {
     if (sec.section.includes("Duy Vinh")) sec.section = "🎨 Decorative VIP ✨";
     for (const item of (sec.items || [])) {
         if (item.caption && item.caption.text) {
-            item.caption.text = item.caption.text.replace(/duyvinh/gi, "Tommm");
+            item.caption.text = item.caption.text.replace(/duyvinh09|duyvinh\.09|duyvinh|tommm09/gi, "tommm1207");
             existingTexts.add(item.caption.text.trim().toLowerCase());
         }
         if (item.overlay_id) existingTexts.add(item.overlay_id);
@@ -202,7 +202,11 @@ for (const sec of vpsOverlays) {
     }
     if (uniqueItems.length > 0) dvOverlays.push({ section: "🎨 " + sec.section, items: uniqueItems });
 }
-dvOverlays.splice(1, 0, tommmExclusiveSection, weekdayCaptionsSection);
+// Bỏ mục Tommm VIP Exclusive, chỉ giữ mục Thứ Ngày Đa Ngôn Ngữ + toàn bộ bộ Caption sạch (đã đổi sang tommm1207)
+// Tách riêng các bộ Caption thêm (custom sections) để MERGE thông minh với các Caption ngày lễ mới chính chủ của Locket!
+const customExtraSections = [weekdayCaptionsSection].concat(
+    dvOverlays.filter(s => !s.section.includes("General") && !s.section.includes("Decorative by Locket"))
+);
 
 // Use DuyVinh's proven compact camera_filter_config structure, pointing images to Tommm's GitHub!
 const dvFilterCfg = JSON.parse(dvRc.camera_filter_config);
@@ -237,28 +241,62 @@ baseRcEntries["camera_roll"] = JSON.stringify({ "gold_max_duration": 60, "video_
 baseRcEntries["rollcall_share_templates"] = JSON.stringify({ "templates": ["bold", "pop_off", "stacking", "full_screen", "shadow_box", "collage", "pop_collage"], "random_order": false });
 baseRcEntries["time_travel_rewind_v2_share_templates"] = JSON.stringify({ "templates": ["rounded_square", "grid_collage", "cutout_collage", "rounded_square_bold", "wall_calendar"], "random_order": false });
 baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
-    "tag": "LOCKET GOLD • TOMMM",
+    "tag": "LOCKET GOLD • TOMMM1207",
     "tag_gradient": true,
     "tag_style": "gold_gradient",
     "title": "Chào mừng Tommm đến với Locket Gold ✨",
-    "feature_set": [{ "title": "Welcome back, Tommm", "body": "Đã kích hoạt đầy đủ Locket Gold, 360+ Captions, Thứ Ngày Đa Ngôn Ngữ, Video 60s & Photobooth." }],
+    "feature_set": [{ "title": "Welcome back, tommm1207", "body": "Đã kích hoạt đầy đủ Locket Gold, Captions & Rollcall riêng của bạn." }],
     "primary_button_title": "Tiếp tục",
-    "campaign": "locket_gold_welcome_tommm_v4",
+    "campaign": "locket_gold_welcome_tommm1207_v5",
     "start_at": "2020-01-01T00:00:00",
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
 });
-baseRcEntries["overlay_items"] = JSON.stringify(dvOverlays);
-baseRcEntries["camera_filter_config"] = JSON.stringify(dvFilterCfg);
+// Không ghi đè cứng overlay_items & camera_filter_config để giữ nguyên 100% Caption ngày lễ mới nhất & Filter chính chủ của Locket!
+delete baseRcEntries["overlay_items"];
+delete baseRcEntries["camera_filter_config"];
 
-const locketRcJs = `// Tommm Private - Firebase Remote Config (360+ Captions, Thứ Ngày Đa Ngôn Ngữ, Video 60s, Rollcall & Filter)
+const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 var obj = {};
 try { obj = JSON.parse($response.body || "{}"); } catch (_) { obj = {}; }
 if (!obj || typeof obj !== "object") obj = {};
 obj.state = "UPDATE";
 obj.entries = obj.entries || {};
+
+// 1. Lưu lại overlay_items và camera_filter_config CHÍNH CHỦ mới nhất từ server Locket (để luôn có Caption lễ mới & Filter chạy không lỗi)
+var liveOverlayItems = [];
+try {
+    if (obj.entries["overlay_items"]) liveOverlayItems = JSON.parse(obj.entries["overlay_items"]);
+} catch (_) { liveOverlayItems = []; }
+
+var liveFilterCfg = null;
+try {
+    if (obj.entries["camera_filter_config"]) liveFilterCfg = JSON.parse(obj.entries["camera_filter_config"]);
+} catch (_) { liveFilterCfg = null; }
+
+// 2. Áp dụng toàn bộ cấu hình Locket Gold (Video dài, Rollcall Strip, Tắt quảng cáo, Popup chào mừng Tommm)
 var TOMMM_ENTRIES = ${JSON.stringify(baseRcEntries)};
 Object.assign(obj.entries, TOMMM_ENTRIES);
+
+// 3. Merge thông minh: Giữ nguyên 100% Caption mới & Caption ngày lễ chính chủ của Locket ở đầu, sau đó nối thêm bộ Caption mở rộng!
+var EXTRA_SECTIONS = ${JSON.stringify(customExtraSections)};
+var mergedOverlays = Array.isArray(liveOverlayItems) && liveOverlayItems.length > 0 ? liveOverlayItems.slice() : ${JSON.stringify(dvOverlays.slice(0, 1))};
+var existingSecNames = new Set(mergedOverlays.map(function(s) { return s.section; }));
+for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
+    if (!existingSecNames.has(EXTRA_SECTIONS[i].section)) {
+        mergedOverlays.push(EXTRA_SECTIONS[i]);
+    }
+}
+obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
+
+// 4. Mở khóa toàn bộ Filter CHÍNH CHỦ của Locket (không chèn ID giả để không bao giờ bị lỗi "Không thể áp dụng bộ lọc")
+if (liveFilterCfg && typeof liveFilterCfg === "object") {
+    liveFilterCfg.allows_custom_filters = true;
+    liveFilterCfg.show_filter_button = true;
+    liveFilterCfg.sheet_enabled = true;
+    obj.entries["camera_filter_config"] = JSON.stringify(liveFilterCfg);
+}
+
 $done({ body: JSON.stringify(obj) });
 `;
 fs.writeFileSync(path.join(baseDir, 'js_tommm_rc.js'), locketRcJs, 'utf8');
