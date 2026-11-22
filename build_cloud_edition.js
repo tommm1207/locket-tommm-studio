@@ -270,11 +270,47 @@ const jsContent = `// ==========================================================
     const CUSTOM_OVERLAY_ITEMS = ${JSON.stringify(dvOverlays)};
     const CUSTOM_DYNAMIC_CAPTIONS = ${dvRc.overlay_dynamic_captions};
 
+    // Mở khóa Huy hiệu Locket Gold (changeProfileInfo / fetchUserV2) ngay trên iPhone!
+    if (!hasResponse && url.includes("changeProfileInfo")) {
+        $done({
+            response: {
+                status: 200,
+                headers: { "Content-Type": "application/json; charset=utf-8" },
+                body: JSON.stringify({
+                    "data": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true },
+                    "result": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true }
+                })
+            }
+        });
+        return;
+    }
+
     // =========================================================================
     // 1. CHIỀU RESPONSE (Xử lý ngay trên iPhone của Tommm 24/7)
     // =========================================================================
     if (hasResponse) {
         let body = $response.body;
+
+        // 1.0 Mở khóa Huy hiệu Locket Gold khi Locket gọi changeProfileInfo hoặc fetchUserV2
+        if (url.includes("changeProfileInfo") || url.includes("fetchUser")) {
+            try {
+                let uObj = JSON.parse(body || "{}");
+                if (uObj.result && uObj.result.data) {
+                    uObj.result.data.badge = "locket_gold";
+                    uObj.result.data.is_gold = true;
+                }
+                if (uObj.data) {
+                    uObj.data.badge = "locket_gold";
+                    uObj.data.is_gold = true;
+                }
+                $done({
+                    status: 200,
+                    headers: { "Content-Type": "application/json; charset=utf-8" },
+                    body: JSON.stringify(uObj)
+                });
+                return;
+            } catch (_) {}
+        }
 
         // 1.1 Mở khóa phản hồi Filter / Photobooth
         if (url.includes("generateFilteredImage") || url.includes("createOverlay") || url.includes("generateFilter") || url.includes("applyFilter")) {
@@ -755,7 +791,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 tommm_strip_rc = type=http-request,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 tommm_strip_fb = type=http-request,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_cf = type=http-request,pattern=^https?:\\/\\/us-central1-locket-4252a\\.cloudfunctions\\.net\\/(getFilters|createFilter).*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_cf = type=http-request,pattern=^https?:\\/\\/us-central1-locket-4252a\\.cloudfunctions\\.net\\/(getFilters|createFilter|changeProfileInfo).*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 tommm_RC_Gold = type=http-response,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 tommm_Firebase = type=http-response,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 
