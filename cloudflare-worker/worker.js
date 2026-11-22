@@ -6,6 +6,7 @@
 // =========================================================================
 
 const MEMORY_IMAGES = new Map();
+let LAST_PAYLOAD_KEYS = null;
 let keyIndex = 0;
 
 function corsHeaders(extra = {}) {
@@ -63,20 +64,32 @@ function findFirstStringUrl(obj, depth = 0) {
   return null;
 }
 
-async function getInputImageBytes(dataNode) {
+async function getInputImageBytes(dataNode, authHeader) {
   // 1. Base64 in payload
-  for (const k of ["image", "imageBase64", "image_base64", "base64", "photo"]) {
+  for (const k of ["image", "imageBase64", "image_base64", "base64", "photo", "inputImage", "input_image"]) {
     const val = dataNode?.[k];
-    if (typeof val === "string" && val.length > 200 && !val.startsWith("http")) {
+    if (typeof val === "string" && val.length > 200 && !val.startsWith("http") && !val.startsWith("gs://")) {
       const clean = val.includes(",") ? val.split(",", 2)[1] : val;
       return base64ToUint8Array(clean);
     }
   }
-  // 2. Firebase Storage / HTTP URL in payload
-  const imgUrl = findFirstStringUrl(dataNode);
+  // 2. HTTP URL or gs:// bucket path in payload
+  let imgUrl = findFirstStringUrl(dataNode);
+  if (!imgUrl && dataNode && typeof dataNode === "object") {
+    for (const [k, v] of Object.entries(dataNode)) {
+      if (typeof v === "string" && v.startsWith("gs://")) {
+        const m = v.match(/^gs:\/\/([^\/]+)\/(.+)$/);
+        if (m) imgUrl = `https://firebasestorage.googleapis.com/v0/b/${m[1]}/o/${encodeURIComponent(m[2])}?alt=media`;
+      } else if (typeof v === "string" && (k.includes("path") || k.includes("Path")) && v.length > 5 && !v.startsWith("http")) {
+        imgUrl = `https://firebasestorage.googleapis.com/v0/b/locket-filters/o/${encodeURIComponent(v.replace(/^\/+/, ""))}?alt=media`;
+      }
+    }
+  }
   if (imgUrl) {
     try {
-      const r = await fetch(imgUrl, { headers: { "User-Agent": "Locket/1.0" } });
+      const hdrs = { "User-Agent": "Locket/1.0" };
+      if (authHeader) hdrs["Authorization"] = authHeader;
+      const r = await fetch(imgUrl, { headers: hdrs });
       if (r.ok) {
         return new Uint8Array(await r.arrayBuffer());
       }
@@ -179,6 +192,7 @@ export default {
           platform: "Cloudflare Workers 24/7 (Free Workers AI)",
           owner: "Tommm",
           cached_images_in_ram: MEMORY_IMAGES.size,
+          last_payload_keys: LAST_PAYLOAD_KEYS,
         }),
         { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
       );
@@ -213,6 +227,13 @@ export default {
       } catch (_) {}
 
       const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
+      const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+      const imgBytes = await getInputImageBytes(dataNode, authHeader);
+      LAST_PAYLOAD_KEYS = {
+        keys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+        got_input_image: !!(imgBytes && imgBytes.length > 0),
+        input_bytes: imgBytes ? imgBytes.length : 0,
+      };
       const filterId = dataNode.filterId || dataNode.filter_id || dataNode.uid || dataNode.id || "custom_ai";
       const customPrompt =
         dataNode.prompt ||
@@ -220,7 +241,6 @@ export default {
         dataNode.customPrompt ||
         `Apply a creative aesthetic filter (${filterId}) to the photo while preserving the person's face and natural lighting.`;
 
-      const imgBytes = await getInputImageBytes(dataNode);
       let aiResult = await callGeminiImageEdit(env, imgBytes, customPrompt);
       if (!aiResult) {
         aiResult = await callCloudflareFreeAI(env, imgBytes, customPrompt);
