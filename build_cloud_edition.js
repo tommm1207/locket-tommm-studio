@@ -256,7 +256,6 @@ var obj = {};
 try { obj = JSON.parse($response.body || "{}"); } catch (_) { obj = {}; }
 if (!obj || typeof obj !== "object") obj = {};
 obj.state = "UPDATE";
-obj.templateVersion = String(Date.now());
 obj.entries = obj.entries || {};
 var TOMMM_ENTRIES = ${JSON.stringify(baseRcEntries)};
 Object.assign(obj.entries, TOMMM_ENTRIES);
@@ -293,12 +292,6 @@ AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
 [Header Rewrite]
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del x-revenuecat-etag
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del X-RevenueCat-ETag
-http-request ^https?:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/.* header-del if-none-match
-http-request ^https?:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/.* header-del If-None-Match
-http-request ^https?:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/.* header-del x-goog-if-none-match
-http-request ^https?:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/.* header-del If-Modified-Since
-http-response ^https?:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/.* header-del etag
-http-response ^https?:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/.* header-del ETag
 http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\.com(:443)?)\\/user-customization-service\\/v1\\/customize$ header-del if-none-match
 
 [URL Rewrite]
@@ -313,10 +306,10 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 
 [Script]
 # =====================================================================
-# 1. LOCKET GOLD TOMMM CLOUD 24/7 (TÁCH RIÊNG 4 SCRIPT NHẸ, SIÊU ỔN ĐỊNH)
+# 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/.+), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
 tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js, requires-body=true, max-size=-1, timeout=60
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
