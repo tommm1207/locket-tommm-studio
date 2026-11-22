@@ -4,14 +4,14 @@ const path = require('path');
 const baseDir = 'D:\\Locket_Gold_Tommm';
 const dataDir = path.join(baseDir, 'data');
 
-// Use raw.githubusercontent.com directly so updates are 100% instant (zero CDN cache delay!)
 const ghCdnBase = 'https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main';
 const ghRawBase = 'https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main';
 
 const dvRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'duyvinh_rc_output.json'), 'utf8')).entries;
 const vpsRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'vps_firebase.json'), 'utf8')).entries;
 
-// 1. Build Tommm's exclusive Caption sets + 324 merged captions
+// 1. Build Tommm's exclusive Caption sets + Weekday Multi-language + 324 merged captions
+// IMPORTANT: Every custom caption MUST have overlay_id starting with "caption:custom_" because Locket iOS filters remote captions against overlay_dynamic_captions ("custom" prefix)!
 const dvOverlays = JSON.parse(dvRc.overlay_items);
 const vpsOverlays = JSON.parse(vpsRc.overlay_items);
 
@@ -19,7 +19,7 @@ const tommmExclusiveSection = {
     section: "👑 Tommm VIP Exclusive ✨",
     items: [
         {
-            overlay_id: "caption:tommm_welcome",
+            overlay_id: "caption:custom_tommm01",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -31,7 +31,7 @@ const tommmExclusiveSection = {
             }
         },
         {
-            overlay_id: "caption:tommm_signature",
+            overlay_id: "caption:custom_tommm02",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -43,7 +43,7 @@ const tommmExclusiveSection = {
             }
         },
         {
-            overlay_id: "caption:tommm_vibe",
+            overlay_id: "caption:custom_tommm03",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -55,7 +55,7 @@ const tommmExclusiveSection = {
             }
         },
         {
-            overlay_id: "caption:tommm_study",
+            overlay_id: "caption:custom_tommm04",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -67,7 +67,7 @@ const tommmExclusiveSection = {
             }
         },
         {
-            overlay_id: "caption:tommm_love",
+            overlay_id: "caption:custom_tommm05",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -79,7 +79,7 @@ const tommmExclusiveSection = {
             }
         },
         {
-            overlay_id: "caption:tommm_flex",
+            overlay_id: "caption:custom_tommm06",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -91,7 +91,7 @@ const tommmExclusiveSection = {
             }
         },
         {
-            overlay_id: "caption:tommm_private",
+            overlay_id: "caption:custom_tommm07",
             source: "remote",
             caption: {
                 type: "static_content",
@@ -102,6 +102,44 @@ const tommmExclusiveSection = {
                 background: { colors: ["#0F172A", "#334155"] }
             }
         }
+    ]
+};
+
+const weekdayCaptionsSection = {
+    section: "📅 Thứ Ngày Đa Ngôn Ngữ (VI • EN • ZH • TW • DE)",
+    items: [
+        // Tiếng Việt
+        { overlay_id: "caption:custom_dayvi2", source: "remote", caption: { type: "static_content", text: "THỨ HAI", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:custom_dayvi3", source: "remote", caption: { type: "static_content", text: "THỨ BA", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:custom_dayvi4", source: "remote", caption: { type: "static_content", text: "THỨ TƯ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:custom_dayvi5", source: "remote", caption: { type: "static_content", text: "THỨ NĂM", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:custom_dayvi6", source: "remote", caption: { type: "static_content", text: "THỨ SÁU", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:custom_dayvi7", source: "remote", caption: { type: "static_content", text: "THỨ BẢY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:custom_dayvi8", source: "remote", caption: { type: "static_content", text: "CHỦ NHẬT", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#991B1B", "#DC2626"] } } },
+        // English
+        { overlay_id: "caption:custom_dayen2", source: "remote", caption: { type: "static_content", text: "MONDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:custom_dayen3", source: "remote", caption: { type: "static_content", text: "TUESDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:custom_dayen4", source: "remote", caption: { type: "static_content", text: "WEDNESDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:custom_dayen5", source: "remote", caption: { type: "static_content", text: "THURSDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:custom_dayen6", source: "remote", caption: { type: "static_content", text: "FRIDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:custom_dayen7", source: "remote", caption: { type: "static_content", text: "SATURDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:custom_dayen8", source: "remote", caption: { type: "static_content", text: "SUNDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#BE123C", "#F43F5E"] } } },
+        // Tiếng Trung / Đài Loan (星期 / 禮拜)
+        { overlay_id: "caption:custom_dayzh2", source: "remote", caption: { type: "static_content", text: "星期一 • 禮拜一", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:custom_dayzh3", source: "remote", caption: { type: "static_content", text: "星期二 • 禮拜二", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:custom_dayzh4", source: "remote", caption: { type: "static_content", text: "星期三 • 禮拜三", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:custom_dayzh5", source: "remote", caption: { type: "static_content", text: "星期四 • 禮拜四", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:custom_dayzh6", source: "remote", caption: { type: "static_content", text: "星期五 • 禮拜五", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:custom_dayzh7", source: "remote", caption: { type: "static_content", text: "星期六 • 禮拜六", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:custom_dayzh8", source: "remote", caption: { type: "static_content", text: "星期日 • 禮拜天", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#991B1B", "#EF4444"] } } },
+        // Tiếng Đức (Deutsch)
+        { overlay_id: "caption:custom_dayde2", source: "remote", caption: { type: "static_content", text: "MONTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:custom_dayde3", source: "remote", caption: { type: "static_content", text: "DIENSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:custom_dayde4", source: "remote", caption: { type: "static_content", text: "MITTWOCH", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:custom_dayde5", source: "remote", caption: { type: "static_content", text: "DONNERSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:custom_dayde6", source: "remote", caption: { type: "static_content", text: "FREITAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:custom_dayde7", source: "remote", caption: { type: "static_content", text: "SAMSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:custom_dayde8", source: "remote", caption: { type: "static_content", text: "SONNTAG", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#B91C1C", "#F59E0B"] } } }
     ]
 };
 
@@ -138,47 +176,9 @@ for (const sec of vpsOverlays) {
     }
 }
 
-const weekdayCaptionsSection = {
-    section: "📅 Thứ Ngày Đa Ngôn Ngữ (VI • EN • ZH • TW • DE)",
-    items: [
-        // Tiếng Việt
-        { overlay_id: "caption:day_vi_2", source: "remote", caption: { type: "static_content", text: "THỨ HAI", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
-        { overlay_id: "caption:day_vi_3", source: "remote", caption: { type: "static_content", text: "THỨ BA", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
-        { overlay_id: "caption:day_vi_4", source: "remote", caption: { type: "static_content", text: "THỨ TƯ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
-        { overlay_id: "caption:day_vi_5", source: "remote", caption: { type: "static_content", text: "THỨ NĂM", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
-        { overlay_id: "caption:day_vi_6", source: "remote", caption: { type: "static_content", text: "THỨ SÁU", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
-        { overlay_id: "caption:day_vi_7", source: "remote", caption: { type: "static_content", text: "THỨ BẢY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
-        { overlay_id: "caption:day_vi_8", source: "remote", caption: { type: "static_content", text: "CHỦ NHẬT", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#991B1B", "#DC2626"] } } },
-        // English
-        { overlay_id: "caption:day_en_2", source: "remote", caption: { type: "static_content", text: "MONDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
-        { overlay_id: "caption:day_en_3", source: "remote", caption: { type: "static_content", text: "TUESDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
-        { overlay_id: "caption:day_en_4", source: "remote", caption: { type: "static_content", text: "WEDNESDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
-        { overlay_id: "caption:day_en_5", source: "remote", caption: { type: "static_content", text: "THURSDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
-        { overlay_id: "caption:day_en_6", source: "remote", caption: { type: "static_content", text: "FRIDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
-        { overlay_id: "caption:day_en_7", source: "remote", caption: { type: "static_content", text: "SATURDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
-        { overlay_id: "caption:day_en_8", source: "remote", caption: { type: "static_content", text: "SUNDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#BE123C", "#F43F5E"] } } },
-        // Tiếng Trung Giản Thể / Đài Loan Phồn Thể (星期 / 禮拜)
-        { overlay_id: "caption:day_zh_2", source: "remote", caption: { type: "static_content", text: "星期一 • 禮拜一", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
-        { overlay_id: "caption:day_zh_3", source: "remote", caption: { type: "static_content", text: "星期二 • 禮拜二", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
-        { overlay_id: "caption:day_zh_4", source: "remote", caption: { type: "static_content", text: "星期三 • 禮拜三", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
-        { overlay_id: "caption:day_zh_5", source: "remote", caption: { type: "static_content", text: "星期四 • 禮拜四", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
-        { overlay_id: "caption:day_zh_6", source: "remote", caption: { type: "static_content", text: "星期五 • 禮拜五", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
-        { overlay_id: "caption:day_zh_7", source: "remote", caption: { type: "static_content", text: "星期六 • 禮拜六", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
-        { overlay_id: "caption:day_zh_8", source: "remote", caption: { type: "static_content", text: "星期日 • 禮拜天", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#991B1B", "#EF4444"] } } },
-        // Tiếng Đức (Deutsch)
-        { overlay_id: "caption:day_de_2", source: "remote", caption: { type: "static_content", text: "MONTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
-        { overlay_id: "caption:day_de_3", source: "remote", caption: { type: "static_content", text: "DIENSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
-        { overlay_id: "caption:day_de_4", source: "remote", caption: { type: "static_content", text: "MITTWOCH", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
-        { overlay_id: "caption:day_de_5", source: "remote", caption: { type: "static_content", text: "DONNERSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
-        { overlay_id: "caption:day_de_6", source: "remote", caption: { type: "static_content", text: "FREITAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
-        { overlay_id: "caption:day_de_7", source: "remote", caption: { type: "static_content", text: "SAMSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
-        { overlay_id: "caption:day_de_8", source: "remote", caption: { type: "static_content", text: "SONNTAG", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#B91C1C", "#F59E0B"] } } }
-    ]
-};
-
 dvOverlays.splice(1, 0, tommmExclusiveSection, weekdayCaptionsSection);
 
-// 2. Build Camera Filter Config pointing to Tommm's GitHub CDN (24/7 Cloud!)
+// 2. Build Camera Filter Config pointing to Tommm's GitHub Cloud
 const mergedFilterCfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'merged_camera_filter_config.json'), 'utf8'));
 const removeIds = new Set(["frame_ba_khi", "sticker_binh_luan_minh_tue", "cmt_locket", "frame_tommm_gold"]);
 
@@ -215,32 +215,76 @@ for (const rf of (mergedFilterCfg.remote_filters || [])) {
 
 mergedFilterCfg.remote_filters = cleanRemoteFilters;
 mergedFilterCfg.picker_filters = (mergedFilterCfg.picker_filters || []).filter(id => !removeIds.has(id));
-
 for (const sec of (mergedFilterCfg.sheet_filters || [])) {
     sec.filter_ids = (sec.filter_ids || []).filter(id => !removeIds.has(id));
 }
-
 delete mergedFilterCfg.remoteFilters;
 delete mergedFilterCfg.filters;
 delete mergedFilterCfg.sheetFilters;
 delete mergedFilterCfg.pickerFilters;
 
-// 3. Clean Native iOS text-only greeting, NO custom banner image!
-const tommmPopup = {
-    tag: "LOCKET GOLD • TOMMM",
-    tag_gradient: true,
-    tag_style: "gold_gradient",
-    title: "Chào mừng Tommm đến với Locket Gold ✨",
-    feature_set: [{
-        title: "Welcome back, Tommm",
-        body: "Đã kích hoạt đầy đủ tính năng Locket Gold, Caption & Photobooth riêng của bạn."
+// 3. Build Base Remote Config Entries starting from 100% of DuyVinh's 182 proven working entries!
+const baseRcEntries = Object.assign({}, dvRc);
+// Scrub DuyVinh social links & Shin-chan widget frame watermark
+delete baseRcEntries["settings_instagram_url"];
+delete baseRcEntries["settings_tiktok_url"];
+delete baseRcEntries["widget_frame_event"];
+
+// Upgrade camera & camera_roll in baseRcEntries to 60s with exact required fields (srgb, lanczos, quality_mbps)!
+baseRcEntries["camera"] = JSON.stringify({
+    "gold_max_duration": 60,
+    "max_duration": 60,
+    "ultra_wide": true,
+    "volume_button": true,
+    "flash_button": true,
+    "telephoto": true,
+    "srgb": true,
+    "lanczos": true,
+    "quality_mbps": 0.6
+});
+baseRcEntries["camera_roll"] = JSON.stringify({
+    "gold_max_duration": 60,
+    "video_max_duration": 60,
+    "max_duration": 60,
+    "trim_max_duration": 60,
+    "camera_roll_max_duration": 60,
+    "quality_mbps": 0.6,
+    "flash_button": true
+});
+
+// Add Rollcall weekday & photobooth strip share templates
+baseRcEntries["rollcall_share_templates"] = JSON.stringify({"templates":["bold","pop_off","stacking","full_screen","shadow_box","collage","pop_collage"],"random_order":false});
+baseRcEntries["time_travel_rewind_v2_share_templates"] = JSON.stringify({"templates":["rounded_square","grid_collage","cutout_collage","rounded_square_bold","wall_calendar"],"random_order":false});
+baseRcEntries["rollcall_memories_streaks_enabled"] = "true";
+baseRcEntries["rollcall_profile_memories_enabled"] = "true";
+baseRcEntries["rollcall_profile_memories_config"] = JSON.stringify({"useBadgeFetchMode":true,"sharePreviews":true,"currentWeekPlaceholder":true,"historyRefreshTTLSeconds":0});
+
+// Clean text-only Tommm Welcome Popup
+baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
+    "tag": "LOCKET GOLD • TOMMM",
+    "tag_gradient": true,
+    "tag_style": "gold_gradient",
+    "title": "Chào mừng Tommm đến với Locket Gold ✨",
+    "feature_set": [{
+        "title": "Welcome back, Tommm",
+        "body": "Đã kích hoạt đầy đủ Locket Gold, 360+ Captions, Thứ Ngày Đa Ngôn Ngữ, Video 60s & Photobooth."
     }],
-    primary_button_title: "Tiếp tục",
-    campaign: "locket_gold_welcome_tommm_cloud_v1",
-    start_at: "2020-01-01T00:00:00",
-    end_at: "2099-12-31T23:59:59",
-    use_local_time_zone: true
-};
+    "primary_button_title": "Tiếp tục",
+    "campaign": "locket_gold_welcome_tommm_v2",
+    "start_at": "2020-01-01T00:00:00",
+    "end_at": "2099-12-31T23:59:59",
+    "use_local_time_zone": true
+});
+
+// Dynamic captions list - include "custom" so all caption:custom_* are rendered!
+const dynCaptions = ["standard","poll","color_palette","review","music","location","weather","time","streak","star_sign","party_time","locket_count","good_morning","goodnight","ootd","miss_you","custom","halloween_2026"];
+baseRcEntries["overlay_dynamic_captions"] = JSON.stringify(dynCaptions);
+baseRcEntries["ios_overlay_items_enabled"] = JSON.stringify(dynCaptions);
+baseRcEntries["overlay_items_enabled"] = JSON.stringify(dynCaptions);
+
+// Remove heavy keys from baseRcEntries before serializing so we don't duplicate them
+delete baseRcEntries["overlay_items"];
+delete baseRcEntries["camera_filter_config"];
 
 const fullEntitlementList = [
     "Gold", "gold", "locket_gold", "locket_gold_annual", "premium", "Premium",
@@ -252,7 +296,6 @@ const fullEntitlementList = [
 const jsContent = `// =========================================================================
 // Locket_Tommm_Private.js - Hệ thống Locket Gold Cloud 24/7 của Tommm
 // Chủ sở hữu: Tommm (GitHub Cloud: tommm1207/locket-tommm-studio)
-// Hoạt động 24/7 không cần bật máy tính!
 // =========================================================================
 
 (function() {
@@ -260,7 +303,7 @@ const jsContent = `// ==========================================================
     const hasRequest = typeof $request !== "undefined" && $request !== null;
     const url = (hasRequest && $request.url) ? $request.url : (hasResponse && $response.url ? $response.url : "");
 
-    const TOMMM_POPUP_CONFIG = ${JSON.stringify(tommmPopup)};
+    const BASE_RC_ENTRIES = ${JSON.stringify(baseRcEntries)};
     const CUSTOM_CAMERA_FILTER_CONFIG = ${JSON.stringify(mergedFilterCfg)};
     CUSTOM_CAMERA_FILTER_CONFIG.remoteFilters = CUSTOM_CAMERA_FILTER_CONFIG.remote_filters;
     CUSTOM_CAMERA_FILTER_CONFIG.filters = CUSTOM_CAMERA_FILTER_CONFIG.remote_filters;
@@ -268,9 +311,8 @@ const jsContent = `// ==========================================================
     CUSTOM_CAMERA_FILTER_CONFIG.pickerFilters = CUSTOM_CAMERA_FILTER_CONFIG.picker_filters;
 
     const CUSTOM_OVERLAY_ITEMS = ${JSON.stringify(dvOverlays)};
-    const CUSTOM_DYNAMIC_CAPTIONS = ${dvRc.overlay_dynamic_captions};
 
-    // Mở khóa Huy hiệu Locket Gold (changeProfileInfo / fetchUserV2) ngay trên iPhone!
+    // 0. Mở khóa Huy hiệu Locket Gold (changeProfileInfo) ngay từ chiều Request
     if (!hasResponse && url.includes("changeProfileInfo")) {
         $done({
             response: {
@@ -278,7 +320,7 @@ const jsContent = `// ==========================================================
                 headers: { "Content-Type": "application/json; charset=utf-8" },
                 body: JSON.stringify({
                     "data": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true },
-                    "result": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true }
+                    "result": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true, "data": { "badge": "locket_gold", "is_gold": true } }
                 })
             }
         });
@@ -291,25 +333,32 @@ const jsContent = `// ==========================================================
     if (hasResponse) {
         let body = $response.body;
 
-        // 1.0 Mở khóa Huy hiệu Locket Gold khi Locket gọi changeProfileInfo hoặc fetchUserV2
+        // 1.0 Mở khóa Huy hiệu Locket Gold khi Locket gọi changeProfileInfo / fetchUserV2
         if (url.includes("changeProfileInfo") || url.includes("fetchUser")) {
             try {
                 let uObj = JSON.parse(body || "{}");
-                if (uObj.result && uObj.result.data) {
-                    uObj.result.data.badge = "locket_gold";
-                    uObj.result.data.is_gold = true;
-                }
-                if (uObj.data) {
+                if (!uObj || typeof uObj !== "object") uObj = {};
+                if (!uObj.result) uObj.result = { status: 200, data: {} };
+                if (!uObj.result.data) uObj.result.data = {};
+                uObj.result.data.badge = "locket_gold";
+                uObj.result.data.badge_tier = "gold";
+                uObj.result.data.is_gold = true;
+                if (uObj.data && typeof uObj.data === "object") {
                     uObj.data.badge = "locket_gold";
+                    uObj.data.badge_tier = "gold";
                     uObj.data.is_gold = true;
                 }
-                $done({
-                    status: 200,
-                    headers: { "Content-Type": "application/json; charset=utf-8" },
-                    body: JSON.stringify(uObj)
-                });
+                let respHeaders = Object.assign({}, $response.headers || {});
+                for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding"]) {
+                    delete respHeaders[h];
+                }
+                respHeaders["Content-Type"] = "application/json; charset=utf-8";
+                $done({ status: 200, headers: respHeaders, body: JSON.stringify(uObj) });
                 return;
-            } catch (_) {}
+            } catch (_) {
+                $done({});
+                return;
+            }
         }
 
         // 1.1 Mở khóa phản hồi Filter / Photobooth
@@ -324,10 +373,7 @@ const jsContent = `// ==========================================================
                 }
                 $done({
                     status: 200,
-                    headers: {
-                        "Content-Type": "application/json; charset=utf-8",
-                        "Access-Control-Allow-Origin": "*"
-                    },
+                    headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
                     body: JSON.stringify(resObj)
                 });
                 return;
@@ -337,7 +383,7 @@ const jsContent = `// ==========================================================
             }
         }
 
-        // 1.2 Mở khóa toàn diện RevenueCat Gold VIP + Tất cả Filter Lễ hội / AI / Photobooth
+        // 1.2 Mở khóa toàn diện RevenueCat Gold VIP (Dùng ngày hôm nay cho ngày lên Gold!)
         if (url.includes("revenuecat.com") || url.includes("rc-backup.com")) {
             try {
                 const allEntNames = ${JSON.stringify(fullEntitlementList)};
@@ -350,8 +396,8 @@ const jsContent = `// ==========================================================
                         "description": "Locket Gold Tommm VIP",
                         "identifier": "default",
                         "packages": [
-                            { "identifier": "$rc_annual", "platform_product_identifier": "locket_3600_1y" },
-                            { "identifier": "$rc_monthly", "platform_product_identifier": "locket_1600_1y" }
+                            { "identifier": "$rc_annual", "platform_product_identifier": "locket_1600_1y" },
+                            { "identifier": "$rc_monthly", "platform_product_identifier": "locket_3600_1y" }
                         ]
                     }];
                     $done({
@@ -383,40 +429,29 @@ const jsContent = `// ==========================================================
                 if (!obj || typeof obj !== "object") obj = {};
                 if (!obj.subscriber) obj.subscriber = {};
 
-                let appUid = obj.subscriber.original_app_user_id || "";
-                const m = url.match(/\\/subscribers\\/([^\\/\\?]+)/);
-                if (m && m[1]) appUid = decodeURIComponent(m[1]);
-
-                const purchaseDate = "2024-01-01T00:00:00Z";
-                const expiresDate = "2099-12-31T23:59:59Z";
+                // Ngày lên Locket Gold: Ngày hôm nay (2026-11-23)!
+                const purchaseDate = "2026-11-23T00:00:00Z";
+                const expiresDate = "9999-12-07T10:10:14Z";
 
                 const makeEnt = (prodId) => ({
                     "expires_date": expiresDate,
                     "grace_period_expires_date": null,
                     "product_identifier": prodId,
-                    "purchase_date": purchaseDate,
-                    "is_active": true,
-                    "will_renew": true,
-                    "period_type": "normal",
-                    "latest_purchase_date": purchaseDate,
-                    "original_purchase_date": purchaseDate,
-                    "store": "app_store",
-                    "ownership_type": "PURCHASED",
-                    "product_plan_identifier": null
+                    "purchase_date": purchaseDate
                 });
 
-                const makeSub = (prodId) => ({
+                const makeSub = (prodId, amt) => ({
                     "auto_resume_date": null,
                     "billing_issues_detected_at": null,
                     "display_name": prodId,
                     "expires_date": expiresDate,
                     "grace_period_expires_date": null,
-                    "is_sandbox": false,
+                    "is_sandbox": true,
                     "management_url": "https://apps.apple.com/account/subscriptions",
                     "original_purchase_date": purchaseDate,
                     "ownership_type": "PURCHASED",
                     "period_type": "normal",
-                    "product_plan_identifier": null,
+                    "price": { "amount": amt, "currency": "VND" },
                     "purchase_date": purchaseDate,
                     "refunded_at": null,
                     "store": "app_store",
@@ -424,22 +459,14 @@ const jsContent = `// ==========================================================
                     "unsubscribe_detected_at": null
                 });
 
-                obj.request_date = new Date().toISOString();
-                obj.request_date_ms = Date.now();
-                obj.subscriber.entitlements = {};
+                obj.subscriber.entitlements = obj.subscriber.entitlements || {};
                 for (const ename of allEntNames) {
                     obj.subscriber.entitlements[ename] = makeEnt(ename === "effect_pack_20" ? "com.locket.Locket.FilterPack_20Photos_500" : "locket_1600_1y");
                 }
-                obj.subscriber.subscriptions = {
-                    "locket_1600_1y": makeSub("locket_1600_1y"),
-                    "locket_3600_1y": makeSub("locket_3600_1y"),
-                    "locket_gold_annual": makeSub("locket_gold_annual"),
-                    "com.locket.gold.annual": makeSub("com.locket.gold.annual"),
-                    "com.locket.Locket.FilterPack_20Photos_500": makeSub("com.locket.Locket.FilterPack_20Photos_500")
-                };
-                obj.subscriber.original_purchase_date = purchaseDate;
-                obj.subscriber.first_seen = purchaseDate;
-                if (appUid) obj.subscriber.original_app_user_id = appUid;
+                obj.subscriber.subscriptions = obj.subscriber.subscriptions || {};
+                obj.subscriber.subscriptions["locket_1600_1y"] = makeSub("locket_1600_1y", 399000);
+                obj.subscriber.subscriptions["locket_3600_1y"] = makeSub("locket_3600_1y", 399000);
+                obj.subscriber.subscriptions["com.locket.Locket.FilterPack_20Photos_500"] = makeSub("com.locket.Locket.FilterPack_20Photos_500", 0);
 
                 let respHeaders = Object.assign({}, $response.headers || {});
                 for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding", "X-RevenueCat-ETag", "x-revenuecat-etag", "ETag", "etag"]) {
@@ -447,11 +474,7 @@ const jsContent = `// ==========================================================
                 }
                 respHeaders["Content-Type"] = "application/json; charset=utf-8";
 
-                $done({
-                    status: 200,
-                    headers: respHeaders,
-                    body: JSON.stringify(obj)
-                });
+                $done({ status: 200, headers: respHeaders, body: JSON.stringify(obj) });
                 return;
             } catch (e) {
                 $done({});
@@ -459,7 +482,7 @@ const jsContent = `// ==========================================================
             }
         }
 
-        // 1.3 Mở khóa Firebase Remote Config (Tommm Cloud Edition)
+        // 1.3 Mở khóa Firebase Remote Config (Kế thừa 100% 182 khóa chuẩn của DuyVinh + Thứ Ngày Đa Ngôn Ngữ + Filter)
         if (url.includes("firebaseremoteconfig")) {
             try {
                 let obj = {};
@@ -467,205 +490,9 @@ const jsContent = `// ==========================================================
                 if (!obj || typeof obj !== "object") obj = {};
 
                 obj.state = "UPDATE";
-                obj.templateVersion = String(Date.now());
-                obj.appName = "com.locket.Locket";
-
-                let entries = obj.entries || {};
-                entries["cache_ttl_seconds"] = "0";
-                entries["client_cache_ttl_sec"] = "0";
-
-                let fg = {};
-                try { fg = JSON.parse(entries["feature_gates"] || "{}"); } catch (_) { fg = {}; }
-                const gatesToEnable = [
-                    "app_icon_picker", "camera_roll", "camera_roll_video", "camera_roll_video_30s",
-                    "camera_roll_video_upload", "camera_theme", "locket_views", "long_captions",
-                    "longer_video", "longer_video_30s", "photo_library_video", "can_upload_30s_video",
-                    "can_record_30s_video", "unlimited_friends", "priority_support", "profile_badge",
-                    "profileBadge", "remove_ads", "video", "video_30s", "video_60s", "custom_widget_frames",
-                    "streaks", "groups", "camera_filter_sheet", "camera_filters", "camera_filter",
-                    "filter", "filters", "photo_filters", "ai_filters", "holiday_effects",
-                    "holiday_filters", "ar_filters", "face_filters", "camera_filter_button",
-                    "custom_filters", "create_filter", "extended_video_30s"
-                ];
-                for (const g of gatesToEnable) fg[g] = "enabled";
-                entries["feature_gates"] = JSON.stringify(fg);
-
-                entries["video_duration"] = "60";
-                entries["video_max_duration"] = "60.0";
-                entries["gold_max_duration"] = "60.0";
-                entries["goldMaxDuration"] = "60.0";
-                entries["max_video_duration"] = "60";
-                entries["max_video_length"] = "60";
-                entries["max_video_length_seconds"] = "60";
-                entries["video_length_seconds"] = "60";
-                entries["video_duration_seconds"] = "60";
-                entries["max_video_duration_seconds"] = "60";
-                entries["video_recording_duration_seconds"] = "60";
-                entries["can_record_video_duration_seconds"] = "60";
-                entries["extended_video_length_seconds"] = "60";
-                entries["longer_video_duration_seconds"] = "60";
-                entries["longer_videos_enabled"] = "true";
-                entries["longer_video_enabled"] = "true";
-                entries["can_record_long_video"] = "true";
-                entries["long_video_enabled"] = "true";
-                entries["longer_video_max_duration"] = "60";
-                entries["camera_roll_max_duration"] = "60.0";
-                entries["camera_roll_video_max_duration"] = "60.0";
-                entries["camera_roll_duration"] = "60.0";
-                entries["video_trim_max_duration"] = "60.0";
-                entries["trim_max_duration"] = "60.0";
-                entries["longer_camera_roll_videos_enabled"] = "true";
-                entries["camera_roll_video_upload_enabled"] = "true";
-                entries["camera_roll_video_enabled"] = "true";
-                entries["camera_roll_preview_enabled"] = "true";
-                entries["internal_camera_roll_video_upload_enabled"] = "true";
-                entries["camera_volume_button_enabled"] = "true";
-                entries["camera_microphone_enabled"] = "true";
-                entries["video_sound_enabled"] = "true";
-                entries["upload_main_image_quality"] = "0.85";
-                entries["upload_main_image_size"] = "1440";
-                entries["upload_thumbnail_image_quality"] = "0.85";
-                entries["upload_thumbnail_image_size"] = "1020";
-
-                entries["camera_roll"] = JSON.stringify({
-                    "gold_max_duration": 60.0,
-                    "max_duration": 60.0,
-                    "video_max_duration": 60.0,
-                    "trim_max_duration": 60.0,
-                    "camera_roll_max_duration": 60.0,
-                    "video_length": 60.0,
-                    "quality_mbps": 0.8,
-                    "video": true,
-                    "video_enabled": true,
-                    "upload_enabled": true,
-                    "allow_video": true
-                });
-                entries["camera"] = JSON.stringify({
-                    "gold_max_duration": 60.0,
-                    "max_duration": 60.0,
-                    "ultra_wide": true,
-                    "volume_button": true,
-                    "flash_button": true,
-                    "telephoto": true,
-                    "video_max_duration": 60.0,
-                    "video_duration": 60.0
-                });
-                entries["camera_config"] = entries["camera"];
-
-                entries["max_friends_count"] = "999999999";
-                entries["signup_max_friends_count"] = "999999999";
-                entries["unlimited_max_friend_count"] = "999999999";
-                entries["soft_friend_limit_threshold_count"] = "999999999";
-                entries["unlimited_friends_prompt_config"] = JSON.stringify({"minimum_friends_count": 0, "show": false});
-                entries["get_moment_views_as_cloud_function"] = "false";
-                entries["moment_views_enabled"] = "true";
-                entries["moment_views_v2"] = "true";
-                entries["record_moment_views"] = "true";
-                entries["notify_moment_views"] = "true";
-                entries["moment_reactions_v2"] = "true";
-                entries["fetch_moments_in_conversation"] = "true";
-                entries["chat_read_receipts"] = "true";
-                entries["get_latest_moment_v2"] = "true";
-
-                entries["gold_subscription_override"] = "true";
-                entries["android_gold_subscription_override"] = "true";
-                entries["is_gold"] = "true";
-                entries["has_gold"] = "true";
-                entries["gold_active"] = "true";
-                entries["v2_refresh"] = "true";
-                entries["profile_badge_visible"] = "true";
-                entries["lunar_new_year_app_icon_enabled"] = "true";
-
-                entries["sentry_sample_rate"] = "0";
-                entries["sentry_network_tracing"] = "false";
-                entries["sentry_performance_tracking"] = "false";
-                entries["sentry_trace_sample_rate"] = "0";
-                entries["sentry_profiles_sample_rate"] = "0";
-                entries["history_ads_mode"] = "off";
-                entries["history_ads_prefetch_count"] = "0";
-                entries["history_ads_prefetch_immediate"] = "false";
-                entries["history_ads_dynamic_insertion"] = "false";
-
-                delete entries["widget_frame_event"];
-                delete entries["synced_widget_frame"];
-                delete entries["last_synced_widget_frame_event"];
-                entries["feature_discovery_popup_config"] = JSON.stringify(TOMMM_POPUP_CONFIG);
-
-                delete entries["paywall_config"];
-                entries["paywall_presentation_config"] = JSON.stringify({
-                    "uid": "paywall_testflight",
-                    "onboarding": false,
-                    "after_sent_moment": false,
-                    "after_moment": false,
-                    "after_capture": false,
-                    "on_foreground": false,
-                    "holiday_effects": false,
-                    "camera_filters": false,
-                    "camera_filter": false,
-                    "filters": false,
-                    "filter": false,
-                    "ai_filter": false,
-                    "ai_filters": false,
-                    "filtered_image": false,
-                    "filtered_images": false,
-                    "generate_filtered_image": false,
-                    "interval": 2592000,
-                    "profile_banner": false
-                });
-                entries["upsell_features"] = JSON.stringify({
-                    "app_icon_picker": false,
-                    "camera_roll": false,
-                    "camera_theme": false,
-                    "locket_views": false,
-                    "remove_ads": false,
-                    "custom_widget_frames": false,
-                    "filter": false,
-                    "filters": false,
-                    "camera_filter": false,
-                    "camera_filters": false,
-                    "holiday_filter": false,
-                    "holiday_filters": false,
-                    "ai_filter": false,
-                    "ai_filters": false
-                });
-
-                entries["camera_filter_config"] = JSON.stringify(CUSTOM_CAMERA_FILTER_CONFIG);
-                entries["camera_filter_fetch_cache_max_age_seconds"] = "0";
-                entries["camera_filter_storage_bucket"] = "gs://locket-filters";
-                entries["overlay_items"] = JSON.stringify(CUSTOM_OVERLAY_ITEMS);
-                entries["overlay_dynamic_captions"] = JSON.stringify(CUSTOM_DYNAMIC_CAPTIONS);
-                entries["overlay_navigator_enabled"] = "true";
-                entries["overlays_v2_config"] = JSON.stringify({"suggestions_enabled": true});
-                entries["captions_enabled"] = "true";
-                entries["music_caption_enabled"] = "true";
-                entries["music_caption_song_preview_enabled"] = "true";
-                entries["link_caption_link_enabled"] = "true";
-                entries["star_sign_caption_image_url"] = "https://storage.googleapis.com/locket-public/overlays/star_signs";
-                entries["live_photos"] = JSON.stringify({"capture":true,"video":true,"viewing":true,"catch_up":true,"widget_playback":true,"widget_looping_mode":"unseen"});
-                entries["capture_classification_config"] = JSON.stringify({"detection":true,"debug_caption":false,"expanded_sheet_legacy_support":true,"display_reaction_suggestions":true});
-                entries["custom_profile_pics"] = "true";
-                entries["rollcall_enabled"] = "true";
-                entries["rollcall_comment_actions"] = "true";
-                entries["rollcall_profile_button"] = "true";
-                entries["rollcall_prompt_export_after_share"] = "true";
-                entries["rollcall_confirm_skip_tagging"] = "false";
-                entries["rollcall_tap_to_tag_enabled"] = "true";
-                entries["rollcall_memories_streaks_enabled"] = "true";
-                entries["rollcall_profile_memories_enabled"] = "true";
-                entries["rollcall_profile_memories_config"] = JSON.stringify({"useBadgeFetchMode":true,"sharePreviews":true,"currentWeekPlaceholder":true,"historyRefreshTTLSeconds":0});
-                entries["rollcall_banner_config"] = JSON.stringify({"display_mode":"active","autoPresentBanner":true,"auto_present_banner":true,"longPressEnabled":true,"long_press_enabled":true,"addPostBadgeEnabled":true,"add_post_badge_enabled":true,"start_at":"2020-01-01T00:00:00","end_at":"2099-12-31T23:59:59"});
-                entries["rollcall_banner_v2_config"] = JSON.stringify({"fetchLimit":100,"ignoreTimeRange":true,"liveActivityStartShortcut":true,"noFilter":true});
-                entries["rollcall_banner_treatment"] = "image_stack";
-                entries["rollcall_share_templates"] = JSON.stringify({"templates":["bold","pop_off","stacking","full_screen","shadow_box","collage","pop_collage"],"random_order":false});
-                entries["time_travel_rewind_v2_enabled"] = "true";
-                entries["time_travel_rewind_v2_share_templates"] = JSON.stringify({"templates":["rounded_square","grid_collage","cutout_collage","rounded_square_bold","wall_calendar"],"random_order":false});
-                entries["locket_yearbook_story_sharing_encouraged"] = "true";
-                entries["calendar_delete_moment_enabled"] = "true";
-                entries["calendar_rewind_enabled"] = "true";
-                entries["share_history_config"] = JSON.stringify({"prompt_enabled":true,"fetching_enabled":true});
-                entries["group_scrapbook_config"] = JSON.stringify({"enabled":true,"moment_limit":999999999,"default_layout":{"show_member_joined":true,"parallax_percentage":50,"is_device_motion_enabled":true}});
-
-                obj.entries = entries;
+                obj.entries = Object.assign({}, obj.entries || {}, BASE_RC_ENTRIES);
+                obj.entries["camera_filter_config"] = JSON.stringify(CUSTOM_CAMERA_FILTER_CONFIG);
+                obj.entries["overlay_items"] = JSON.stringify(CUSTOM_OVERLAY_ITEMS);
 
                 let respHeaders = Object.assign({}, $response.headers || {});
                 for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding", "ETag", "etag"]) {
@@ -673,11 +500,7 @@ const jsContent = `// ==========================================================
                 }
                 respHeaders["Content-Type"] = "application/json; charset=utf-8";
 
-                $done({
-                    status: 200,
-                    headers: respHeaders,
-                    body: JSON.stringify(obj)
-                });
+                $done({ status: 200, headers: respHeaders, body: JSON.stringify(obj) });
                 return;
             } catch (e) {
                 $done({});
@@ -690,7 +513,7 @@ const jsContent = `// ==========================================================
     }
 
     // =========================================================================
-    // 2. CHIỀU REQUEST (Xóa Cache ETag & Xử lý Filter Offline 24/7 ngay trên iPhone!)
+    // 2. CHIỀU REQUEST (Xóa Cache ETag & Xử lý getFilters)
     // =========================================================================
     const reqUrl = (hasRequest && $request.url) ? $request.url : "";
     let reqHeaders = Object.assign({}, ($request && $request.headers) || {});
@@ -708,10 +531,7 @@ const jsContent = `// ==========================================================
         $done({
             response: {
                 status: 200,
-                headers: {
-                    "Content-Type": "application/json; charset=utf-8",
-                    "Access-Control-Allow-Origin": "*"
-                },
+                headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
                 body: JSON.stringify({
                     "result": { "data": { "filters": filterList }, "status": 200 },
                     "data": { "filters": filterList },
@@ -728,7 +548,8 @@ const jsContent = `// ==========================================================
 
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.js'), jsContent, 'utf8');
 
-// 4. Build Locket_Tommm_Private.conf (Public version without private CA p12 for GitHub repo, and Full version with CA p12 for iPhone)
+// 4. Build Locket_Tommm_Cloud.conf and Locket_Tommm_Private.conf
+// IMPORTANT: Add api.locketcamera.com to [Script] and [MITM] so changeProfileInfo / fetchUserV2 is intercepted and Gold Badge toggle works!
 const allInOneExisting = fs.readFileSync(path.join(dataDir, 'All_In_One.db'), 'utf8');
 const caPassMatch = allInOneExisting.match(/ca-passphrase\s*=\s*(.+)/);
 const caP12Match = allInOneExisting.match(/ca-p12\s*=\s*(.+)/);
@@ -737,7 +558,7 @@ const caP12 = caP12Match ? caP12Match[1].trim() : '';
 
 function makeConf(includeP12) {
     return `#!name=Locket Gold Tommm Cloud 24/7 (100% Owned by Tommm)
-#!desc=Hệ thống Locket Gold Cloud 24/7 của Tommm - Không cần bật PC, 330+ Captions, Filter & All Apps
+#!desc=Hệ thống Locket Gold Cloud 24/7 của Tommm - Không cần bật PC, 360+ Captions, Thứ Ngày Đa Ngôn Ngữ, Video 60s
 [General]
 bypass-system = true
 skip-proxy = 192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12, 127.0.0.1, localhost, *.local, *.crashlytics.com
@@ -748,7 +569,6 @@ skip-cert-verify = true
 update-url = ${ghRawBase}/Locket_Tommm_Cloud.conf
 
 [Rule]
-# Chặn hoàn toàn các dịch vụ thu thập dữ liệu / báo cáo lỗi của Locket để tàng hình 100%
 DOMAIN-SUFFIX,sentry.io,REJECT
 DOMAIN-SUFFIX,crashlytics.com,REJECT
 DOMAIN-SUFFIX,amplitude.com,REJECT
@@ -763,7 +583,6 @@ DOMAIN-SUFFIX,locketcamera.com,DIRECT
 FINAL,DIRECT
 
 [URL Rewrite]
-# Chặn quảng cáo Google Video & YouTube Ads
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/(?!(dclk_video_ads|videoplayback\\?)).+&oad _ reject-200
 ^https?:\\/\\/(www|s)\\.youtube\\.com\\/api\\/stats\\/ads _ reject-200
 ^https?:\\/\\/(www|s)\\.youtube\\.com\\/(pagead|ptracking) _ reject-200
@@ -771,7 +590,6 @@ FINAL,DIRECT
 (^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/(?!dclk_video_ads).+?)&ctier=L(&.+?),ctier,(.+) $1$2$3 302
 
 [Header Rewrite]
-# Chống cache 304 Not Modified để luôn kích hoạt Gold, Filter & 330+ Captions ngay trên iPhone của Tommm
 http-request ^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.* header-del x-revenuecat-etag
 http-request ^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.* header-del X-RevenueCat-ETag
 http-request ^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.* header-del If-None-Match
@@ -791,7 +609,8 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 tommm_strip_rc = type=http-request,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 tommm_strip_fb = type=http-request,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_cf = type=http-request,pattern=^https?:\\/\\/us-central1-locket-4252a\\.cloudfunctions\\.net\\/(getFilters|createFilter|changeProfileInfo).*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_cf = type=http-request,pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(getFilters|createFilter|changeProfileInfo).*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_badge_res = type=http-response,pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser).*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 tommm_RC_Gold = type=http-response,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 tommm_Firebase = type=http-response,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 
@@ -819,11 +638,10 @@ Meitu = type=http-response,pattern=^https?:\\/\\/(h5|api)\\.xiuxiu\\.meitu\\.com
 [MITM]
 ${includeP12 ? `ca-passphrase = ${caPassphrase}\nca-p12 = ${caP12}\n` : ''}enable = true
 skip-server-cert-verify = true
-hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, premium*.truecaller.com, sub.store, api.revenuecat.com, *.revenuecat.com, rc-backup.revenuecat.com, api.rc-backup.com, firebaseremoteconfig.googleapis.com, *.firebaseremoteconfig.googleapis.com, firebaseremoteconfigrealtime.googleapis.com, *.firebaseremoteconfigrealtime.googleapis.com, us-central1-locket-4252a.cloudfunctions.net, buy.itunes.apple.com, spclient.wg.spotify.com, *spclient.spotify.com, api-mobile.soundcloud.com, api.picsart.com, us-central1-alight-creative.cloudfunctions.net, api-sub.meitu.com, photos.adobe.io, ap*.intsig.net, api-account.kinemasters.com, api.mr.pixocial.com, newbeee-api.beautyplus.com, user-snow-api.snow.me, h5.xiuxiu.meitu.com, api.xiuxiu.meitu.com
+hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, premium*.truecaller.com, sub.store, api.revenuecat.com, *.revenuecat.com, rc-backup.revenuecat.com, api.rc-backup.com, firebaseremoteconfig.googleapis.com, *.firebaseremoteconfig.googleapis.com, firebaseremoteconfigrealtime.googleapis.com, *.firebaseremoteconfigrealtime.googleapis.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com, buy.itunes.apple.com, spclient.wg.spotify.com, *spclient.spotify.com, api-mobile.soundcloud.com, api.picsart.com, us-central1-alight-creative.cloudfunctions.net, api-sub.meitu.com, photos.adobe.io, ap*.intsig.net, api-account.kinemasters.com, api.mr.pixocial.com, newbeee-api.beautyplus.com, user-snow-api.snow.me, h5.xiuxiu.meitu.com, api.xiuxiu.meitu.com
 `;
 }
 
-// Write public cloud conf (without private p12 key so GitHub stays safe) and local iPhone conf (with trusted p12 key)
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Cloud.conf'), makeConf(false), 'utf8');
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.conf'), makeConf(true), 'utf8');
-console.log("Generated Cloud 24/7 configs for GitHub repo tommm1207/locket-tommm-studio");
+console.log("Successfully rebuilt Cloud 24/7 edition with 100% DuyVinh 182 RC keys + custom_ prefix captions + 2026-11-23 date!");
