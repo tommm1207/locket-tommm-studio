@@ -40,8 +40,19 @@ fs.writeFileSync(path.join(baseDir, 'js_tommm_deleteHeader.js'), deleteHeaderJs,
 // Chuẩn 100% cấu trúc RevenueCat đã kiểm chứng trên Locket iOS!
 // =========================================================================
 const locketGoldJs = `// Tommm Private - Locket Gold VIP + Filter Pack (RevenueCat)
+// Tự động ghi nhớ đúng ngày người dùng kích hoạt lần đầu bằng $persistentStore!
 var obj = JSON.parse($response.body || "{}");
-var PURCHASE_DATE = "2026-11-23T00:00:00Z";
+var STORE_KEY = "tommm_locket_gold_first_date";
+var PURCHASE_DATE = "";
+if (typeof $persistentStore !== "undefined") {
+    PURCHASE_DATE = $persistentStore.read(STORE_KEY) || "";
+    if (!PURCHASE_DATE) {
+        PURCHASE_DATE = new Date().toISOString().replace(/\\.\\d{3}Z$/, "Z");
+        $persistentStore.write(PURCHASE_DATE, STORE_KEY);
+    }
+} else {
+    PURCHASE_DATE = new Date().toISOString().replace(/\\.\\d{3}Z$/, "Z");
+}
 var FAR_FUTURE = "9999-12-07T10:10:14Z";
 
 function makeSub(displayName, amount, currency) {
