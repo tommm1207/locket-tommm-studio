@@ -4,8 +4,8 @@ const path = require('path');
 const baseDir = 'D:\\Locket_Gold_Tommm';
 const dataDir = path.join(baseDir, 'data');
 
-// Use jsDelivr CDN pointing directly to Tommm's own GitHub repo: tommm1207/locket-tommm-studio
-const ghCdnBase = 'https://cdn.jsdelivr.net/gh/tommm1207/locket-tommm-studio@main';
+// Use raw.githubusercontent.com directly so updates are 100% instant (zero CDN cache delay!)
+const ghCdnBase = 'https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main';
 const ghRawBase = 'https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main';
 
 const dvRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'duyvinh_rc_output.json'), 'utf8')).entries;
