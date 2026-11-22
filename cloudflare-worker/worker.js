@@ -1,12 +1,11 @@
 // =========================================================================
 // Cloudflare Worker 24/7 - Locket Gold AI Filter Engine (By Tommm)
-// Hỗ trợ:
-// 1. Xoay vòng nhiều API Key (GEMINI_API_KEYS lưu bảo mật trong Cloudflare Secrets)
-// 2. Model siêu nhanh & tiết kiệm: gemini-3.1-flash-lite-image (tự fallback gemini-3.1-flash-image)
-// 3. Hỗ trợ người dùng TỰ TẠO Filter AI mới trực tiếp trong Locket (nhận prompt động)
-// 4. Lưu ảnh kết quả tạm trong Cloudflare Cache API (tự động xóa sau 15 phút, bảo mật tuyệt đối!)
+// - 100% MIỄN PHÍ 24/7 bằng Cloudflare Workers AI (img2img + flux-1-schnell)
+// - Lưu ảnh tạm bằng In-Memory Map (hoạt động 100% trên *.workers.dev, không bị 404 như caches.default!)
+// - Tự động dọn ảnh khỏi RAM sau 5 phút -> bảo mật tuyệt đối!
 // =========================================================================
 
+const MEMORY_IMAGES = new Map();
 let keyIndex = 0;
 
 function corsHeaders(extra = {}) {
@@ -18,6 +17,13 @@ function corsHeaders(extra = {}) {
     },
     extra
   );
+}
+
+function cleanupMemoryImages() {
+  const now = Date.now();
+  for (const [k, v] of MEMORY_IMAGES.entries()) {
+    if (now - v.ts > 300000) MEMORY_IMAGES.delete(k);
+  }
 }
 
 function arrayBufferToBase64(buffer) {
@@ -39,50 +45,60 @@ function base64ToUint8Array(base64) {
   return bytes;
 }
 
-async function getInputImageBase64(dataNode) {
-  for (const k of ["image", "imageBase64", "image_base64", "base64", "photo"]) {
-    const val = dataNode[k];
-    if (typeof val === "string" && val.length > 200 && !val.startsWith("http")) {
-      return val.includes(",") ? val.split(",", 2)[1] : val;
+function findFirstStringUrl(obj, depth = 0) {
+  if (!obj || depth > 4) return null;
+  if (typeof obj === "string" && obj.startsWith("http")) return obj;
+  if (typeof obj === "object") {
+    for (const k of [
+      "imageUrl", "image_url", "inputImageUrl", "input_image_url",
+      "photoUrl", "photo_url", "url", "sourceUrl", "source_url", "downloadUrl", "download_url"
+    ]) {
+      if (typeof obj[k] === "string" && obj[k].startsWith("http")) return obj[k];
     }
-  }
-  for (const k of ["imageUrl", "image_url", "url", "photoUrl", "photo_url", "inputUrl"]) {
-    const val = dataNode[k];
-    if (typeof val === "string" && val.startsWith("http")) {
-      const r = await fetch(val, { headers: { "User-Agent": "Locket/1.0" } });
-      if (r.ok) {
-        const buf = await r.arrayBuffer();
-        return arrayBufferToBase64(buf);
-      }
+    for (const v of Object.values(obj)) {
+      const found = findFirstStringUrl(v, depth + 1);
+      if (found) return found;
     }
   }
   return null;
 }
 
-async function callGeminiImageEdit(env, imgBase64, promptText) {
+async function getInputImageBytes(dataNode) {
+  // 1. Base64 in payload
+  for (const k of ["image", "imageBase64", "image_base64", "base64", "photo"]) {
+    const val = dataNode?.[k];
+    if (typeof val === "string" && val.length > 200 && !val.startsWith("http")) {
+      const clean = val.includes(",") ? val.split(",", 2)[1] : val;
+      return base64ToUint8Array(clean);
+    }
+  }
+  // 2. Firebase Storage / HTTP URL in payload
+  const imgUrl = findFirstStringUrl(dataNode);
+  if (imgUrl) {
+    try {
+      const r = await fetch(imgUrl, { headers: { "User-Agent": "Locket/1.0" } });
+      if (r.ok) {
+        return new Uint8Array(await r.arrayBuffer());
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function callGeminiImageEdit(env, imgBytes, promptText) {
   const rawKeys = env.GEMINI_API_KEYS || env.GEMINI_API_KEY || "";
   const keys = rawKeys.split(",").map((k) => k.trim()).filter(Boolean);
   if (keys.length === 0) return null;
 
-  const models = [
-    env.GEMINI_MODEL || "gemini-3.1-flash-lite-image",
-    "gemini-3.1-flash-image",
-    "gemini-2.5-flash-image",
-  ];
+  const imgBase64 = imgBytes ? arrayBufferToBase64(imgBytes.buffer) : null;
+  const models = [env.GEMINI_MODEL || "gemini-3.1-flash-lite-image", "gemini-3.1-flash-image"];
 
   for (let attempt = 0; attempt < keys.length; attempt++) {
     const apiKey = keys[(keyIndex++) % keys.length];
     for (const model of models) {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const parts = [{ text: promptText }];
-      if (imgBase64) {
-        parts.unshift({
-          inline_data: {
-            mime_type: "image/jpeg",
-            data: imgBase64,
-          },
-        });
-      }
+      if (imgBase64) parts.unshift({ inline_data: { mime_type: "image/jpeg", data: imgBase64 } });
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -104,25 +120,22 @@ async function callGeminiImageEdit(env, imgBase64, promptText) {
           }
         }
       }
-      // Nếu lỗi 429 (hết quota) thì thoát vòng model để nhảy ngay sang API Key tiếp theo!
       if (res.status === 429) break;
     }
   }
   return null;
 }
 
-async function callCloudflareFreeAI(env, imgBase64, promptText) {
+async function callCloudflareFreeAI(env, imgBytes, promptText) {
   if (!env.AI) return null;
   try {
-    // Nếu có ảnh gốc từ Locket -> dùng img2img miễn phí ngay trên GPU Cloudflare!
-    if (imgBase64) {
-      const imgBytes = Array.from(base64ToUint8Array(imgBase64));
+    if (imgBytes && imgBytes.length > 0) {
       const res = await env.AI.run("@cf/runwayml/stable-diffusion-v1-5-img2img", {
         prompt: promptText,
-        image: imgBytes,
+        image: [...imgBytes],
         strength: 0.45,
         guidance: 7.5,
-        num_steps: 15,
+        num_steps: 12,
       });
       if (res instanceof ReadableStream) {
         const buf = await new Response(res).arrayBuffer();
@@ -132,7 +145,10 @@ async function callCloudflareFreeAI(env, imgBase64, promptText) {
         return { bytes: new Uint8Array(res), mimeType: "image/png" };
       }
     }
-    // Fallback tạo ảnh siêu nhanh miễn phí bằng FLUX.1 Schnell
+  } catch (e) {
+    console.log("img2img fallback to flux:", e);
+  }
+  try {
     const fluxRes = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
       prompt: promptText,
       steps: 4,
@@ -141,7 +157,7 @@ async function callCloudflareFreeAI(env, imgBase64, promptText) {
       return { bytes: base64ToUint8Array(fluxRes.image), mimeType: "image/jpeg" };
     }
   } catch (e) {
-    console.log("Cloudflare Free AI fallback error:", e);
+    console.log("flux error:", e);
   }
   return null;
 }
@@ -152,35 +168,39 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
+    cleanupMemoryImages();
     const url = new URL(request.url);
-    const cache = caches.default;
 
-    // 1. Health check
+    // 1. Status endpoint
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/status")) {
-      const keysCount = (env.GEMINI_API_KEYS || env.GEMINI_API_KEY || "")
-        .split(",")
-        .map((k) => k.trim())
-        .filter(Boolean).length;
       return new Response(
         JSON.stringify({
           status: "online",
-          platform: "Cloudflare Workers 24/7",
+          platform: "Cloudflare Workers 24/7 (Free Workers AI)",
           owner: "Tommm",
-          model: env.GEMINI_MODEL || "gemini-3.1-flash-lite-image",
-          keys_configured: keysCount,
+          cached_images_in_ram: MEMORY_IMAGES.size,
         }),
         { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
       );
     }
 
-    // 2. Trả ảnh kết quả từ Cloudflare Edge Cache (tự động hết hạn sau 15 phút)
+    // 2. Serve generated image from RAM (works 100% on *.workers.dev!)
     if (request.method === "GET" && url.pathname.startsWith("/ai-filters/")) {
-      const cached = await cache.match(request);
-      if (cached) return cached;
-      return new Response("Image expired or not found", { status: 404, headers: corsHeaders() });
+      const id = url.pathname.slice("/ai-filters/".length);
+      const item = MEMORY_IMAGES.get(id);
+      if (item) {
+        return new Response(item.bytes, {
+          status: 200,
+          headers: corsHeaders({
+            "Content-Type": item.mimeType,
+            "Cache-Control": "public, max-age=300",
+          }),
+        });
+      }
+      return new Response("Image expired", { status: 404, headers: corsHeaders() });
     }
 
-    // 3. Xử lý tạo ảnh Filter AI (bao gồm cả Filter có sẵn & Filter người dùng TỰ TẠO prompt mới trong Locket!)
+    // 3. Handle Locket generateFilteredImage / applyFilter / createOverlay
     if (
       request.method === "POST" &&
       (url.pathname.includes("generateFilteredImage") ||
@@ -198,39 +218,29 @@ export default {
         dataNode.prompt ||
         dataNode.filterPrompt ||
         dataNode.customPrompt ||
-        `Apply a creative, high quality aesthetic photo filter (${filterId}) while strictly preserving the person's identity, pose, and natural lighting.`;
+        `Apply a creative aesthetic filter (${filterId}) to the photo while preserving the person's face and natural lighting.`;
 
-      const imgBase64 = await getInputImageBase64(dataNode);
-      // Ưu tiên 1: Gemini API (nếu có key còn quota) -> Ưu tiên 2: Cloudflare Workers AI MIỄN PHÍ 100% (10,000 neurons/ngày)
-      let aiResult = await callGeminiImageEdit(env, imgBase64, customPrompt);
+      const imgBytes = await getInputImageBytes(dataNode);
+      let aiResult = await callGeminiImageEdit(env, imgBytes, customPrompt);
       if (!aiResult) {
-        aiResult = await callCloudflareFreeAI(env, imgBase64, customPrompt);
+        aiResult = await callCloudflareFreeAI(env, imgBytes, customPrompt);
       }
 
       if (!aiResult) {
         return new Response(
-          JSON.stringify({
-            result: {
-              status: 503,
-              error: "AI engine busy. Make sure Cloudflare Workers AI binding [ai] is enabled.",
-            },
-          }),
+          JSON.stringify({ result: { status: 503, error: "AI engine temporarily unavailable" } }),
           { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
         );
       }
 
-      // Lưu ảnh tạm 15 phút vào Cloudflare Edge Cache
       const outId = `tommm_${crypto.randomUUID().slice(0, 12)}.jpg`;
-      const outUrl = `${url.origin}/ai-filters/${outId}`;
-      const imgResp = new Response(aiResult.bytes, {
-        status: 200,
-        headers: corsHeaders({
-          "Content-Type": aiResult.mimeType,
-          "Cache-Control": "public, max-age=900",
-        }),
+      MEMORY_IMAGES.set(outId, {
+        bytes: aiResult.bytes,
+        mimeType: aiResult.mimeType,
+        ts: Date.now(),
       });
-      ctx.waitUntil(cache.put(new Request(outUrl, { method: "GET" }), imgResp));
 
+      const outUrl = `${url.origin}/ai-filters/${outId}`;
       const jsonResp = {
         result: {
           outputUrl: outUrl,
@@ -238,6 +248,8 @@ export default {
           url: outUrl,
           imageUrl: outUrl,
           image_url: outUrl,
+          filteredImageUrl: outUrl,
+          filtered_image_url: outUrl,
           status: 200,
           is_gold: true,
           is_locked: false,
@@ -245,9 +257,18 @@ export default {
           unlocked: true,
           out_of_credits: false,
           ai_credits: 999999,
-          data: { outputUrl: outUrl, url: outUrl, imageUrl: outUrl },
+          data: {
+            outputUrl: outUrl,
+            output_url: outUrl,
+            url: outUrl,
+            imageUrl: outUrl,
+            image_url: outUrl,
+            filteredImageUrl: outUrl,
+            filtered_image_url: outUrl,
+          },
         },
         outputUrl: outUrl,
+        output_url: outUrl,
         url: outUrl,
         imageUrl: outUrl,
         status: 200,
