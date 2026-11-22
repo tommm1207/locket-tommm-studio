@@ -258,11 +258,11 @@ baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
     "title": "✨Tommm✨",
     "feature_set": [{
         "title": "Trải nghiệm Locket Gold nào! 💛",
-        "body": "Chúc mừng bạn mở khoá thành công Locket Gold! Hãy cùng lưu giữ khoảnh khắc đáng nhớ và tận hưởng những tính năng cao cấp của Locket Gold nhé!\n✨Tommm✨",
+        "body": "Chúc mừng bạn mở khoá thành công Locket Gold! Hãy cùng lưu giữ khoảnh khắc đáng nhớ và tận hưởng những tính năng cao cấp nhé!\n✨Tommm✨",
         "imageURL": "https://tommm1207.github.io/locket-tommm-studio/assets/welcome_icon.png"
     }],
     "primary_button_title": "Bắt đầu ngay",
-    "campaign": "locket_gold_welcome_by_tommm_v12",
+    "campaign": "locket_gold_welcome_by_tommm_v13",
     "start_at": "2020-01-01T00:00:00",
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
@@ -378,7 +378,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=12, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=13, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
@@ -443,7 +443,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 [Script]
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=12, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=13, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
