@@ -138,7 +138,45 @@ for (const sec of vpsOverlays) {
     }
 }
 
-dvOverlays.splice(1, 0, tommmExclusiveSection);
+const weekdayCaptionsSection = {
+    section: "📅 Thứ Ngày Đa Ngôn Ngữ (VI • EN • ZH • TW • DE)",
+    items: [
+        // Tiếng Việt
+        { overlay_id: "caption:day_vi_2", source: "remote", caption: { type: "static_content", text: "THỨ HAI", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:day_vi_3", source: "remote", caption: { type: "static_content", text: "THỨ BA", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:day_vi_4", source: "remote", caption: { type: "static_content", text: "THỨ TƯ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:day_vi_5", source: "remote", caption: { type: "static_content", text: "THỨ NĂM", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:day_vi_6", source: "remote", caption: { type: "static_content", text: "THỨ SÁU", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:day_vi_7", source: "remote", caption: { type: "static_content", text: "THỨ BẢY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#0F172A", "#334155"] } } },
+        { overlay_id: "caption:day_vi_8", source: "remote", caption: { type: "static_content", text: "CHỦ NHẬT", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇻🇳" }, background: { colors: ["#991B1B", "#DC2626"] } } },
+        // English
+        { overlay_id: "caption:day_en_2", source: "remote", caption: { type: "static_content", text: "MONDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:day_en_3", source: "remote", caption: { type: "static_content", text: "TUESDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:day_en_4", source: "remote", caption: { type: "static_content", text: "WEDNESDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:day_en_5", source: "remote", caption: { type: "static_content", text: "THURSDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:day_en_6", source: "remote", caption: { type: "static_content", text: "FRIDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:day_en_7", source: "remote", caption: { type: "static_content", text: "SATURDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#1E3A8A", "#2563EB"] } } },
+        { overlay_id: "caption:day_en_8", source: "remote", caption: { type: "static_content", text: "SUNDAY", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇬🇧" }, background: { colors: ["#BE123C", "#F43F5E"] } } },
+        // Tiếng Trung Giản Thể / Đài Loan Phồn Thể (星期 / 禮拜)
+        { overlay_id: "caption:day_zh_2", source: "remote", caption: { type: "static_content", text: "星期一 • 禮拜一", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:day_zh_3", source: "remote", caption: { type: "static_content", text: "星期二 • 禮拜二", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:day_zh_4", source: "remote", caption: { type: "static_content", text: "星期三 • 禮拜三", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:day_zh_5", source: "remote", caption: { type: "static_content", text: "星期四 • 禮拜四", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:day_zh_6", source: "remote", caption: { type: "static_content", text: "星期五 • 禮拜五", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:day_zh_7", source: "remote", caption: { type: "static_content", text: "星期六 • 禮拜六", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#7C2D12", "#EA580C"] } } },
+        { overlay_id: "caption:day_zh_8", source: "remote", caption: { type: "static_content", text: "星期日 • 禮拜天", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇹🇼" }, background: { colors: ["#991B1B", "#EF4444"] } } },
+        // Tiếng Đức (Deutsch)
+        { overlay_id: "caption:day_de_2", source: "remote", caption: { type: "static_content", text: "MONTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:day_de_3", source: "remote", caption: { type: "static_content", text: "DIENSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:day_de_4", source: "remote", caption: { type: "static_content", text: "MITTWOCH", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:day_de_5", source: "remote", caption: { type: "static_content", text: "DONNERSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:day_de_6", source: "remote", caption: { type: "static_content", text: "FREITAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:day_de_7", source: "remote", caption: { type: "static_content", text: "SAMSTAG", max_lines: 1, text_color: "#0F172A", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#FACC15", "#F59E0B"] } } },
+        { overlay_id: "caption:day_de_8", source: "remote", caption: { type: "static_content", text: "SONNTAG", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🇩🇪" }, background: { colors: ["#B91C1C", "#F59E0B"] } } }
+    ]
+};
+
+dvOverlays.splice(1, 0, tommmExclusiveSection, weekdayCaptionsSection);
 
 // 2. Build Camera Filter Config pointing to Tommm's GitHub CDN (24/7 Cloud!)
 const mergedFilterCfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'merged_camera_filter_config.json'), 'utf8'));
@@ -571,8 +609,25 @@ const jsContent = `// ==========================================================
                 entries["capture_classification_config"] = JSON.stringify({"detection":true,"debug_caption":false,"expanded_sheet_legacy_support":true,"display_reaction_suggestions":true});
                 entries["custom_profile_pics"] = "true";
                 entries["rollcall_enabled"] = "true";
+                entries["rollcall_comment_actions"] = "true";
+                entries["rollcall_profile_button"] = "true";
+                entries["rollcall_prompt_export_after_share"] = "true";
+                entries["rollcall_confirm_skip_tagging"] = "false";
+                entries["rollcall_tap_to_tag_enabled"] = "true";
+                entries["rollcall_memories_streaks_enabled"] = "true";
+                entries["rollcall_profile_memories_enabled"] = "true";
+                entries["rollcall_profile_memories_config"] = JSON.stringify({"useBadgeFetchMode":true,"sharePreviews":true,"currentWeekPlaceholder":true,"historyRefreshTTLSeconds":0});
+                entries["rollcall_banner_config"] = JSON.stringify({"display_mode":"active","autoPresentBanner":true,"auto_present_banner":true,"longPressEnabled":true,"long_press_enabled":true,"addPostBadgeEnabled":true,"add_post_badge_enabled":true,"start_at":"2020-01-01T00:00:00","end_at":"2099-12-31T23:59:59"});
+                entries["rollcall_banner_v2_config"] = JSON.stringify({"fetchLimit":100,"ignoreTimeRange":true,"liveActivityStartShortcut":true,"noFilter":true});
+                entries["rollcall_banner_treatment"] = "image_stack";
+                entries["rollcall_share_templates"] = JSON.stringify({"templates":["bold","pop_off","stacking","full_screen","shadow_box","collage","pop_collage"],"random_order":false});
                 entries["time_travel_rewind_v2_enabled"] = "true";
+                entries["time_travel_rewind_v2_share_templates"] = JSON.stringify({"templates":["rounded_square","grid_collage","cutout_collage","rounded_square_bold","wall_calendar"],"random_order":false});
+                entries["locket_yearbook_story_sharing_encouraged"] = "true";
                 entries["calendar_delete_moment_enabled"] = "true";
+                entries["calendar_rewind_enabled"] = "true";
+                entries["share_history_config"] = JSON.stringify({"prompt_enabled":true,"fetching_enabled":true});
+                entries["group_scrapbook_config"] = JSON.stringify({"enabled":true,"moment_limit":999999999,"default_layout":{"show_member_joined":true,"parallax_percentage":50,"is_device_motion_enabled":true}});
 
                 obj.entries = entries;
 
