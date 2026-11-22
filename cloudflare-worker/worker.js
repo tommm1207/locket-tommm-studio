@@ -89,7 +89,10 @@ async function getInputImageBytes(dataNode, authHeader) {
     try {
       const hdrs = { "User-Agent": "Locket/1.0" };
       if (authHeader) hdrs["Authorization"] = authHeader;
-      const r = await fetch(imgUrl, { headers: hdrs });
+      const r = await fetch(imgUrl, {
+        headers: hdrs,
+        cf: { image: { width: 512, height: 512, fit: "cover", quality: 75, format: "jpeg" } },
+      });
       if (r.ok) {
         return new Uint8Array(await r.arrayBuffer());
       }
@@ -142,13 +145,14 @@ async function callGeminiImageEdit(env, imgBytes, promptText) {
 async function callCloudflareFreeAI(env, imgBytes, promptText) {
   if (!env.AI) return null;
   try {
-    if (imgBytes && imgBytes.length > 0) {
+    // Only pass imgBytes to img2img if <= 180KB to avoid Worker memory limit on free tier
+    if (imgBytes && imgBytes.length > 0 && imgBytes.length <= 180000) {
       const res = await env.AI.run("@cf/runwayml/stable-diffusion-v1-5-img2img", {
         prompt: promptText,
-        image: [...imgBytes],
-        strength: 0.45,
+        image: Array.from(imgBytes),
+        strength: 0.4,
         guidance: 7.5,
-        num_steps: 12,
+        num_steps: 10,
       });
       if (res instanceof ReadableStream) {
         const buf = await new Response(res).arrayBuffer();
