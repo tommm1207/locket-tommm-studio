@@ -11,7 +11,6 @@ const dvRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'duyvinh_rc_output.js
 const vpsRc = JSON.parse(fs.readFileSync(path.join(dataDir, 'vps_firebase.json'), 'utf8')).entries;
 
 // 1. Build Tommm's exclusive Caption sets + Weekday Multi-language + 324 merged captions
-// IMPORTANT: Every custom caption MUST have overlay_id starting with "caption:custom_" because Locket iOS filters remote captions against overlay_dynamic_captions ("custom" prefix)!
 const dvOverlays = JSON.parse(dvRc.overlay_items);
 const vpsOverlays = JSON.parse(vpsRc.overlay_items);
 
@@ -178,7 +177,7 @@ for (const sec of vpsOverlays) {
 
 dvOverlays.splice(1, 0, tommmExclusiveSection, weekdayCaptionsSection);
 
-// 2. Build Camera Filter Config pointing to Tommm's GitHub Cloud
+// 2. Build Camera Filter Config (ONLY standard Locket iOS schema keys: NO duplicate remoteFilters/filters/sheetFilters/pickerFilters and compact prompts so camera_filter_config is < 65KB and never crashes Firebase Remote Config SDK!)
 const mergedFilterCfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'merged_camera_filter_config.json'), 'utf8'));
 const removeIds = new Set(["frame_ba_khi", "sticker_binh_luan_minh_tue", "cmt_locket", "frame_tommm_gold"]);
 
@@ -189,48 +188,64 @@ for (const rf of (mergedFilterCfg.remote_filters || [])) {
     const isAi = fs.existsSync(path.join(baseDir, 'assets', 'ai', `${fid}.png`));
     const sub = isAi ? 'ai' : 'frames';
     const cloudUrl = `${ghCdnBase}/assets/${sub}/${fid}.png`;
-    rf.imageUrl = cloudUrl;
-    rf.iconUrl = cloudUrl;
-    rf.overlayImageUrl = cloudUrl;
-    rf.overlayImageURL = cloudUrl;
-    if (rf.icon && typeof rf.icon === 'object') {
-        rf.icon.url = cloudUrl;
-        rf.icon.iconUrl = cloudUrl;
-        rf.icon.remoteImage = cloudUrl;
-    }
-    rf.requires_gold = false;
-    rf.requiresGold = false;
-    rf.is_gold = false;
-    rf.isGold = false;
-    rf.unlocked = true;
-    rf.is_unlocked = true;
-    rf.isUnlocked = true;
-    rf.free = true;
-    rf.allowsTryFilter = true;
-    rf.allows_try_filter = true;
-    rf.tryButtonEnabled = true;
-    rf.try_button_enabled = true;
-    cleanRemoteFilters.push(rf);
+    cleanRemoteFilters.push({
+        uid: fid,
+        id: fid,
+        name: rf.name,
+        category: rf.category || (isAi ? "AI 3D Hot 🔥" : "Photobooth 📸"),
+        prompt: fid,
+        style: rf.style || "cutout",
+        type: rf.type || "normal",
+        filterType: rf.filterType || "normal",
+        overlay: true,
+        imageUrl: cloudUrl,
+        iconUrl: cloudUrl,
+        overlayImageUrl: cloudUrl,
+        overlayImageURL: cloudUrl,
+        tintColor: rf.tintColor || "#F59E0B",
+        colors: rf.colors || ["#FDE047", "#F59E0B"],
+        captureButtonColors: rf.captureButtonColors || ["#FDE047", "#F59E0B"],
+        icon: {
+            url: cloudUrl,
+            iconUrl: cloudUrl,
+            remoteImage: cloudUrl,
+            sfSymbol: (rf.icon && rf.icon.sfSymbol) ? rf.icon.sfSymbol : "sparkles",
+            emoji: (rf.icon && rf.icon.emoji) ? rf.icon.emoji : ""
+        },
+        productUrl: null,
+        textColor: "#FFFFFF",
+        referenceImages: []
+    });
 }
 
-mergedFilterCfg.remote_filters = cleanRemoteFilters;
-mergedFilterCfg.picker_filters = (mergedFilterCfg.picker_filters || []).filter(id => !removeIds.has(id));
+const cleanSheetFilters = [];
 for (const sec of (mergedFilterCfg.sheet_filters || [])) {
-    sec.filter_ids = (sec.filter_ids || []).filter(id => !removeIds.has(id));
+    const fids = (sec.filter_ids || []).filter(id => !removeIds.has(id));
+    if (fids.length > 0) {
+        cleanSheetFilters.push({
+            title: sec.title,
+            filter_ids: fids
+        });
+    }
 }
-delete mergedFilterCfg.remoteFilters;
-delete mergedFilterCfg.filters;
-delete mergedFilterCfg.sheetFilters;
-delete mergedFilterCfg.pickerFilters;
+
+const cleanCameraFilterConfig = {
+    allows_custom_filters: true,
+    show_filter_button: true,
+    sheet_enabled: true,
+    open_sheet_immediately: true,
+    sheet_filters: cleanSheetFilters,
+    filter_groups: mergedFilterCfg.filter_groups || [],
+    picker_filters: (mergedFilterCfg.picker_filters || []).filter(id => !removeIds.has(id)),
+    remote_filters: cleanRemoteFilters
+};
 
 // 3. Build Base Remote Config Entries starting from 100% of DuyVinh's 182 proven working entries!
 const baseRcEntries = Object.assign({}, dvRc);
-// Scrub DuyVinh social links & Shin-chan widget frame watermark
 delete baseRcEntries["settings_instagram_url"];
 delete baseRcEntries["settings_tiktok_url"];
 delete baseRcEntries["widget_frame_event"];
 
-// Upgrade camera & camera_roll in baseRcEntries to 60s with exact required fields (srgb, lanczos, quality_mbps)!
 baseRcEntries["camera"] = JSON.stringify({
     "gold_max_duration": 60,
     "max_duration": 60,
@@ -252,14 +267,12 @@ baseRcEntries["camera_roll"] = JSON.stringify({
     "flash_button": true
 });
 
-// Add Rollcall weekday & photobooth strip share templates
 baseRcEntries["rollcall_share_templates"] = JSON.stringify({"templates":["bold","pop_off","stacking","full_screen","shadow_box","collage","pop_collage"],"random_order":false});
 baseRcEntries["time_travel_rewind_v2_share_templates"] = JSON.stringify({"templates":["rounded_square","grid_collage","cutout_collage","rounded_square_bold","wall_calendar"],"random_order":false});
 baseRcEntries["rollcall_memories_streaks_enabled"] = "true";
 baseRcEntries["rollcall_profile_memories_enabled"] = "true";
 baseRcEntries["rollcall_profile_memories_config"] = JSON.stringify({"useBadgeFetchMode":true,"sharePreviews":true,"currentWeekPlaceholder":true,"historyRefreshTTLSeconds":0});
 
-// Clean text-only Tommm Welcome Popup
 baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
     "tag": "LOCKET GOLD • TOMMM",
     "tag_gradient": true,
@@ -270,21 +283,16 @@ baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
         "body": "Đã kích hoạt đầy đủ Locket Gold, 360+ Captions, Thứ Ngày Đa Ngôn Ngữ, Video 60s & Photobooth."
     }],
     "primary_button_title": "Tiếp tục",
-    "campaign": "locket_gold_welcome_tommm_v2",
+    "campaign": "locket_gold_welcome_tommm_v3",
     "start_at": "2020-01-01T00:00:00",
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
 });
 
-// Dynamic captions list - include "custom" so all caption:custom_* are rendered!
 const dynCaptions = ["standard","poll","color_palette","review","music","location","weather","time","streak","star_sign","party_time","locket_count","good_morning","goodnight","ootd","miss_you","custom","halloween_2026"];
 baseRcEntries["overlay_dynamic_captions"] = JSON.stringify(dynCaptions);
-baseRcEntries["ios_overlay_items_enabled"] = JSON.stringify(dynCaptions);
-baseRcEntries["overlay_items_enabled"] = JSON.stringify(dynCaptions);
-
-// Remove heavy keys from baseRcEntries before serializing so we don't duplicate them
-delete baseRcEntries["overlay_items"];
-delete baseRcEntries["camera_filter_config"];
+baseRcEntries["camera_filter_config"] = JSON.stringify(cleanCameraFilterConfig);
+baseRcEntries["overlay_items"] = JSON.stringify(dvOverlays);
 
 const fullEntitlementList = [
     "Gold", "gold", "locket_gold", "locket_gold_annual", "premium", "Premium",
@@ -304,13 +312,7 @@ const jsContent = `// ==========================================================
     const url = (hasRequest && $request.url) ? $request.url : (hasResponse && $response.url ? $response.url : "");
 
     const BASE_RC_ENTRIES = ${JSON.stringify(baseRcEntries)};
-    const CUSTOM_CAMERA_FILTER_CONFIG = ${JSON.stringify(mergedFilterCfg)};
-    CUSTOM_CAMERA_FILTER_CONFIG.remoteFilters = CUSTOM_CAMERA_FILTER_CONFIG.remote_filters;
-    CUSTOM_CAMERA_FILTER_CONFIG.filters = CUSTOM_CAMERA_FILTER_CONFIG.remote_filters;
-    CUSTOM_CAMERA_FILTER_CONFIG.sheetFilters = CUSTOM_CAMERA_FILTER_CONFIG.sheet_filters;
-    CUSTOM_CAMERA_FILTER_CONFIG.pickerFilters = CUSTOM_CAMERA_FILTER_CONFIG.picker_filters;
-
-    const CUSTOM_OVERLAY_ITEMS = ${JSON.stringify(dvOverlays)};
+    const PICKER_FILTERS = ${JSON.stringify(cleanCameraFilterConfig.picker_filters)};
 
     // 0. Mở khóa Huy hiệu Locket Gold (changeProfileInfo) ngay từ chiều Request
     if (!hasResponse && url.includes("changeProfileInfo")) {
@@ -348,12 +350,7 @@ const jsContent = `// ==========================================================
                     uObj.data.badge_tier = "gold";
                     uObj.data.is_gold = true;
                 }
-                let respHeaders = Object.assign({}, $response.headers || {});
-                for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding"]) {
-                    delete respHeaders[h];
-                }
-                respHeaders["Content-Type"] = "application/json; charset=utf-8";
-                $done({ status: 200, headers: respHeaders, body: JSON.stringify(uObj) });
+                $done({ body: JSON.stringify(uObj) });
                 return;
             } catch (_) {
                 $done({});
@@ -371,11 +368,7 @@ const jsContent = `// ==========================================================
                     delete resObj.result.error;
                     delete resObj.result.errors;
                 }
-                $done({
-                    status: 200,
-                    headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
-                    body: JSON.stringify(resObj)
-                });
+                $done({ body: JSON.stringify(resObj) });
                 return;
             } catch (_) {
                 $done({});
@@ -383,7 +376,7 @@ const jsContent = `// ==========================================================
             }
         }
 
-        // 1.2 Mở khóa toàn diện RevenueCat Gold VIP (Dùng ngày hôm nay cho ngày lên Gold!)
+        // 1.2 Mở khóa toàn diện RevenueCat Gold VIP (Dùng ngày hôm nay 2026-11-23 cho ngày lên Gold!)
         if (url.includes("revenuecat.com") || url.includes("rc-backup.com")) {
             try {
                 const allEntNames = ${JSON.stringify(fullEntitlementList)};
@@ -400,18 +393,12 @@ const jsContent = `// ==========================================================
                             { "identifier": "$rc_monthly", "platform_product_identifier": "locket_3600_1y" }
                         ]
                     }];
-                    $done({
-                        status: 200,
-                        headers: { "Content-Type": "application/json; charset=utf-8" },
-                        body: JSON.stringify(offObj)
-                    });
+                    $done({ body: JSON.stringify(offObj) });
                     return;
                 }
 
                 if (url.includes("product_entitlement_mapping")) {
                     $done({
-                        status: 200,
-                        headers: { "Content-Type": "application/json; charset=utf-8" },
                         body: JSON.stringify({
                             "product_entitlement_mapping": {
                                 "locket_1600_1y": { "product_identifier": "locket_1600_1y", "entitlements": allEntNames },
@@ -424,57 +411,48 @@ const jsContent = `// ==========================================================
                     return;
                 }
 
-                let obj = {};
-                try { obj = JSON.parse(body || "{}"); } catch (_) { obj = {}; }
-                if (!obj || typeof obj !== "object") obj = {};
-                if (!obj.subscriber) obj.subscriber = {};
-
-                // Ngày lên Locket Gold: Ngày hôm nay (2026-11-23)!
+                let obj = JSON.parse(body || "{}");
                 const purchaseDate = "2026-11-23T00:00:00Z";
                 const expiresDate = "9999-12-07T10:10:14Z";
 
                 const makeEnt = (prodId) => ({
-                    "expires_date": expiresDate,
                     "grace_period_expires_date": null,
+                    "purchase_date": purchaseDate,
                     "product_identifier": prodId,
-                    "purchase_date": purchaseDate
+                    "expires_date": expiresDate
                 });
 
                 const makeSub = (prodId, amt) => ({
                     "auto_resume_date": null,
-                    "billing_issues_detected_at": null,
                     "display_name": prodId,
-                    "expires_date": expiresDate,
-                    "grace_period_expires_date": null,
                     "is_sandbox": true,
-                    "management_url": "https://apps.apple.com/account/subscriptions",
-                    "original_purchase_date": purchaseDate,
                     "ownership_type": "PURCHASED",
+                    "billing_issues_detected_at": null,
+                    "management_url": "https://apps.apple.com/account/subscriptions",
                     "period_type": "normal",
                     "price": { "amount": amt, "currency": "VND" },
-                    "purchase_date": purchaseDate,
+                    "expires_date": expiresDate,
+                    "grace_period_expires_date": null,
                     "refunded_at": null,
+                    "unsubscribe_detected_at": null,
+                    "original_purchase_date": purchaseDate,
+                    "purchase_date": purchaseDate,
                     "store": "app_store",
-                    "store_transaction_id": "2000001108724193",
-                    "unsubscribe_detected_at": null
+                    "store_transaction_id": "2000001108724193"
                 });
 
+                obj.subscriber = obj.subscriber || {};
+                obj.subscriber.subscriptions = obj.subscriber.subscriptions || {};
                 obj.subscriber.entitlements = obj.subscriber.entitlements || {};
+
                 for (const ename of allEntNames) {
                     obj.subscriber.entitlements[ename] = makeEnt(ename === "effect_pack_20" ? "com.locket.Locket.FilterPack_20Photos_500" : "locket_1600_1y");
                 }
-                obj.subscriber.subscriptions = obj.subscriber.subscriptions || {};
                 obj.subscriber.subscriptions["locket_1600_1y"] = makeSub("locket_1600_1y", 399000);
                 obj.subscriber.subscriptions["locket_3600_1y"] = makeSub("locket_3600_1y", 399000);
                 obj.subscriber.subscriptions["com.locket.Locket.FilterPack_20Photos_500"] = makeSub("com.locket.Locket.FilterPack_20Photos_500", 0);
 
-                let respHeaders = Object.assign({}, $response.headers || {});
-                for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding", "X-RevenueCat-ETag", "x-revenuecat-etag", "ETag", "etag"]) {
-                    delete respHeaders[h];
-                }
-                respHeaders["Content-Type"] = "application/json; charset=utf-8";
-
-                $done({ status: 200, headers: respHeaders, body: JSON.stringify(obj) });
+                $done({ body: JSON.stringify(obj) });
                 return;
             } catch (e) {
                 $done({});
@@ -482,25 +460,14 @@ const jsContent = `// ==========================================================
             }
         }
 
-        // 1.3 Mở khóa Firebase Remote Config (Kế thừa 100% 182 khóa chuẩn của DuyVinh + Thứ Ngày Đa Ngôn Ngữ + Filter)
+        // 1.3 Mở khóa Firebase Remote Config (Chuẩn 100% $done({ body }) như Locket_Unlocked.js!)
         if (url.includes("firebaseremoteconfig")) {
             try {
-                let obj = {};
-                try { obj = JSON.parse(body || "{}"); } catch (_) { obj = {}; }
-                if (!obj || typeof obj !== "object") obj = {};
-
+                let obj = JSON.parse(body || "{}");
                 obj.state = "UPDATE";
-                obj.entries = Object.assign({}, obj.entries || {}, BASE_RC_ENTRIES);
-                obj.entries["camera_filter_config"] = JSON.stringify(CUSTOM_CAMERA_FILTER_CONFIG);
-                obj.entries["overlay_items"] = JSON.stringify(CUSTOM_OVERLAY_ITEMS);
-
-                let respHeaders = Object.assign({}, $response.headers || {});
-                for (const h of ["Content-Encoding", "content-encoding", "Content-Length", "content-length", "Transfer-Encoding", "transfer-encoding", "ETag", "etag"]) {
-                    delete respHeaders[h];
-                }
-                respHeaders["Content-Type"] = "application/json; charset=utf-8";
-
-                $done({ status: 200, headers: respHeaders, body: JSON.stringify(obj) });
+                obj.entries = obj.entries || {};
+                Object.assign(obj.entries, BASE_RC_ENTRIES);
+                $done({ body: JSON.stringify(obj) });
                 return;
             } catch (e) {
                 $done({});
@@ -516,25 +483,27 @@ const jsContent = `// ==========================================================
     // 2. CHIỀU REQUEST (Xóa Cache ETag & Xử lý getFilters)
     // =========================================================================
     const reqUrl = (hasRequest && $request.url) ? $request.url : "";
-    let reqHeaders = Object.assign({}, ($request && $request.headers) || {});
-
     if (reqUrl.includes("revenuecat.com") || reqUrl.includes("rc-backup.com") || reqUrl.includes("firebaseremoteconfig")) {
-        for (const h of ["If-None-Match", "if-none-match", "If-Modified-Since", "if-modified-since", "X-RevenueCat-ETag", "x-revenuecat-etag", "ETag", "etag", "x-goog-if-none-match"]) {
-            delete reqHeaders[h];
+        const headersToStrip = new Set(["x-revenuecat-etag", "if-none-match", "if-modified-since", "x-goog-if-none-match", "etag"]);
+        let modifiedHeaders = Object.assign({}, ($request && $request.headers) || {});
+        for (let key in modifiedHeaders) {
+            if (headersToStrip.has(key.toLowerCase())) {
+                modifiedHeaders[key] = undefined;
+                delete modifiedHeaders[key];
+            }
         }
-        $done({ headers: reqHeaders });
+        $done({ headers: modifiedHeaders });
         return;
     }
 
     if (reqUrl.includes("getFilters") || reqUrl.includes("createFilter")) {
-        const filterList = CUSTOM_CAMERA_FILTER_CONFIG.picker_filters || [];
         $done({
             response: {
                 status: 200,
                 headers: { "Content-Type": "application/json; charset=utf-8", "Access-Control-Allow-Origin": "*" },
                 body: JSON.stringify({
-                    "result": { "data": { "filters": filterList }, "status": 200 },
-                    "data": { "filters": filterList },
+                    "result": { "data": { "filters": PICKER_FILTERS }, "status": 200 },
+                    "data": { "filters": PICKER_FILTERS },
                     "status": 200
                 })
             }
@@ -548,8 +517,6 @@ const jsContent = `// ==========================================================
 
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.js'), jsContent, 'utf8');
 
-// 4. Build Locket_Tommm_Cloud.conf and Locket_Tommm_Private.conf
-// IMPORTANT: Add api.locketcamera.com to [Script] and [MITM] so changeProfileInfo / fetchUserV2 is intercepted and Gold Badge toggle works!
 const allInOneExisting = fs.readFileSync(path.join(dataDir, 'All_In_One.db'), 'utf8');
 const caPassMatch = allInOneExisting.match(/ca-passphrase\s*=\s*(.+)/);
 const caP12Match = allInOneExisting.match(/ca-p12\s*=\s*(.+)/);
@@ -607,12 +574,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. HỆ THỐNG LOCKET GOLD CLOUD 24/7 CỦA TOMMM (GITHUB: tommm1207/locket-tommm-studio)
 # =====================================================================
-tommm_strip_rc = type=http-request,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_strip_fb = type=http-request,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_cf = type=http-request,pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(getFilters|createFilter|changeProfileInfo).*,requires-body=0,max-size=1048576,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_badge_res = type=http-response,pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser).*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_RC_Gold = type=http-response,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
-tommm_Firebase = type=http-response,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,requires-body=1,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_strip_rc = type=http-request,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.+\\/(receipts|subscribers),script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_strip_fb = type=http-request,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/.*,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_cf = type=http-request,pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(getFilters|createFilter|changeProfileInfo).*,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_badge_res = type=http-response,pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser).*,requires-body=true,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_RC_Gold = type=http-response,pattern=^https?:\\/\\/(api|rc-backup)\\.revenuecat\\.com\\/.+,requires-body=true,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
+tommm_Firebase = type=http-response,pattern=^https?:\\/\\/.*firebaseremoteconfig.*\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+,requires-body=true,max-size=-1,script-path=${ghCdnBase}/Locket_Tommm_Private.js,timeout=60
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -644,4 +611,4 @@ hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com
 
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Cloud.conf'), makeConf(false), 'utf8');
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.conf'), makeConf(true), 'utf8');
-console.log("Successfully rebuilt Cloud 24/7 edition with 100% DuyVinh 182 RC keys + custom_ prefix captions + 2026-11-23 date!");
+console.log("Successfully rebuilt compact Cloud 24/7 edition!");
