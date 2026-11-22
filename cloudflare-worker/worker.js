@@ -111,6 +111,41 @@ async function callGeminiImageEdit(env, imgBase64, promptText) {
   return null;
 }
 
+async function callCloudflareFreeAI(env, imgBase64, promptText) {
+  if (!env.AI) return null;
+  try {
+    // Nếu có ảnh gốc từ Locket -> dùng img2img miễn phí ngay trên GPU Cloudflare!
+    if (imgBase64) {
+      const imgBytes = Array.from(base64ToUint8Array(imgBase64));
+      const res = await env.AI.run("@cf/runwayml/stable-diffusion-v1-5-img2img", {
+        prompt: promptText,
+        image: imgBytes,
+        strength: 0.45,
+        guidance: 7.5,
+        num_steps: 15,
+      });
+      if (res instanceof ReadableStream) {
+        const buf = await new Response(res).arrayBuffer();
+        return { bytes: new Uint8Array(buf), mimeType: "image/png" };
+      }
+      if (res instanceof Uint8Array || res instanceof ArrayBuffer) {
+        return { bytes: new Uint8Array(res), mimeType: "image/png" };
+      }
+    }
+    // Fallback tạo ảnh siêu nhanh miễn phí bằng FLUX.1 Schnell
+    const fluxRes = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+      prompt: promptText,
+      steps: 4,
+    });
+    if (fluxRes && fluxRes.image) {
+      return { bytes: base64ToUint8Array(fluxRes.image), mimeType: "image/jpeg" };
+    }
+  } catch (e) {
+    console.log("Cloudflare Free AI fallback error:", e);
+  }
+  return null;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") {
@@ -166,14 +201,18 @@ export default {
         `Apply a creative, high quality aesthetic photo filter (${filterId}) while strictly preserving the person's identity, pose, and natural lighting.`;
 
       const imgBase64 = await getInputImageBase64(dataNode);
-      const aiResult = await callGeminiImageEdit(env, imgBase64, customPrompt);
+      // Ưu tiên 1: Gemini API (nếu có key còn quota) -> Ưu tiên 2: Cloudflare Workers AI MIỄN PHÍ 100% (10,000 neurons/ngày)
+      let aiResult = await callGeminiImageEdit(env, imgBase64, customPrompt);
+      if (!aiResult) {
+        aiResult = await callCloudflareFreeAI(env, imgBase64, customPrompt);
+      }
 
       if (!aiResult) {
         return new Response(
           JSON.stringify({
             result: {
-              status: 429,
-              error: "Gemini API keys exceeded quota or not configured in Cloudflare Secrets (GEMINI_API_KEYS).",
+              status: 503,
+              error: "AI engine busy. Make sure Cloudflare Workers AI binding [ai] is enabled.",
             },
           }),
           { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
