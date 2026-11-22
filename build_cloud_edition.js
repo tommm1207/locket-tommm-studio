@@ -259,10 +259,10 @@ baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
     "feature_set": [{
         "title": "Chào mừng bạn! 💛",
         "body": "Chúc bạn sử dụng vui vẻ và lưu giữ thật nhiều khoảnh khắc đẹp cùng Locket Gold — By ✨Tommm✨",
-        "imageURL": "https://public.locketcamera.com/locket-public/journal_calendar_assets/holiday_indicators/valentines_indicator%403x.png"
+        "imageURL": "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/welcome_icon.jpg"
     }],
     "primary_button_title": "Bắt đầu ngay",
-    "campaign": "locket_gold_welcome_by_tommm_v8",
+    "campaign": "locket_gold_welcome_by_tommm_v9",
     "start_at": "2020-01-01T00:00:00",
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
