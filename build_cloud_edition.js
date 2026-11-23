@@ -278,6 +278,70 @@ baseRcEntries["feature_discovery_popup_config"] = JSON.stringify({
     "end_at": "2099-12-31T23:59:59",
     "use_local_time_zone": true
 });
+// Build clean PNG Frame & 4-Cut Photobooth filter definitions (handled by Tommm Cloudflare Worker, 100% original face)
+const framesManifest = JSON.parse(fs.readFileSync(path.join(dataDir, 'frames_manifest.json'), 'utf8'));
+const mergedFilterCfg = JSON.parse(fs.readFileSync(path.join(dataDir, 'merged_camera_filter_config.json'), 'utf8'));
+const filterMetaById = new Map();
+for (const rf of (dvFilterCfg.remote_filters || [])) {
+    const id = rf.id || rf.uid;
+    if (id && !removeIds.has(id)) filterMetaById.set(id, rf);
+}
+for (const rf of (mergedFilterCfg.remote_filters || [])) {
+    const id = rf.id || rf.uid;
+    if (id && !removeIds.has(id) && !filterMetaById.has(id)) filterMetaById.set(id, rf);
+}
+
+const photoboothIds = [
+    "photobooth_4cut", "photobooth_cute", "frame_berry_days", "frame_happy_snap", "frame_sky_diary",
+    "pb_holo_4cut", "pb_scrapbook_ripped_4cut", "pb_ripped_paper_4cut", "pb_denim_ripped_2x2",
+    "pb_cortis_4cut", "pb_cortis_v1", "pb_cortis_v2", "pb_ech_xanh", "pb_galaxy",
+    "pb_meo_dang_yeu_4cut", "pb_photobooth_hello_kitty", "pb_shinchan_4cut", "pb_strawberry",
+    "pb_supperman_4cut", "pb_trung_bac_thao", "pb_vien_hello_kitty", "pb_vintage"
+].filter(id => framesManifest[id]);
+
+const singleFrameIds = Object.keys(framesManifest).filter(id => !photoboothIds.includes(id));
+
+const customFrameGroups = [
+    { id: "group_photobooth", title: { en: "Khung & Photobooth 📸", vi: "Khung & Photobooth 📸" }, filter_ids: photoboothIds },
+    { id: "group_frames", title: { en: "Khung Viền & Hot Trend 🖼️", vi: "Khung Viền & Hot Trend 🖼️" }, filter_ids: singleFrameIds }
+];
+const customFrameIds = photoboothIds.concat(singleFrameIds);
+
+const customRemoteFilters = customFrameIds.map(id => {
+    const src = filterMetaById.get(id) || {};
+    const cloudUrl = `${ghRawBase}/assets/frames/${id}.png`;
+    const is4Cut = !!(framesManifest[id] && framesManifest[id].is4Cut);
+    return {
+        uid: id,
+        id: id,
+        name: src.name || id,
+        prompt: id,
+        style: src.style || "cutout",
+        type: "normal",
+        filterType: src.filterType || "normal",
+        overlay: true,
+        imageUrl: cloudUrl,
+        iconUrl: cloudUrl,
+        overlayImageUrl: cloudUrl,
+        overlayImageURL: cloudUrl,
+        tintColor: src.tintColor || (is4Cut ? "#FFD6E0" : "#93C5FD"),
+        colors: Array.isArray(src.colors) && src.colors.length ? src.colors : (is4Cut ? ["#FFD6E0", "#FFE4EC"] : ["#60A5FA", "#F472B6"]),
+        captureButtonColors: Array.isArray(src.captureButtonColors) && src.captureButtonColors.length ? src.captureButtonColors : (is4Cut ? ["#FFD6E0", "#FFE4EC"] : ["#60A5FA", "#F472B6"]),
+        icon: {
+            url: cloudUrl,
+            iconUrl: cloudUrl,
+            remoteImage: cloudUrl,
+            sfSymbol: (src.icon && src.icon.sfSymbol) || (is4Cut ? "square.grid.2x2" : "photo.on.rectangle"),
+            symbol: (src.icon && src.icon.symbol) || (is4Cut ? "square.grid.2x2" : "photo.on.rectangle"),
+            emoji: (src.icon && src.icon.emoji) || (is4Cut ? "📸" : "🖼️")
+        },
+        outputUrl: null,
+        productUrl: null,
+        textColor: src.textColor || "#FFFFFF",
+        referenceImages: []
+    };
+});
+
 // Fallback Filter config chỉ gồm các Filter chính chủ của Locket (phòng khi Firebase trả NO_CHANGE nên không có liveFilterCfg)
 const nativeGroups = (dvFilterCfg.sheet_filters || []).filter(g => !["group_hot_ai_3d", "group_photobooth", "group_frames"].includes(g.id));
 const nativeIds = [];
@@ -419,12 +483,58 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
 }
 obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
 
-// 4. Luôn bật nút AI / Filter CHÍNH CHỦ của Locket (dùng liveFilterCfg nếu có, hoặc fallbackFilterCfg nếu Firebase trả NO_CHANGE)
-var activeFilterCfg = (liveFilterCfg && typeof liveFilterCfg === "object") ? liveFilterCfg : ${JSON.stringify(fallbackFilterCfg)};
+// 4. Luôn bật nút AI / Filter CHÍNH CHỦ của Locket + Gộp nhóm Khung Viền & Photobooth 4 ô (giữ nguyên mặt 100%, chạy Cloudflare 0đ)
+var CUSTOM_FRAME_GROUPS = ${JSON.stringify(customFrameGroups)};
+var CUSTOM_FRAME_IDS = ${JSON.stringify(customFrameIds)};
+var CUSTOM_REMOTE_FILTERS = ${JSON.stringify(customRemoteFilters)};
+
+var activeFilterCfg = (liveFilterCfg && typeof liveFilterCfg === "object") ? JSON.parse(JSON.stringify(liveFilterCfg)) : ${JSON.stringify(fallbackFilterCfg)};
 activeFilterCfg.allows_custom_filters = true;
 activeFilterCfg.show_filter_button = true;
 activeFilterCfg.sheet_enabled = true;
 if (typeof activeFilterCfg.open_sheet_immediately === "undefined") activeFilterCfg.open_sheet_immediately = true;
+
+var existingSheets = Array.isArray(activeFilterCfg.sheet_filters) ? activeFilterCfg.sheet_filters : [];
+var seenGroupIds = {};
+for (var g = 0; g < CUSTOM_FRAME_GROUPS.length; g++) {
+    seenGroupIds[CUSTOM_FRAME_GROUPS[g].id] = true;
+}
+var mergedSheets = CUSTOM_FRAME_GROUPS.slice();
+for (var sg = 0; sg < existingSheets.length; sg++) {
+    var grp = existingSheets[sg];
+    if (grp && !seenGroupIds[grp.id]) {
+        if (grp.id) seenGroupIds[grp.id] = true;
+        mergedSheets.push(grp);
+    }
+}
+activeFilterCfg.sheet_filters = mergedSheets;
+
+var existingPickers = Array.isArray(activeFilterCfg.picker_filters) ? activeFilterCfg.picker_filters : [];
+var seenPickers = {};
+var mergedPickers = [];
+var combinedPickers = CUSTOM_FRAME_IDS.concat(existingPickers);
+for (var p = 0; p < combinedPickers.length; p++) {
+    var pid = combinedPickers[p];
+    if (pid && !seenPickers[pid]) {
+        seenPickers[pid] = true;
+        mergedPickers.push(pid);
+    }
+}
+activeFilterCfg.picker_filters = mergedPickers;
+
+var existingRemote = Array.isArray(activeFilterCfg.remote_filters) ? activeFilterCfg.remote_filters : [];
+var seenRemoteIds = {};
+var mergedRemote = [];
+var combinedRemote = CUSTOM_REMOTE_FILTERS.concat(existingRemote);
+for (var rfIdx = 0; rfIdx < combinedRemote.length; rfIdx++) {
+    var rfItem = combinedRemote[rfIdx];
+    var rfId = rfItem && (rfItem.id || rfItem.uid);
+    if (rfId && !seenRemoteIds[rfId]) {
+        seenRemoteIds[rfId] = true;
+        mergedRemote.push(rfItem);
+    }
+}
+activeFilterCfg.remote_filters = mergedRemote;
 obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 
 $done({ body: JSON.stringify(obj) });
@@ -480,7 +590,8 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=16, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=17, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|applyFilter|createOverlay), script-path=${ghRawBase}/js_tommm_ai_route.js?v=17, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
@@ -547,7 +658,8 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 [Script]
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=16, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=17, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|applyFilter|createOverlay), script-path=${ghRawBase}/js_tommm_ai_route.js?v=17, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
