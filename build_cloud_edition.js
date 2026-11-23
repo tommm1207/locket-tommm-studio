@@ -103,36 +103,10 @@ $done({ body: JSON.stringify(obj) });
 fs.writeFileSync(path.join(baseDir, 'js_tommm_gold.js'), locketGoldJs, 'utf8');
 
 // =========================================================================
-// 3. TÁCH RIÊNG SCRIPT 3: locket_badge.js (Nhẹ < 1KB - Bật Huy hiệu Gold)
+// 3. TÁCH RIÊNG SCRIPT 3: js_tommm_badge.js (Pass-through - không chặn changeProfileInfo thật)
 // =========================================================================
-const locketBadgeJs = `// Tommm Private - Enable Locket Gold Badge
-if (typeof $response !== "undefined" && $response && $response.body) {
-    try {
-        let uObj = JSON.parse($response.body);
-        if (uObj.result && uObj.result.data) {
-            uObj.result.data.badge = "locket_gold";
-            uObj.result.data.is_gold = true;
-        }
-        if (uObj.data) {
-            uObj.data.badge = "locket_gold";
-            uObj.data.is_gold = true;
-        }
-        $done({ body: JSON.stringify(uObj) });
-    } catch (_) {
-        $done({});
-    }
-} else {
-    $done({
-        response: {
-            status: 200,
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify({
-                "data": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true },
-                "result": { "badge": "locket_gold", "badge_tier": "gold", "is_gold": true, "success": true, "data": { "badge": "locket_gold", "is_gold": true } }
-            })
-        }
-    });
-}
+const locketBadgeJs = `// Tommm Private - Pass-through (do not block real changeProfileInfo / fetchUser)
+$done({});
 `;
 fs.writeFileSync(path.join(baseDir, 'js_tommm_badge.js'), locketBadgeJs, 'utf8');
 
@@ -593,8 +567,6 @@ tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
 tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=18, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|applyFilter|createOverlay|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=18, timeout=60, script-update-interval=0
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -662,8 +634,6 @@ tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
 tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=18, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|applyFilter|createOverlay|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=18, timeout=60, script-update-interval=0
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com
