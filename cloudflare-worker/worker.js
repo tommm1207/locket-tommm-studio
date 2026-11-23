@@ -341,6 +341,32 @@ async function getInputImageBytes(dataNode, authHeader) {
   return { bytes: null, sourceUrl: imgUrl };
 }
 
+function findFrameInValue(val, depth = 0, exactOnly = false) {
+  if (val == null || depth > 3) return null;
+  if (typeof val === "string") {
+    const trimmed = val.trim();
+    if (FRAMES_MANIFEST[trimmed]) return trimmed;
+    if (!exactOnly) {
+      for (const id of Object.keys(FRAMES_MANIFEST)) {
+        if (trimmed.includes(id)) return id;
+      }
+    }
+    return null;
+  }
+  if (Array.isArray(val)) {
+    for (const item of val) {
+      const found = findFrameInValue(item, depth + 1, exactOnly);
+      if (found) return found;
+    }
+  } else if (typeof val === "object") {
+    for (const v of Object.values(val)) {
+      const found = findFrameInValue(v, depth + 1, exactOnly);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function detectFilterId(dataNode, rawBodyText) {
   const candidates = [
     dataNode?.filterId,
@@ -364,9 +390,13 @@ function detectFilterId(dataNode, rawBodyText) {
       }
     }
   }
+  const exactNested = findFrameInValue(dataNode, 0, true);
+  if (exactNested) return exactNested;
+  const partialNested = findFrameInValue(dataNode, 0, false);
+  if (partialNested) return partialNested;
   if (rawBodyText) {
     for (const id of Object.keys(FRAMES_MANIFEST)) {
-      if (rawBodyText.includes(`"${id}"`)) return id;
+      if (rawBodyText.includes(`"${id}"`) || rawBodyText.includes(id)) return id;
     }
   }
   return null;
@@ -562,11 +592,20 @@ async function handleStudioRequest(request, env) {
 
       // Pass-through official native Locket filters straight to Locket's servers
       if (!filterId || !FRAMES_MANIFEST[filterId]) {
-        const upstreamUrl = `https://us-central1-locket-4252a.cloudfunctions.net${url.pathname}${url.search}`;
+        const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
+        LAST_DEBUG = {
+          mode: "passthrough",
+          pathname: url.pathname,
+          origHost,
+          dataKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+          preview: rawBodyText.slice(0, 300),
+          ts: new Date().toISOString(),
+        };
+        const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
         const fwdHeaders = new Headers();
         for (const [k, v] of request.headers.entries()) {
           const kl = k.toLowerCase();
-          if (kl === "host" || kl === "content-length" || kl.startsWith("cf-")) continue;
+          if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
           fwdHeaders.set(k, v);
         }
         return fetch(upstreamUrl, {
