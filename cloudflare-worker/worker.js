@@ -504,11 +504,10 @@ async function encodeCanvasToImage(canvasRgb, origin, tempId) {
   return { bytes: finalBytes, mimeType, ext };
 }
 
-export default {
-  async fetch(request, env, ctx) {
-    if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders() });
-    }
+async function handleStudioRequest(request, env) {
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders() });
+  }
 
     cleanupMemory();
     const url = new URL(request.url);
@@ -673,8 +672,28 @@ export default {
       });
     }
 
-    return new Response(JSON.stringify({ result: { status: 200, success: true }, status: 200 }), {
-      headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
-    });
+  return new Response(JSON.stringify({ result: { status: 200, success: true }, status: 200 }), {
+    headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+  });
+}
+
+export class StudioRoom {
+  constructor(state, env) {
+    this.state = state;
+    this.env = env;
+  }
+
+  async fetch(request) {
+    return handleStudioRequest(request, this.env);
+  }
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    if (env && env.STUDIO) {
+      const id = env.STUDIO.idFromName("tommm-global-studio");
+      return env.STUDIO.get(id).fetch(request);
+    }
+    return handleStudioRequest(request, env);
   },
 };

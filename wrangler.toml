@@ -8,3 +8,12 @@ binding = "AI"
 [vars]
 GEMINI_MODEL = "gemini-3.1-flash-lite-image"
 GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets"
+
+[durable_objects]
+bindings = [
+  { name = "STUDIO", class_name = "StudioRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StudioRoom"]
