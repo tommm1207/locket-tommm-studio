@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const baseDir = 'D:\\Locket_Gold_Tommm';
+const baseDir = __dirname;
 const dataDir = path.join(baseDir, 'data');
 
 const ghRawBase = 'https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main';
@@ -215,7 +215,18 @@ for (const sec of vpsOverlays) {
 }
 // Bỏ mục Tommm VIP Exclusive, chỉ giữ mục Thứ Ngày Đa Ngôn Ngữ + toàn bộ bộ Caption sạch (đã đổi sang tommm1207)
 // Tách riêng các bộ Caption thêm (custom sections) để MERGE thông minh với các Caption ngày lễ mới chính chủ của Locket!
-const customExtraSections = [weekdayCaptionsSection].concat(
+let cloudArchivedItems = [];
+const cloudArchivePath = path.join(dataDir, 'archived_official_captions.json');
+if (fs.existsSync(cloudArchivePath)) {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(cloudArchivePath, 'utf8'));
+        if (Array.isArray(parsed)) cloudArchivedItems = parsed;
+    } catch (_) {}
+}
+const cloudArchiveSection = cloudArchivedItems.length > 0
+    ? [{ section: "✨ Kho Caption Lễ Locket (Cloud)", items: cloudArchivedItems }]
+    : [];
+const customExtraSections = cloudArchiveSection.concat([weekdayCaptionsSection]).concat(
     dvOverlays.filter(s => !s.section.includes("General") && !s.section.includes("Decorative by Locket"))
 );
 
@@ -423,7 +434,9 @@ fs.writeFileSync(path.join(baseDir, 'js_tommm_rc.js'), locketRcJs, 'utf8');
 // =========================================================================
 // 5. BUILD CLEAN Locket_Tommm_Cloud.conf (SỬ DỤNG 4 SCRIPT TÁCH RIÊNG - CHUẨN 100% ALL_IN_ONE)
 // =========================================================================
-const allInOneExisting = fs.readFileSync(path.join(dataDir, 'All_In_One.db'), 'utf8');
+const allInOnePath = path.join(dataDir, 'All_In_One.db');
+const hasAllInOne = fs.existsSync(allInOnePath);
+const allInOneExisting = hasAllInOne ? fs.readFileSync(allInOnePath, 'utf8') : '';
 const caPassMatch = allInOneExisting.match(/ca-passphrase\s*=\s*(.+)/);
 const caP12Match = allInOneExisting.match(/ca-p12\s*=\s*(.+)/);
 const caPassphrase = caPassMatch ? caPassMatch[1].trim() : 'ha3p1Jdy';
@@ -499,7 +512,9 @@ hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com
 }
 
 fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Cloud.conf'), makeConf(false), 'utf8');
-fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.conf'), makeConf(true), 'utf8');
+if (hasAllInOne && caP12) {
+    fs.writeFileSync(path.join(baseDir, 'Locket_Tommm_Private.conf'), makeConf(true), 'utf8');
+}
 
 // Also generate Shadowrocket Module (.sgmodule) so users NEVER lose their CA certificate when updating!
 const sgModuleContent = `#!name=Locket Gold • ✨Tommm✨ (Cloud 24/7)

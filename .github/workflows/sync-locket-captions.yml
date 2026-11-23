@@ -1,0 +1,40 @@
+name: Auto Sync Locket Official Captions
+
+on:
+  schedule:
+    # Chạy tự động mỗi ngày lúc 03:00 sáng giờ Việt Nam (20:00 UTC)
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-captions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch & archive new Locket captions
+        env:
+          LOCKET_FIREBASE_API_KEY: ${{ secrets.LOCKET_FIREBASE_API_KEY }}
+          LOCKET_FIREBASE_APP_ID: ${{ secrets.LOCKET_FIREBASE_APP_ID }}
+        run: node sync_locket_captions.js
+
+      - name: Commit & push if new captions found
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add data/archived_official_captions.json js_tommm_rc.js Locket_Tommm_Cloud.conf Locket_Tommm_Cloud.sgmodule
+            git commit -m "Auto-sync new Locket official captions ($(date -u +'%Y-%m-%d'))"
+            git push
+          else
+            echo "No new captions to commit."
+          fi
