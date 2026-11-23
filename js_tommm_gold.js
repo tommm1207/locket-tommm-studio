@@ -57,4 +57,11 @@ var pack20Product = "com.locket.Locket.FilterPack_20Photos_500";
 obj.subscriber.subscriptions[pack20Product] = makeSub(pack20Product, 0, "VND");
 obj.subscriber.entitlements["effect_pack_20"] = makeEnt(pack20Product);
 
+var reqUrl = (typeof $request !== "undefined" && $request && $request.url) ? $request.url : "";
+var urlMatch = reqUrl.match(/\/subscribers\/([^/?#]+)/i);
+var myUid = (urlMatch && urlMatch[1]) || (obj.subscriber && obj.subscriber.original_app_user_id) || "";
+if (myUid && typeof $persistentStore !== "undefined") {
+    $persistentStore.write(String(myUid), "tommm_my_locket_uid");
+}
+
 $done({ body: JSON.stringify(obj) });
