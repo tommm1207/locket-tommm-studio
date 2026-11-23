@@ -342,16 +342,56 @@ try {
 var TOMMM_ENTRIES = ${JSON.stringify(baseRcEntries)};
 Object.assign(obj.entries, TOMMM_ENTRIES);
 
-// 3. Merge thông minh & LỌC TRÙNG TUYỆT ĐỐI theo từng overlay_id (tránh Swift Identifiable crash khi trùng ID!)
+// 3. Tự động lưu vĩnh viễn mọi Caption mới chính chủ của Locket (lễ/sự kiện) vào $persistentStore để hết mùa cũng không bị mất!
 var EXTRA_SECTIONS = ${JSON.stringify(customExtraSections)};
 var mergedOverlays = Array.isArray(liveOverlayItems) && liveOverlayItems.length > 0 ? liveOverlayItems.slice() : ${JSON.stringify(dvOverlays.slice(0, 1))};
 var seenOverlayIds = {};
+var archivedItems = [];
+try {
+    if (typeof $persistentStore !== "undefined") {
+        var rawArch = $persistentStore.read("tommm_saved_official_captions");
+        if (rawArch) archivedItems = JSON.parse(rawArch);
+        if (!Array.isArray(archivedItems)) archivedItems = [];
+    }
+} catch (_) { archivedItems = []; }
+
+var archivedIds = {};
+for (var k = 0; k < archivedItems.length; k++) {
+    if (archivedItems[k] && archivedItems[k].overlay_id) archivedIds[archivedItems[k].overlay_id] = true;
+}
+
+var archiveChanged = false;
 for (var a = 0; a < mergedOverlays.length; a++) {
     var secItems = mergedOverlays[a].items || [];
     for (var b = 0; b < secItems.length; b++) {
-        if (secItems[b] && secItems[b].overlay_id) seenOverlayIds[secItems[b].overlay_id] = true;
+        var cur = secItems[b];
+        if (cur && cur.overlay_id) {
+            seenOverlayIds[cur.overlay_id] = true;
+            if (!archivedIds[cur.overlay_id] && archivedItems.length < 250) {
+                archivedIds[cur.overlay_id] = true;
+                archivedItems.push(cur);
+                archiveChanged = true;
+            }
+        }
     }
 }
+if (archiveChanged && typeof $persistentStore !== "undefined") {
+    try { $persistentStore.write(JSON.stringify(archivedItems), "tommm_saved_official_captions"); } catch (_) {}
+}
+
+// Khôi phục lại các Caption chính chủ đã lưu từ các dịp trước (nếu Locket vừa gỡ khỏi server)
+var restoredItems = [];
+for (var r = 0; r < archivedItems.length; r++) {
+    var ar = archivedItems[r];
+    if (ar && ar.overlay_id && !seenOverlayIds[ar.overlay_id]) {
+        seenOverlayIds[ar.overlay_id] = true;
+        restoredItems.push(ar);
+    }
+}
+if (restoredItems.length > 0) {
+    mergedOverlays.push({ section: "⭐ Đã Lưu Tự Động (Locket)", items: restoredItems });
+}
+
 for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
     var rawItems = EXTRA_SECTIONS[i].items || [];
     var cleanItems = [];
@@ -427,7 +467,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=15, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=16, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
@@ -492,7 +532,7 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 [Script]
 tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60
 tommm_del_header = type=http-request, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=15, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=16, requires-body=true, max-size=-1, timeout=60, script-update-interval=0
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js, requires-body=true, max-size=-1, timeout=60
 
