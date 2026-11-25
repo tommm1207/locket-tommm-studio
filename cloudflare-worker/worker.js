@@ -1,8 +1,9 @@
 // =========================================================================
-// Cloudflare Worker 24/7 - Locket Gold PNG Frame & 4-Cut Photobooth Engine
+// Cloudflare Worker 24/7 - Locket Gold PNG Frame, Photobooth & AI Engine
 // - 100% Mien phi 0d, chay 24/7 tren Cloudflare Workers (By Tommm)
-// - Giu nguyen khuon mat 100% bang ghep khung PNG / Photobooth 4 o (khong AI bien dang)
-// - Cac filter chinh chu khac cua Locket duoc pass-through thang ve server Locket
+// - Khung PNG / Photobooth 4 o giu nguyen khuon mat 100% (uu tien so 1)
+// - AI Filters chay bang Cloudflare Workers AI (FLUX.2 Klein 4B), 0d, khong can API key ngoai
+// - Cac filter khong nhan dien duoc se pass-through ve server Locket
 // =========================================================================
 
 const SIZE = 512;
@@ -10,6 +11,78 @@ const GITHUB_FRAMES_BIN_BASE =
   "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/frames_bin";
 
 const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]}};
+
+const FACE_LOCK =
+  "Edit the input photo. Strictly preserve the exact same person, identical facial features, eyes, nose, mouth, skin tone, expression, pose, camera framing, and natural lighting. ";
+
+const AI_FILTER_PROMPTS = {
+  // 26 Custom AI 3D Hot & extra filters
+  stk_tai_tho: "Place a cute fluffy white plush bunny ears headband with soft pink inner ears realistically on top of the person's head.",
+  stk_mu_ngu_khoc: "Put a cozy cream knit sleeping cap on the person's head, add soft rosy cheeks and two tiny cute translucent teardrop tears beneath the eyes.",
+  stk_jollibee: "Change only the person's shirt and headwear into a crisp red-and-yellow Jollibee crew uniform shirt and matching red Jollibee cap.",
+  stk_nak_ve_than: "Give the person sleek silver-white center-parted hair with shoulder-length locks and dress them in a realistic futuristic blue-and-silver Nakroth Dimensional Guardian cosplay armor jacket.",
+  stk_gojo_satoru: "Give the person spiky silver-white hair, place a sleek black fabric blindfold over their eyes, and dress them in a black high-collar Jujutsu uniform jacket.",
+  stk_shopee_food: "Dress the person in an authentic bright orange ShopeeFood delivery jacket and matching orange delivery helmet or cap with realistic fabric textures.",
+  fireworks: "Fill the night sky background behind the person with vibrant colorful fireworks bursting with warm glowing sparks and bokeh.",
+  harry_potter: "Dress the person in a classic black Hogwarts wizard robe with a red-and-gold striped Gryffindor scarf and thin round metal glasses.",
+  minecraft: "Restyle the background and clothing into blocky 3D Minecraft voxel geometry and pixelated textures while keeping the person's face recognizable.",
+  fire_flame: "Surround the background and edges of the frame with dramatic glowing orange fire flames and rising golden sparks illuminated naturally on the clothing.",
+  giant_spider: "Add a realistic fuzzy dark spider perched playfully near the person's shoulder with natural shadows.",
+  ocean_underwater: "Transform the scene into a serene underwater aquarium with cool blue water caustics, rising air bubbles, and small colorful tropical fish swimming in the background.",
+  ufo_alien: "Place a subtle glowing metallic UFO saucer hovering in the distant sky behind the person with soft beam light.",
+  sweat_hearts: "Float glossy pastel pink and red 3D hearts softly in the air around the person with dreamy romantic lighting.",
+  volcano_lava: "Replace the distant background with glowing molten volcanic lava streams and warm floating orange embers.",
+  rain_storm: "Add a moody cinematic rainstorm atmosphere with falling rain streaks, subtle water droplets, soft mist, and distant lightning in the background sky.",
+  fortnite_llama: "Add a colorful purple-and-blue Fortnite loot llama piñata peeking playfully into the background behind the person.",
+  watercolor_art: "Render the scene as a delicate hand-painted watercolor illustration with soft brush strokes and paper texture while keeping the face recognizable.",
+  golden_hour: "Bathe the scene in warm golden hour sunset sunlight rays, soft lens flare, and flattering warm golden rim lighting.",
+  rose_flower: "Place a single fresh red rose stem held gently in the person's mouth with realistic petals and shadows.",
+  shrek_ogre: "Add funny green Shrek ogre trumpet ears on both sides of the head with a playful green fairytale ogre vibe while keeping the face recognizable.",
+  superhero_cape: "Add a classic blue-and-red superhero suit collar and a flowing red superhero cape over the person's shoulders.",
+  spooky_ghost: "Add a cute translucent white ghostly figure floating playfully in the background behind the person.",
+  pirate_hat: "Put a weathered dark tricorn pirate captain hat with gold trim on the person's head and add subtle pirate coat lapels.",
+  jungle_leaf: "Frame the background with lush green tropical jungle monstera leaves and warm dappled forest sunlight.",
+  cute_zombie: "Apply playful Halloween zombie face paint with pale greenish skin tint and cute chibi stitch marks while keeping the person's features clear.",
+
+  // 35 Official Native Locket AI filters + locket + hom_nay_an_gi
+  okay_wig: "Place an oversized glossy funny salon wig comically perched on the person's head with realistic hair strands.",
+  influencer: "Add glamorous studio ring-light eye catchlights, trendy chic sunglasses resting on top of the head, and clean luxury lifestyle studio lighting.",
+  looks_maxxing: "Enhance the portrait with crisp high-fashion studio sculpting light, subtle chiseled jawline shadow, and glossy magazine editorial clarity.",
+  toothless: "Give the person a playful goofy comedy edit showing a funny gap-tooth smile.",
+  bye_brows: "Apply a lighthearted comedy edit cleanly removing the person's eyebrows with smooth natural forehead skin.",
+  bowling_ball: "Apply a funny comedy edit making the top of the person's head completely smooth, bald, and glossy like a polished bowling ball.",
+  blonde_bleached: "Change the person's hair color cleanly to bright platinum bleached blonde with natural roots and lighting.",
+  beard: "Add a realistic thick well-groomed full beard and mustache seamlessly matching the person's hair color.",
+  bob_cut: "Restyle the person's hair into a sleek chin-length straight bob haircut with natural volume.",
+  buns: "Restyle the person's hair into cute high double space buns on top of the head.",
+  tatted: "Add realistic black-and-grey fine-line aesthetic tattoos gently along the neck and visible skin.",
+  mohawk: "Restyle the person's hair into a tall edgy punk mohawk down the center of the head.",
+  braces: "Add realistic metallic orthodontic braces cleanly aligned on the person's visible teeth.",
+  slimed: "Splash bright neon green glossy Nickelodeon-style slime dripping playfully over the person's hair and shoulders.",
+  princess: "Place a sparkling crystal silver tiara crown on the head and add a pastel fairytale princess dress collar with gentle sparkles.",
+  disco_lights: "Illuminate the scene with colorful spinning disco ball light reflections and vibrant neon magenta and cyan party beams.",
+  cash_money: "Add crisp US dollar bills fluttering and raining joyfully through the air around the person.",
+  happy_birthday: "Put a festive colorful polka-dot birthday party hat on the head and add floating confetti with warm glowing birthday cake candles in the foreground.",
+  cutesy: "Add soft kawaii pastel pink blush, tiny sparkling star stickers on the cheeks, and a dreamy soft glow.",
+  sticker_face: "Place playful colorful vinyl stickers like tiny stars, pastel hearts, and smiley faces neatly on the person's cheeks and nose.",
+  flower_crown: "Place a delicate crown woven from fresh white daisies and pastel roses resting naturally on the person's head.",
+  love_bug: "Put a cute red plush ladybug antennae headband on the head and float soft pink hearts in the background.",
+  wedding: "Dress the person in elegant white wedding attire such as a delicate veil collar or crisp tuxedo with romantic floral bokeh behind.",
+  cowboy_cowgirl: "Put a classic brown suede cowboy hat on the head and add a patterned western bandana loosely around the neck.",
+  giraffe: "Put a funny cozy plush giraffe hood with cute stuffed horns and spotted giraffe ears over the person's head.",
+  clown: "Apply playful colorful clown makeup with a shiny red nose, painted cheeks, and a curly rainbow wig.",
+  easter_bunney_cutout: "Place cute pastel plush Easter bunny ears on the head surrounded by soft spring pastel flowers in the background.",
+  easter_chick_cutout: "Place a cute fluffy yellow plush Easter chick hat perched playfully on top of the person's head.",
+  bearded: "Add a long majestic wizard or lumberjack beard matching the person's natural hair tone.",
+  leprechaun: "Put a festive green St. Patrick's Day leprechaun top hat with a gold buckle on the head and float green shamrocks behind.",
+  lucky_face: "Add cute sparkling green four-leaf clover stickers on the cheeks with warm golden lucky shimmer in the air.",
+  sweet_hearts: "Float pastel candy conversation hearts in the air around the person with soft pink romantic studio lighting.",
+  elf_cutout: "Put a festive green-and-red Christmas elf hat with cute pointy elf ears and a golden jingle bell on the head.",
+  santa_cutout: "Put a cozy fluffy red-and-white Santa Claus hat on the head with soft falling snow bokeh in the background.",
+  frosty: "Wrap a cozy winter knit scarf around the neck with soft falling snowflakes and crisp frosty winter wonderland lighting.",
+  locket: "Surround the person with a mystical golden starlight aura, floating warm sparkles, and magical twilight glow.",
+  hom_nay_an_gi: "Float playful appetizing miniature icons of Vietnamese street food like pho bowls, banh mi, and iced milk tea in a halo around the background.",
+};
 
 const MEMORY_IMAGES = new Map();
 const FRAME_CACHE = new Map();
@@ -460,6 +533,102 @@ function alphaCompositeRgbaOverRgb(canvasRgb, frameRgba) {
   }
 }
 
+function firstNonEmptyString(values) {
+  for (const v of values) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function detectAiRequest(dataNode, rawBodyText) {
+  let rawFilterId = firstNonEmptyString([
+    dataNode?.filterId,
+    dataNode?.filter_id,
+    dataNode?.uid,
+    dataNode?.id,
+    dataNode?.filter?.id,
+    dataNode?.filter?.uid,
+    dataNode?.effectId,
+    dataNode?.effect_id,
+  ]);
+  const rawUserPrompt = firstNonEmptyString([
+    dataNode?.customPrompt,
+    dataNode?.custom_prompt,
+    dataNode?.prompt,
+    dataNode?.filterPrompt,
+    dataNode?.filter_prompt,
+    dataNode?.filter?.prompt,
+    dataNode?.text,
+    dataNode?.description,
+  ]);
+
+  if (!rawFilterId && rawBodyText) {
+    for (const id of Object.keys(AI_FILTER_PROMPTS)) {
+      if (rawBodyText.includes('"' + id + '"')) {
+        rawFilterId = id;
+        break;
+      }
+    }
+  }
+
+  if (rawFilterId && AI_FILTER_PROMPTS[rawFilterId]) {
+    return { filterId: rawFilterId, prompt: FACE_LOCK + AI_FILTER_PROMPTS[rawFilterId], source: "catalog" };
+  }
+  if (rawUserPrompt && AI_FILTER_PROMPTS[rawUserPrompt]) {
+    return { filterId: rawUserPrompt, prompt: FACE_LOCK + AI_FILTER_PROMPTS[rawUserPrompt], source: "catalog_prompt_id" };
+  }
+  if (rawUserPrompt) {
+    return {
+      filterId: rawFilterId || "custom_prompt",
+      prompt: FACE_LOCK + "Apply this natural photorealistic edit: " + rawUserPrompt.slice(0, 500),
+      source: "custom_prompt",
+    };
+  }
+  if (rawFilterId) {
+    return {
+      filterId: rawFilterId,
+      prompt: FACE_LOCK + 'Apply a natural photorealistic "' + rawFilterId.replace(/[_-]+/g, " ") + '" camera filter effect.',
+      source: "dynamic_filter_id",
+    };
+  }
+  return null;
+}
+
+function sniffImageFormat(bytes) {
+  if (bytes && bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return { mimeType: "image/png", ext: "png" };
+  }
+  if (bytes && bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xd8) {
+    return { mimeType: "image/jpeg", ext: "jpg" };
+  }
+  if (
+    bytes &&
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return { mimeType: "image/webp", ext: "webp" };
+  }
+  return { mimeType: "image/jpeg", ext: "jpg" };
+}
+
+async function fetchBytesViaWsrv(targetUrl, query, minBytes = 200) {
+  try {
+    const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(targetUrl)}&${query}`);
+    if (res.ok) {
+      const ab = await res.arrayBuffer();
+      if (ab.byteLength > minBytes) return new Uint8Array(ab);
+    }
+  } catch (_) {}
+  return null;
+}
+
 async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId) {
   let pngBytes = null;
 
@@ -467,16 +636,8 @@ async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId) {
   if (imgBytes && imgBytes.length > 0) {
     const rawKey = `raw_${tempId}.jpg`;
     MEMORY_IMAGES.set(rawKey, { bytes: imgBytes, mimeType: "image/jpeg", ts: Date.now() });
-    const rawUrl = `${origin}/ai-filters/${rawKey}`;
     try {
-      const wRes = await fetch(
-        `https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=512&h=512&fit=cover&output=png&af=false`
-      );
-      if (wRes.ok) {
-        const ab = await wRes.arrayBuffer();
-        if (ab.byteLength > 200) pngBytes = new Uint8Array(ab);
-      }
-    } catch (_) {
+      pngBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, "w=512&h=512&fit=cover&output=png&af=false", 200);
     } finally {
       MEMORY_IMAGES.delete(rawKey);
     }
@@ -484,21 +645,116 @@ async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId) {
 
   // Secondary fallback: if sourceUrl is directly accessible to wsrv.nl
   if (!pngBytes && sourceUrl && sourceUrl.startsWith("http")) {
-    try {
-      const wRes2 = await fetch(
-        `https://wsrv.nl/?url=${encodeURIComponent(sourceUrl)}&w=512&h=512&fit=cover&output=png&af=false`
-      );
-      if (wRes2.ok) {
-        const ab2 = await wRes2.arrayBuffer();
-        if (ab2.byteLength > 200) pngBytes = new Uint8Array(ab2);
-      }
-    } catch (_) {}
+    pngBytes = await fetchBytesViaWsrv(sourceUrl, "w=512&h=512&fit=cover&output=png&af=false", 200);
   }
 
   if (pngBytes) {
     return decodePngToRgb(pngBytes);
   }
   return null;
+}
+
+async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId) {
+  let resizedBytes = null;
+  if (imgBytes && imgBytes.length > 0) {
+    const rawKey = `ai_raw_${tempId}.jpg`;
+    MEMORY_IMAGES.set(rawKey, { bytes: imgBytes, mimeType: sniffImageFormat(imgBytes).mimeType, ts: Date.now() });
+    try {
+      resizedBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, "w=512&h=512&fit=cover&output=jpg&q=90", 500);
+    } finally {
+      MEMORY_IMAGES.delete(rawKey);
+    }
+  }
+
+  if (!resizedBytes && sourceUrl && sourceUrl.startsWith("http")) {
+    resizedBytes = await fetchBytesViaWsrv(sourceUrl, "w=512&h=512&fit=cover&output=jpg&q=90", 500);
+  }
+
+  if (resizedBytes) {
+    return { bytes: resizedBytes, mimeType: "image/jpeg" };
+  }
+  if (imgBytes && imgBytes.length > 0) {
+    return { bytes: imgBytes, mimeType: sniffImageFormat(imgBytes).mimeType };
+  }
+  return null;
+}
+
+async function runCloudflareFluxEdit(env, promptText, inputImg) {
+  const aiModel = (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
+  const outSize = parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
+
+  const form = new FormData();
+  form.append("prompt", promptText);
+  form.append("width", String(outSize));
+  form.append("height", String(outSize));
+  if (inputImg && inputImg.bytes && inputImg.bytes.length > 0) {
+    const ext = inputImg.mimeType === "image/png" ? "input.png" : "input.jpg";
+    form.append("input_image_0", new Blob([inputImg.bytes], { type: inputImg.mimeType }), ext);
+  }
+
+  const formResp = new Response(form);
+  const aiResp = await env.AI.run(aiModel, {
+    multipart: {
+      body: formResp.body,
+      contentType: formResp.headers.get("content-type"),
+    },
+  });
+
+  let bytes = null;
+  if (typeof aiResp?.image === "string") {
+    bytes = base64ToUint8Array(aiResp.image);
+  } else if (typeof aiResp?.result?.image === "string") {
+    bytes = base64ToUint8Array(aiResp.result.image);
+  } else if (aiResp instanceof Uint8Array) {
+    bytes = aiResp;
+  } else if (aiResp instanceof ArrayBuffer) {
+    bytes = new Uint8Array(aiResp);
+  } else if (aiResp && typeof aiResp.getReader === "function") {
+    bytes = new Uint8Array(await new Response(aiResp).arrayBuffer());
+  } else {
+    throw new Error("Unexpected Workers AI response: " + JSON.stringify(aiResp).slice(0, 200));
+  }
+
+  return { bytes, ...sniffImageFormat(bytes), aiModel, outSize };
+}
+
+function buildLocketFilterResponse(outUrl) {
+  const jsonResp = {
+    result: {
+      outputUrl: outUrl,
+      output_url: outUrl,
+      url: outUrl,
+      imageUrl: outUrl,
+      image_url: outUrl,
+      filteredImageUrl: outUrl,
+      filtered_image_url: outUrl,
+      status: 200,
+      is_gold: true,
+      is_locked: false,
+      requires_gold: false,
+      unlocked: true,
+      out_of_credits: false,
+      ai_credits: 999999,
+      data: {
+        outputUrl: outUrl,
+        output_url: outUrl,
+        url: outUrl,
+        imageUrl: outUrl,
+        image_url: outUrl,
+        filteredImageUrl: outUrl,
+        filtered_image_url: outUrl,
+      },
+    },
+    outputUrl: outUrl,
+    output_url: outUrl,
+    url: outUrl,
+    imageUrl: outUrl,
+    status: 200,
+  };
+  return new Response(JSON.stringify(jsonResp), {
+    status: 200,
+    headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+  });
 }
 
 async function encodeCanvasToImage(canvasRgb, origin, tempId) {
@@ -539,83 +795,64 @@ async function handleStudioRequest(request, env) {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
 
-    cleanupMemory();
-    const url = new URL(request.url);
+  cleanupMemory();
+  const url = new URL(request.url);
 
-    // 1. Status endpoint
-    if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/status")) {
-      return new Response(
-        JSON.stringify({
-          status: "online",
-          platform: "Cloudflare Workers 24/7 (PNG Frame & Photobooth Engine)",
-          owner: "Tommm",
-          frames_loaded: Object.keys(FRAMES_MANIFEST).length,
-          cached_frames_in_ram: FRAME_CACHE.size,
-          cached_images_in_ram: MEMORY_IMAGES.size,
-          last_debug: LAST_DEBUG,
+  // 1. Status endpoint
+  if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/status")) {
+    return new Response(
+      JSON.stringify({
+        status: "online",
+        platform: "Cloudflare Workers 24/7 (PNG Frame, Photobooth & FLUX.2 AI Engine)",
+        owner: "Tommm",
+        ai_model: (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b",
+        ai_binding_ready: !!(env && env.AI),
+        ai_prompts_loaded: Object.keys(AI_FILTER_PROMPTS).length,
+        frames_loaded: Object.keys(FRAMES_MANIFEST).length,
+        cached_frames_in_ram: FRAME_CACHE.size,
+        cached_images_in_ram: MEMORY_IMAGES.size,
+        last_debug: LAST_DEBUG,
+      }),
+      { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
+    );
+  }
+
+  // 2. Serve temporary / generated images from RAM
+  if (request.method === "GET" && url.pathname.startsWith("/ai-filters/")) {
+    const id = url.pathname.slice("/ai-filters/".length);
+    const item = MEMORY_IMAGES.get(id);
+    if (item) {
+      return new Response(item.bytes, {
+        status: 200,
+        headers: corsHeaders({
+          "Content-Type": item.mimeType,
+          "Cache-Control": "public, max-age=300",
         }),
-        { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
-      );
+      });
     }
+    return new Response("Image expired", { status: 404, headers: corsHeaders() });
+  }
 
-    // 2. Serve temporary / generated images from RAM
-    if (request.method === "GET" && url.pathname.startsWith("/ai-filters/")) {
-      const id = url.pathname.slice("/ai-filters/".length);
-      const item = MEMORY_IMAGES.get(id);
-      if (item) {
-        return new Response(item.bytes, {
-          status: 200,
-          headers: corsHeaders({
-            "Content-Type": item.mimeType,
-            "Cache-Control": "public, max-age=300",
-          }),
-        });
-      }
-      return new Response("Image expired", { status: 404, headers: corsHeaders() });
-    }
+  // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter / createOverlay
+  if (
+    request.method === "POST" &&
+    (url.pathname.includes("generateFilteredImage") ||
+      url.pathname.includes("generateFilter") ||
+      url.pathname.includes("applyFilter") ||
+      url.pathname.includes("createOverlay"))
+  ) {
+    const rawBodyText = await request.text();
+    let bodyObj = {};
+    try {
+      bodyObj = JSON.parse(rawBodyText || "{}");
+    } catch (_) {}
 
-    // 3. Handle Locket generateFilteredImage / applyFilter / createOverlay
-    if (
-      request.method === "POST" &&
-      (url.pathname.includes("generateFilteredImage") ||
-        url.pathname.includes("applyFilter") ||
-        url.pathname.includes("createOverlay"))
-    ) {
-      const rawBodyText = await request.text();
-      let bodyObj = {};
-      try {
-        bodyObj = JSON.parse(rawBodyText || "{}");
-      } catch (_) {}
+    const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
+    const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+    const filterId = detectFilterId(dataNode, rawBodyText);
 
-      const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
-      const filterId = detectFilterId(dataNode, rawBodyText);
-
-      // Pass-through official native Locket filters straight to Locket's servers
-      if (!filterId || !FRAMES_MANIFEST[filterId]) {
-        const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
-        LAST_DEBUG = {
-          mode: "passthrough",
-          pathname: url.pathname,
-          origHost,
-          dataKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
-          preview: rawBodyText.slice(0, 300),
-          ts: new Date().toISOString(),
-        };
-        const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
-        const fwdHeaders = new Headers();
-        for (const [k, v] of request.headers.entries()) {
-          const kl = k.toLowerCase();
-          if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
-          fwdHeaders.set(k, v);
-        }
-        return fetch(upstreamUrl, {
-          method: "POST",
-          headers: fwdHeaders,
-          body: rawBodyText,
-        });
-      }
-
-      const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+    // Priority 1: Pixel-exact PNG Frames & 4-Cut Photobooth (100% original face)
+    if (filterId && FRAMES_MANIFEST[filterId]) {
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
 
@@ -663,6 +900,7 @@ async function handleStudioRequest(request, env) {
       });
 
       LAST_DEBUG = {
+        mode: "png_frame",
         filterId,
         is4Cut: manifest.is4Cut,
         got_input: !!imgBytes,
@@ -672,44 +910,77 @@ async function handleStudioRequest(request, env) {
         ts: new Date().toISOString(),
       };
 
-      const outUrl = `${url.origin}/ai-filters/${outId}`;
-      const jsonResp = {
-        result: {
-          outputUrl: outUrl,
-          output_url: outUrl,
-          url: outUrl,
-          imageUrl: outUrl,
-          image_url: outUrl,
-          filteredImageUrl: outUrl,
-          filtered_image_url: outUrl,
-          status: 200,
-          is_gold: true,
-          is_locked: false,
-          requires_gold: false,
-          unlocked: true,
-          out_of_credits: false,
-          ai_credits: 999999,
-          data: {
-            outputUrl: outUrl,
-            output_url: outUrl,
-            url: outUrl,
-            imageUrl: outUrl,
-            image_url: outUrl,
-            filteredImageUrl: outUrl,
-            filtered_image_url: outUrl,
-          },
-        },
-        outputUrl: outUrl,
-        output_url: outUrl,
-        url: outUrl,
-        imageUrl: outUrl,
-        status: 200,
-      };
-      return new Response(JSON.stringify(jsonResp), {
-        status: 200,
-        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
-      });
+      return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
     }
+
+    // Priority 2: Cloudflare Workers AI (FLUX.2 Klein 4B) for AI 3D Hot, Native AI & Custom Prompts
+    const aiReq = detectAiRequest(dataNode, rawBodyText);
+    if (aiReq && env && env.AI) {
+      const t0 = Date.now();
+      try {
+        const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
+        const tempId = crypto.randomUUID().slice(0, 12);
+        const preparedInput = await prepareAiInputImage(imgBytes, sourceUrl, url.origin, tempId);
+        const aiOut = await runCloudflareFluxEdit(env, aiReq.prompt, preparedInput);
+
+        const outId = `tommm_ai_${tempId}.${aiOut.ext}`;
+        MEMORY_IMAGES.set(outId, {
+          bytes: aiOut.bytes,
+          mimeType: aiOut.mimeType,
+          ts: Date.now(),
+        });
+
+        LAST_DEBUG = {
+          mode: "ai_flux",
+          aiModel: aiOut.aiModel,
+          filterId: aiReq.filterId,
+          source: aiReq.source,
+          got_input: !!imgBytes,
+          input_bytes: preparedInput?.bytes?.length || 0,
+          out_mime: aiOut.mimeType,
+          out_bytes: aiOut.bytes.length,
+          ms: Date.now() - t0,
+          error: null,
+          ts: new Date().toISOString(),
+        };
+
+        return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+      } catch (err) {
+        LAST_DEBUG = {
+          mode: "ai_error",
+          filterId: aiReq.filterId,
+          error: String(err?.message || err),
+          ms: Date.now() - t0,
+          ts: new Date().toISOString(),
+        };
+      }
+    }
+
+    // Priority 3: Pass-through unknown filters straight to Locket's servers
+    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
+    if (!LAST_DEBUG || LAST_DEBUG.mode !== "ai_error") {
+      LAST_DEBUG = {
+        mode: "passthrough",
+        pathname: url.pathname,
+        origHost,
+        dataKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+        preview: rawBodyText.slice(0, 300),
+        ts: new Date().toISOString(),
+      };
+    }
+    const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
+    const fwdHeaders = new Headers();
+    for (const [k, v] of request.headers.entries()) {
+      const kl = k.toLowerCase();
+      if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
+      fwdHeaders.set(k, v);
+    }
+    return fetch(upstreamUrl, {
+      method: "POST",
+      headers: fwdHeaders,
+      body: rawBodyText,
+    });
+  }
 
   return new Response(JSON.stringify({ result: { status: 200, success: true }, status: 200 }), {
     headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),

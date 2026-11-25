@@ -6,7 +6,8 @@ compatibility_date = "2026-01-01"
 binding = "AI"
 
 [vars]
-GEMINI_MODEL = "gemini-3.1-flash-lite-image"
+AI_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
+AI_OUTPUT_SIZE = "768"
 GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets"
 
 [durable_objects]
