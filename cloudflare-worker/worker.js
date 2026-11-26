@@ -1914,7 +1914,7 @@ async function handleStudioRequest(request, env) {
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
-        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_string",
+        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_object_full",
         last_debug: LAST_DEBUG,
         last_caption_debug: LAST_CAPTION_DEBUG,
       }),
@@ -1924,7 +1924,15 @@ async function handleStudioRequest(request, env) {
 
   // 1.5 Runtime switcher cho response format của /generateCaption (test nhanh không cần redeploy)
   if (request.method === "GET" && url.pathname === "/caption-mode") {
-    const allowed = ["data_string", "data_object_full", "data_openai_resp", "data_parsed", "bare"];
+    const allowed = [
+      "data_object_full",
+      "data_string",
+      "data_openai_resp",
+      "data_parsed",
+      "result_openai_resp",
+      "result_data_caption_only",
+      "bare",
+    ];
     const m = (url.searchParams.get("m") || "").trim();
     if (m === "reset" || m === "default") {
       CAPTION_MODE_OVERRIDE = null;
@@ -1934,7 +1942,7 @@ async function handleStudioRequest(request, env) {
     return new Response(
       JSON.stringify({
         ok: true,
-        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_string",
+        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_object_full",
         allowed,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
@@ -2019,6 +2027,7 @@ async function handleStudioRequest(request, env) {
 
   // 2.5 Handle Locket /generateCaption (LNN LIVE Tin nong & Trich dan)
   if (request.method === "POST" && url.pathname.includes("generateCaption")) {
+    const t0 = Date.now();
     const rawBodyText = await request.text();
     let bodyObj = {};
     try {
@@ -2053,9 +2062,9 @@ async function handleStudioRequest(request, env) {
     let upStatus = 0;
     let upText = "";
     try {
-      // Forward lên server gốc với timeout NGẮN (2s) — nếu account có quyền thì passthrough thật;
+      // Forward lên server gốc với timeout NGẮN (800ms) — nếu account có quyền thì passthrough thật;
       // nếu chậm/401 (thường gặp) thì bỏ qua ngay, generate bằng AI để app không bị timeout -> "thử lại".
-      const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText, signal: AbortSignal.timeout(2000) });
+      const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText, signal: AbortSignal.timeout(800) });
       upStatus = upRes.status;
       upText = await upRes.text();
       let parsedUp = null;
@@ -2117,7 +2126,7 @@ async function handleStudioRequest(request, env) {
       usedErr = plain.aiErr;
     }
 
-    const mode = CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_string";
+    const mode = CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_object_full";
     const reqModel = (dataNode && dataNode.model) || "gpt-5.4";
 
     LAST_CAPTION_DEBUG = {
@@ -2128,12 +2137,15 @@ async function handleStudioRequest(request, env) {
       captionType,
       hasSchema,
       schemaTop: rfSchema && rfSchema.properties ? Object.keys(rfSchema.properties) : [],
+      rfFull: rf ? JSON.stringify(rf).slice(0, 1200) : null,
       reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
       reqModel,
       promptPreview: appPrompt.slice(0, 160),
       got_input: !!(imgBytes || sourceUrl),
       input_bytes: imgBytes ? imgBytes.length : 0,
       upStatus,
+      upBody: upText.slice(0, 300),
+      ms: Date.now() - t0,
       generated: outStr.slice(0, 240),
       ts: new Date().toISOString(),
     };
@@ -2141,6 +2153,31 @@ async function handleStudioRequest(request, env) {
     let finalBody;
     if (mode === "bare") {
       finalBody = outStr;
+    } else if (mode === "result_openai_resp") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          id: "resp_" + tempId,
+          object: "response",
+          status_text: "completed",
+          model: reqModel,
+          output_text: outStr,
+          output: [{
+            id: "msg_" + tempId,
+            type: "message",
+            status: "completed",
+            role: "assistant",
+            content: [{ type: "output_text", text: outStr, annotations: [] }],
+          }],
+        },
+      });
+    } else if (mode === "result_data_caption_only") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: { caption: outStr },
+        },
+      });
     } else if (mode === "data_object_full") {
       finalBody = JSON.stringify({
         result: {
@@ -2190,7 +2227,7 @@ async function handleStudioRequest(request, env) {
         },
       });
     } else {
-      // data_string (mặc định)
+      // data_string
       finalBody = JSON.stringify({
         result: {
           status: 200,
