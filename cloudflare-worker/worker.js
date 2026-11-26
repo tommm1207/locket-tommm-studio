@@ -127,6 +127,7 @@ let LAST_CAPTION_DEBUG = null;
 let CAPTION_MODE_OVERRIDE = null;
 let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
+const SKIP_GEMINI_MODELS = new Map(); // modelId -> timestamp until skip (on 503 high demand / 404 / timeout)
 const RECENT_QUOTE_IDS = [];
 function rememberQuoteIds(ids) {
   for (const id of ids) {
@@ -135,6 +136,14 @@ function rememberQuoteIds(ids) {
   }
   while (RECENT_QUOTE_IDS.length > 40) RECENT_QUOTE_IDS.shift();
 }
+const RECENT_LIVE_QUOTES = [];
+function rememberLiveQuoteKey(key) {
+  if (!key) return;
+  if (!RECENT_LIVE_QUOTES.includes(key)) RECENT_LIVE_QUOTES.push(key);
+  while (RECENT_LIVE_QUOTES.length > 80) RECENT_LIVE_QUOTES.shift();
+}
+const LIVE_QUOTE_CACHE = { items: [], fetchedAt: 0, wikiIdx: 0 };
+const VI_WIKIQUOTE_TOPICS = ["Hạnh phúc", "Cuộc sống", "Tình yêu", "Tình bạn", "Thời gian", "Thành công", "Hy vọng", "Tự do"];
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -1261,7 +1270,7 @@ async function describeImageWithVision(env, prepBytes, prepMime) {
     const g = await geminiGenerateCaption(env, obsSys, obsUser, prepBytes, prepMime, k, 95, true);
     const clean = String(g.text || "").replace(/\s+/g, " ").trim();
     if (clean && !isCaptionRefusal(clean)) {
-      return { desc: clean.slice(0, 320), source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest") };
+      return { desc: clean.slice(0, 320), source: "gemini:" + (g.model || (env && env.GEMINI_TEXT_MODEL) || "gemini-4-hydrogen") };
     }
   }
 
@@ -1473,11 +1482,12 @@ function availableKeys(providerName, raw) {
   return fresh.length > 0 ? fresh : rotated;
 }
 
-// Gọi Gemini generateContent cho CAPTION (text, có kèm ảnh nếu có). Trả chuỗi text hoặc null.
-async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key, maxTokens = 120, rawMode = false) {
-  if (!key) return { text: null, err: "no_gemini_key" };
-  const model = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+// Gọi Gemini generateContent cho CAPTION (text, có kèm ảnh nếu có). Smart cascade: gemini-4-hydrogen -> 3.5-flash-lite -> 3.1-flash-lite -> flash-lite-latest.
+async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key, maxTokens = 120, rawMode = false, temperature = 0.8) {
+  if (!key) return { text: null, model: null, err: "no_gemini_key" };
+  const defaultModels = ["gemini-4-hydrogen", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-lite-latest"];
+  const envModel = env && env.GEMINI_TEXT_MODEL ? String(env.GEMINI_TEXT_MODEL).trim() : "";
+  const models = envModel ? [envModel, ...defaultModels.filter((m) => m !== envModel)] : defaultModels;
 
   const parts = [{ text: userText }];
   if (imgBytes && imgBytes.length > 0) {
@@ -1486,29 +1496,54 @@ async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
   const payload = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: "user", parts }],
-    generationConfig: { temperature: 0.8, maxOutputTokens: maxTokens },
+    generationConfig: { temperature, maxOutputTokens: Math.max(maxTokens, 160) },
   };
-  try {
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      if (r.status === 429 || r.status === 403) benchKey(key); // hết quota key này -> cho nghỉ
-      return { text: null, err: `gemini_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
+
+  let lastErr = null;
+  for (const model of models) {
+    if ((SKIP_GEMINI_MODELS.get(model) || 0) > Date.now()) continue;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+    try {
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(model === "gemini-4-hydrogen" ? 2800 : 6000),
+      });
+      if (!r.ok) {
+        lastErr = `gemini_http_${r.status}: ${(await r.text()).slice(0, 160)}`;
+        if (r.status === 429 || r.status === 403) {
+          benchKey(key, 20);
+          return { text: null, model, err: lastErr };
+        }
+        if (r.status === 404) {
+          SKIP_GEMINI_MODELS.set(model, Date.now() + 30 * 60 * 1000);
+          continue;
+        }
+        if (r.status === 503) {
+          SKIP_GEMINI_MODELS.set(model, Date.now() + 3 * 60 * 1000);
+          continue;
+        }
+        continue;
+      }
+      const j = await r.json();
+      const cand = j && j.candidates && j.candidates[0];
+      const txtParts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
+      let txt = txtParts.map((p) => (typeof p.text === "string" ? p.text : "")).join(" ").trim();
+      if (rawMode) {
+        if (txt) return { text: txt, model, err: null };
+        lastErr = "gemini_empty";
+        continue;
+      }
+      txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
+      if (txt && txt.length >= 3) return { text: txt.slice(0, 120), model, err: null };
+      lastErr = "gemini_empty";
+    } catch (e) {
+      lastErr = String((e && e.message) || e);
+      SKIP_GEMINI_MODELS.set(model, Date.now() + 2 * 60 * 1000);
     }
-    const j = await r.json();
-    const cand = j && j.candidates && j.candidates[0];
-    const txtParts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
-    let txt = txtParts.map((p) => (typeof p.text === "string" ? p.text : "")).join(" ").trim();
-    if (rawMode) return txt ? { text: txt, err: null } : { text: null, err: "gemini_empty" };
-    txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
-    if (txt && txt.length >= 3) return { text: txt.slice(0, 120), err: null };
-    return { text: null, err: "gemini_empty" };
-  } catch (e) {
-    return { text: null, err: String(e && e.message || e) };
   }
+  return { text: null, model: null, err: lastErr || "gemini_unavailable" };
 }
 
 // Gọi 1 endpoint CHAT tương thích OpenAI cho CAPTION (dùng chung cho NVIDIA NIM & Groq).
@@ -1819,49 +1854,273 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null, sk
   return { data: { quotes }, matchedCount, selectedIds };
 }
 
-async function generateFreshPhotoQuotes(env, visionDesc) {
-  if (!visionDesc || !env || (!env.AI && !env.CF_AI_ACCOUNTS)) return [];
-  const sys =
-    'Bạn là người viết câu trích dẫn tiếng Việt tinh tế, giàu cảm xúc, tự nhiên 100% đúng ngữ pháp (tuyệt đối không dịch cứng, không sai chính tả, không pha chữ Hán, không bịa tên người nổi tiếng). Dựa vào mô tả bức ảnh, hãy sáng tác ĐÚNG 2 câu trích dẫn ngắn gọn (8-18 từ mỗi câu), bám sát chi tiết thật trong ảnh:\n- c1: sâu lắng, chữa lành hoặc chill nhẹ nhàng.\n- c2: duyên dáng, tươi vui hoặc truyền cảm hứng nhẹ.\nChỉ trả về duy nhất 1 JSON hợp lệ: {"c1":"...","c2":"..."}. Không thêm chữ nào khác.';
-  const usr = `Mô tả bức ảnh: ${visionDesc}\n\nHãy sáng tác 2 câu trích dẫn tiếng Việt thật hay và tự nhiên cho bức ảnh này.`;
-  try {
-    const res = await runCfTextChatPooled(
-      env,
-      [
-        { role: "system", content: sys },
-        { role: "user", content: usr },
-      ],
-      160,
-      0.75
-    );
-    let txt = String(res?.text || "").trim().replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
-    const a = txt.indexOf("{");
-    const b = txt.lastIndexOf("}");
-    if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
-    const j = JSON.parse(txt);
-    const cleanOne = (v) =>
-      String(v || "")
-        .replace(/[\r\n]+/g, " ")
-        .replace(/^["'“”*]+|["'“”*]+$/g, "")
-        .trim();
-    const valid = (s) => s.length >= 12 && s.length <= 125 && !isCaptionRefusal(s) && !/[\u4e00-\u9fff]/.test(s);
+function cleanWikiText(s) {
+  return String(s || "")
+    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\{\{[^}]*\}\}/g, " ")
+    .replace(/\[\[(?:[^|\]]+\|)?([^\]]+)\]\]/g, "$1")
+    .replace(/''+/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^["'“”*:\-\s]+|["'“”*\s]+$/g, "")
+    .trim();
+}
+
+function parseViWikiquoteWikitext(wt) {
+  const lines = String(wt || "").split(/\r?\n/);
+  const items = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    const qMatch = lines[i].match(/^\*([^*\n].*)/);
+    if (!qMatch) continue;
+    let j = i + 1;
+    while (j < lines.length && !lines[j].trim()) j++;
+    if (j >= lines.length) continue;
+    const aMatch = lines[j].match(/^\*\*([^*\n].*)/);
+    if (!aMatch) continue;
+    const quote = cleanWikiText(qMatch[1]);
+    const author = cleanWikiText(aMatch[1]);
+    if (
+      quote.length >= 16 &&
+      quote.length <= 135 &&
+      author.length >= 2 &&
+      author.length <= 45 &&
+      !/http|\[\[|thiếu nguồn|chưa rõ/i.test(quote + " " + author) &&
+      !/[\u4e00-\u9fff]/.test(quote)
+    ) {
+      items.push({
+        key: "wk:" + author + ":" + quote.slice(0, 32),
+        text: quote,
+        author,
+        lang: "vi",
+        src: "vi_wikiquote",
+      });
+    }
+    i = j;
+  }
+  return items;
+}
+
+async function fetchExternalRealQuotesBatch() {
+  const djSkip = Math.floor(Math.random() * 1410);
+  const topic = VI_WIKIQUOTE_TOPICS[LIVE_QUOTE_CACHE.wikiIdx++ % VI_WIKIQUOTE_TOPICS.length];
+
+  const djPromise = (async () => {
+    const r = await fetch(`https://dummyjson.com/quotes?limit=40&skip=${djSkip}`, {
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!r.ok) return [];
+    const j = await r.json();
+    const list = Array.isArray(j?.quotes) ? j.quotes : [];
     const out = [];
-    const s1 = cleanOne(j?.c1);
-    const s2 = cleanOne(j?.c2);
-    if (valid(s1)) out.push({ quote: s1, attribution: "Nhật ký hôm nay" });
-    if (valid(s2) && s2 !== s1) out.push({ quote: s2, attribution: "Locket AI" });
+    for (const q of list) {
+      const text = String(q?.quote || "").replace(/\s+/g, " ").trim();
+      const author = String(q?.author || "").replace(/\s+/g, " ").trim();
+      if (
+        text.length >= 20 &&
+        text.length <= 145 &&
+        author.length >= 2 &&
+        !/unknown|anonymous/i.test(author)
+      ) {
+        out.push({ key: "dj:" + q.id, text, author, lang: "en", src: "dummyjson" });
+      }
+    }
     return out;
-  } catch (_) {
-    return [];
+  })();
+
+  const zqPromise = (async () => {
+    const r = await fetch("https://zenquotes.io/api/quotes", {
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!r.ok) return [];
+    const list = await r.json();
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    for (const x of list) {
+      const text = String(x?.q || "").replace(/\s+/g, " ").trim();
+      const author = String(x?.a || "").replace(/\s+/g, " ").trim();
+      if (
+        text.length >= 20 &&
+        text.length <= 145 &&
+        author.length >= 2 &&
+        !/zenquotes|unknown|anonymous/i.test(text + " " + author)
+      ) {
+        out.push({ key: "zq:" + author + ":" + text.slice(0, 32), text, author, lang: "en", src: "zenquotes" });
+      }
+    }
+    return out;
+  })();
+
+  const wkPromise = (async () => {
+    const u = `https://vi.wikiquote.org/w/api.php?action=parse&page=${encodeURIComponent(topic)}&prop=wikitext&format=json`;
+    const r = await fetch(u, {
+      headers: { "User-Agent": "LocketTommmStudio/1.0 (https://locket-tommm-studio.khoinguyennguyen85.workers.dev)" },
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!r.ok) return [];
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("json")) return [];
+    const j = await r.json();
+    const wt = j?.parse?.wikitext?.["*"] || "";
+    return parseViWikiquoteWikitext(wt).slice(0, 20);
+  })();
+
+  const results = await Promise.allSettled([djPromise, zqPromise, wkPromise]);
+  const incoming = [];
+  for (const res of results) {
+    if (res.status === "fulfilled" && Array.isArray(res.value)) {
+      incoming.push(...res.value);
+    }
+  }
+  if (incoming.length > 0) {
+    const seen = new Set();
+    const merged = [];
+    for (const item of [...incoming, ...LIVE_QUOTE_CACHE.items]) {
+      if (!item || !item.key || seen.has(item.key)) continue;
+      seen.add(item.key);
+      merged.push(item);
+      if (merged.length >= 160) break;
+    }
+    LIVE_QUOTE_CACHE.items = merged;
+    LIVE_QUOTE_CACHE.fetchedAt = Date.now();
   }
 }
 
-function mergeHybridQuotes(pickedObj, freshQuotes, seedText = "") {
+function shuffleInPlace(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+async function getLiveRealQuoteCandidates(count = 16) {
+  let unused = LIVE_QUOTE_CACHE.items.filter((it) => !RECENT_LIVE_QUOTES.includes(it.key));
+  if (unused.length < 18 || Date.now() - LIVE_QUOTE_CACHE.fetchedAt > 15 * 60 * 1000) {
+    await fetchExternalRealQuotesBatch();
+    unused = LIVE_QUOTE_CACHE.items.filter((it) => !RECENT_LIVE_QUOTES.includes(it.key));
+  }
+  const pool = unused.length > 0 ? unused : LIVE_QUOTE_CACHE.items;
+  if (pool.length === 0) return [];
+
+  const viPool = shuffleInPlace(pool.filter((it) => it.lang === "vi"));
+  const enPool = shuffleInPlace(pool.filter((it) => it.lang === "en"));
+  const selected = [];
+  for (const item of viPool.slice(0, 6)) selected.push(item);
+  for (const item of enPool) {
+    if (selected.length >= count) break;
+    selected.push(item);
+  }
+  if (selected.length < count) {
+    for (const item of viPool.slice(6)) {
+      if (selected.length >= count) break;
+      selected.push(item);
+    }
+  }
+  return shuffleInPlace(selected);
+}
+
+async function fetchAndPickLiveRealQuotes(env, visionDesc) {
+  if (!visionDesc) return { quotes: [], via: null };
+  const candidates = await getLiveRealQuoteCandidates(16);
+  if (candidates.length === 0) return { quotes: [], via: null };
+
+  const numbered = candidates
+    .map((c, i) => `${i}: [${c.lang.toUpperCase()}] "${c.text}" — ${c.author}`)
+    .join("\n");
+  const sys =
+    'Bạn là người tuyển chọn và dịch trích dẫn có thật sang tiếng Việt. Từ danh sách CÁC CÂU TRÍCH DẪN CÓ THẬT dưới đây, hãy chọn ĐÚNG 2 câu có chỉ số `idx` khác nhau phù hợp nhất với bức ảnh.\n' +
+    "- Tuyệt đối KHÔNG bịa câu mới, KHÔNG bịa tên tác giả.\n" +
+    "- Nếu câu được đánh dấu [EN], hãy dịch sát nghĩa sang tiếng Việt thật tự nhiên, mượt mà, giàu chất thơ (đúng chính tả 100%, không dịch cứng word-by-word, không pha chữ Hán).\n" +
+    "- Nếu câu được đánh dấu [VI], giữ nguyên văn tiếng Việt gốc.\n" +
+    'Chỉ trả về duy nhất 1 JSON hợp lệ: {"picks":[{"idx":2,"vi":"..."},{"idx":9,"vi":"..."}]}. Không thêm chữ nào khác.';
+  const usr = `Mô tả bức ảnh: ${visionDesc}\n\nDanh sách trích dẫn thật:\n${numbered}`;
+
+  const parseLivePicks = (rawText) => {
+    if (!rawText) return [];
+    let txt = String(rawText).trim().replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    const a = txt.indexOf("{");
+    const b = txt.lastIndexOf("}");
+    if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
+    let j = null;
+    try {
+      j = JSON.parse(txt);
+    } catch (_) {
+      return [];
+    }
+    const picks = Array.isArray(j?.picks) ? j.picks : [];
+    const seenIdx = new Set();
+    const out = [];
+    for (const p of picks) {
+      if (out.length >= 2) break;
+      const idx = Number(p?.idx);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= candidates.length || seenIdx.has(idx)) continue;
+      const cand = candidates[idx];
+      let finalQuote = "";
+      if (cand.lang === "vi") {
+        finalQuote = cand.text;
+      } else {
+        const cleaned = String(p?.vi || "")
+          .replace(/[\r\n]+/g, " ")
+          .replace(/^["'“”*]+|["'“”*]+$/g, "")
+          .trim();
+        const hasViDiacritics = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i.test(cleaned);
+        if (
+          cleaned.length >= 12 &&
+          cleaned.length <= 150 &&
+          !isCaptionRefusal(cleaned) &&
+          !/[\u4e00-\u9fff]/.test(cleaned) &&
+          hasViDiacritics
+        ) {
+          finalQuote = cleaned;
+        }
+      }
+      if (!finalQuote) continue;
+      seenIdx.add(idx);
+      rememberLiveQuoteKey(cand.key);
+      out.push({ quote: finalQuote, attribution: cand.author, src: cand.src });
+    }
+    return out;
+  };
+
+  // 1) Gemini smart cascade (3 keys)
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const g = await geminiGenerateCaption(env, sys, usr, null, null, k, 320, true, 0.3);
+    const quotes = parseLivePicks(g.text);
+    if (quotes.length >= 1) {
+      return { quotes, via: g.model || "gemini" };
+    }
+  }
+
+  // 2) Fallback CF 18-pool Llama 4 Scout
+  if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+    try {
+      const res = await runCfTextChatPooled(
+        env,
+        [
+          { role: "system", content: sys },
+          { role: "user", content: usr },
+        ],
+        260,
+        0.3
+      );
+      const quotes = parseLivePicks(res?.text);
+      if (quotes.length >= 1) {
+        return { quotes, via: "cf" };
+      }
+    } catch (_) {}
+  }
+
+  return { quotes: [], via: null };
+}
+
+function mergeHybridQuotes(pickedObj, liveObj, seedText = "") {
   const baseQuotes = Array.isArray(pickedObj?.data?.quotes) ? pickedObj.data.quotes : [];
   const baseIds = Array.isArray(pickedObj?.selectedIds) ? pickedObj.selectedIds : [];
-  if (!Array.isArray(freshQuotes) || freshQuotes.length === 0 || baseQuotes.length < 5) {
+  const liveQuotes = Array.isArray(liveObj) ? liveObj : Array.isArray(liveObj?.quotes) ? liveObj.quotes : [];
+  const liveVia = !Array.isArray(liveObj) && liveObj?.via ? liveObj.via : "";
+  if (liveQuotes.length === 0 || baseQuotes.length < 5) {
     rememberQuoteIds(baseIds);
-    return { data: pickedObj.data, hybridCount: 0 };
+    return { data: pickedObj.data, liveCount: 0, liveVia: "" };
   }
   const pairChoices = [
     [2, 4],
@@ -1871,22 +2130,38 @@ function mergeHybridQuotes(pickedObj, freshQuotes, seedText = "") {
   ];
   let h = 0;
   for (let i = 0; i < seedText.length; i++) h = (h * 31 + seedText.charCodeAt(i)) >>> 0;
-  const replaceSlots = new Set(pairChoices[h % pairChoices.length].slice(0, freshQuotes.length));
+  const candidateSlots = pairChoices[h % pairChoices.length];
+  const keptAttrs = new Set(
+    baseQuotes
+      .filter((_, idx) => !candidateSlots.includes(idx))
+      .map((q) => String(q.attribution || "").toLowerCase().trim())
+  );
+  const filteredLive = liveQuotes.filter((lq) => {
+    const a = String(lq.attribution || "").toLowerCase().trim();
+    if (!a || keptAttrs.has(a)) return false;
+    keptAttrs.add(a);
+    return true;
+  });
+  if (filteredLive.length === 0) {
+    rememberQuoteIds(baseIds);
+    return { data: pickedObj.data, liveCount: 0, liveVia: "" };
+  }
+  const replaceSlots = new Set(candidateSlots.slice(0, filteredLive.length));
   const merged = baseQuotes.map((item) => ({ ...item }));
   let fIdx = 0;
   for (const slot of replaceSlots) {
-    if (slot < merged.length && freshQuotes[fIdx]) {
-      merged[slot].quote = freshQuotes[fIdx].quote;
-      merged[slot].attribution = freshQuotes[fIdx].attribution;
+    if (slot < merged.length && filteredLive[fIdx]) {
+      merged[slot].quote = filteredLive[fIdx].quote;
+      merged[slot].attribution = filteredLive[fIdx].attribution;
       fIdx++;
     }
   }
   const keptIds = baseIds.filter((_, idx) => !replaceSlots.has(idx));
   rememberQuoteIds(keptIds);
-  return { data: { quotes: merged }, hybridCount: fIdx };
+  return { data: { quotes: merged }, liveCount: fIdx, liveVia };
 }
 
-// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu hybrid: 3 bank thật + 2 AI theo ảnh).
+// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu hybrid: 3 bank thật + 2 danh ngôn thật kéo live).
 async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, sourceUrl, origin, tempId, captionType) {
   const schema = rawSchema ? normalizeSchema(rawSchema) : null;
   const isQuote = /quote/i.test(appPrompt + " " + captionType) || !!(schema && schema.properties && schema.properties.quotes);
@@ -1905,7 +2180,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     try { return JSON.parse(s); } catch (_) { return null; }
   };
 
-  // Nhánh QUOTE: Hybrid Mode = 3 câu VERIFIED_QUOTE_BANK (200 câu thật) + 2 câu AI sáng tác riêng theo ảnh (chạy song song)
+  // Nhánh QUOTE: Hybrid Mode = 3 câu từ kho 200 câu thật + 2 câu danh ngôn thật kéo live từ DummyJSON/ZenQuotes/Wikiquote
   if (schema && schema.properties && schema.properties.quotes) {
     const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
     const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : Object.keys(VERIFIED_QUOTE_BANK);
@@ -1925,24 +2200,13 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
         ]
       : pickPromptDirect;
 
-    // 1) Gemini Vision (nếu có key — nhanh & chính xác nhất)
-    for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-      const g = await geminiGenerateCaption(env, "Return only JSON mapping category names to quote IDs.", pickPromptDirect, prepBytes, prepMime, k, 160, true);
-      const parsedMap = tryParse(g.text);
-      if (parsedMap && typeof parsedMap === "object") {
-        const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
-        if (picked.matchedCount >= 2) {
-          return { data: picked.data, source: "gemini_bank", err: null };
-        }
-      }
-    }
-
-    // 2) Fast 2-step + Song song: CF Vision mô tả ảnh (~1.4s) -> [Groq chọn 3-5 ID bank || Llama 4 sáng tác 2 câu theo ảnh]
+    // 1) Vision mô tả ảnh (~1.4s)
     const vision = await describeImageWithVision(env, prepBytes, prepMime);
     const pickPromptRanked = buildPickPrompt(vision.desc || "");
     const descMsg = `Photo description: ${vision.desc || "A candid everyday photo."}\n\n${pickPromptRanked}`;
 
-    const pickWithGroq = async () => {
+    const pickBankIds = async () => {
+      // (a) Groq fast JSON ID picker
       for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
         try {
           const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
@@ -1973,73 +2237,79 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
           }
         } catch (_) {}
       }
-      return null;
-    };
 
-    const [groqRes, freshQuotes] = await Promise.all([
-      pickWithGroq(),
-      generateFreshPhotoQuotes(env, vision.desc || ""),
-    ]);
-
-    if (groqRes && groqRes.picked) {
-      const merged = mergeHybridQuotes(groqRes.picked, freshQuotes, tempId);
-      return {
-        data: merged.data,
-        source: groqRes.source + (merged.hybridCount > 0 ? `+hybrid_${merged.hybridCount}` : ""),
-        err: null,
-      };
-    }
-
-    // 3) CF Vision Pool trực tiếp fallback (Llama 4 Scout -> Mistral 3.1)
-    if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
-      const res = await runVisionChatPooled(env, [{ role: "user", content: userContentPick }], 200, 0.35);
-      const parsedMap = tryParse(res.text);
-      if (parsedMap && typeof parsedMap === "object") {
-        const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
-        if (picked.matchedCount >= 2) {
-          const merged = mergeHybridQuotes(picked, freshQuotes, tempId);
-          return {
-            data: merged.data,
-            source: (res.source || "cf_vision_bank") + (merged.hybridCount > 0 ? `+hybrid_${merged.hybridCount}` : ""),
-            err: null,
-          };
-        }
-      }
-    }
-
-    // 4) NVIDIA NIM Vision fallback
-    for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
-      try {
-        const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
-        const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
-        const r = await fetch(`${base}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
-          body: JSON.stringify({ model: nvModel, messages: [{ role: "user", content: userContentPick }], max_tokens: 140, temperature: 0.35 }),
-        });
-        if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
-        const j = await r.json();
-        const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
+      // (b) Gemini cascade fallback for bank ID picking
+      for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+        const g = await geminiGenerateCaption(
+          env,
+          "Return only JSON mapping category names to quote IDs.",
+          vision.desc ? descMsg : pickPromptRanked,
+          vision.desc ? null : prepBytes,
+          vision.desc ? null : prepMime,
+          k,
+          220,
+          true,
+          0.3
+        );
+        const parsedMap = tryParse(g.text);
         if (parsedMap && typeof parsedMap === "object") {
           const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
           if (picked.matchedCount >= 2) {
-            const merged = mergeHybridQuotes(picked, freshQuotes, tempId);
-            return {
-              data: merged.data,
-              source: "nvidia:" + nvModel + "_bank" + (merged.hybridCount > 0 ? `+hybrid_${merged.hybridCount}` : ""),
-              err: null,
-            };
+            return { picked, source: (vision.source ? vision.source + "+" : "") + "gemini:" + (g.model || "gemini") + "_bank" };
           }
         }
-      } catch (_) {}
-    }
+      }
 
-    // 5) Varied real fallback từ VERIFIED_QUOTE_BANK (kèm freshQuotes nếu có)
-    const fbPicked = pickVerifiedQuotesFromMap({}, tempId + String(Date.now()), cats, true);
-    const mergedFb = mergeHybridQuotes(fbPicked, freshQuotes, tempId);
+      // (c) CF Vision Pool fallback
+      if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+        const res = await runVisionChatPooled(env, [{ role: "user", content: userContentPick }], 200, 0.35);
+        const parsedMap = tryParse(res.text);
+        if (parsedMap && typeof parsedMap === "object") {
+          const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
+          if (picked.matchedCount >= 2) {
+            return { picked, source: res.source || "cf_vision_bank" };
+          }
+        }
+      }
+
+      // (d) NVIDIA NIM Vision fallback
+      for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+        try {
+          const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
+          const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
+          const r = await fetch(`${base}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+            body: JSON.stringify({ model: nvModel, messages: [{ role: "user", content: userContentPick }], max_tokens: 140, temperature: 0.35 }),
+          });
+          if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
+          const j = await r.json();
+          const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
+          if (parsedMap && typeof parsedMap === "object") {
+            const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
+            if (picked.matchedCount >= 2) {
+              return { picked, source: "nvidia:" + nvModel + "_bank" };
+            }
+          }
+        } catch (_) {}
+      }
+
+      // (e) Varied real fallback từ VERIFIED_QUOTE_BANK
+      const fbPicked = pickVerifiedQuotesFromMap({}, tempId + String(Date.now()), cats, true);
+      return { picked: fbPicked, source: "verified_bank_fallback" };
+    };
+
+    // 2) Chạy song song: [chọn bank IDs || kéo & dịch 2 câu danh ngôn thật live]
+    const [bankRes, liveRes] = await Promise.all([
+      pickBankIds(),
+      fetchAndPickLiveRealQuotes(env, vision.desc || ""),
+    ]);
+
+    const merged = mergeHybridQuotes(bankRes.picked, liveRes, tempId);
+    const liveSuffix = merged.liveCount > 0 ? `+live_real_${merged.liveCount}${merged.liveVia ? "_" + merged.liveVia : ""}` : "";
     return {
-      data: mergedFb.data,
-      source: "verified_bank_fallback" + (mergedFb.hybridCount > 0 ? `+hybrid_${mergedFb.hybridCount}` : ""),
+      data: merged.data,
+      source: bankRes.source + liveSuffix,
       err: null,
     };
   }
@@ -2278,17 +2548,7 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const prepBytes = prep && prep.bytes && prep.bytes.length > 0 ? prep.bytes : null;
   const prepMime = prep ? prep.mimeType : "image/jpeg";
 
-  // 1) Google Gemini (vision — flagship tiếng Việt nếu đã cấu hình GEMINI_API_KEY)
-  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-    const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
-    const cleaned = cleanSingleLine(g.text);
-    if (cleaned) {
-      return { text: cleaned, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: lastErr };
-    }
-    if (g.err) lastErr = g.err;
-  }
-
-  // 2) Fast 2-stage trên CF 18-pool: Vision Observer (llama-4-scout ~1.4s) -> Llama 4 Scout viết tiếng Việt (~0.8s)
+  // 1) Fast 2-stage trên CF 18-pool (Priority #1 cho LNN LIVE): Vision Observer (llama-4-scout ~1.4s) -> Llama 4 Scout viết tiếng Việt (~0.8s)
   if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
     const vision = await describeImageWithVision(env, prepBytes, prepMime);
     if (vision.desc) {
@@ -2308,7 +2568,7 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
       if (cfTextRes.err) lastErr = cfTextRes.err;
     }
 
-    // Fallback 2b) Direct CF Vision (Llama 4 Scout -> Mistral 3.1)
+    // Fallback 1b) Direct CF Vision (Llama 4 Scout -> Mistral 3.1)
     const userContent = [];
     if (prepBytes) {
       userContent.push({ type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } });
@@ -2329,6 +2589,16 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
       return { text: cleaned, source: cfRes.source || "cf_vision", aiErr: null };
     }
     if (cfRes.err) lastErr = cfRes.err;
+  }
+
+  // 2) Google Gemini (vision fallback — 3 keys, smart cascade)
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
+    const cleaned = cleanSingleLine(g.text);
+    if (cleaned) {
+      return { text: cleaned, source: "gemini:" + (g.model || (env && env.GEMINI_TEXT_MODEL) || "gemini-4-hydrogen"), aiErr: lastErr };
+    }
+    if (g.err) lastErr = g.err;
   }
 
   // 3) NVIDIA NIM (vision)
@@ -2388,7 +2658,7 @@ async function handleStudioRequest(request, env) {
         },
         nvidia_model: (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct",
         groq_model: (env && env.GROQ_MODEL) || "llama-3.3-70b-versatile",
-        gemini_text_model: (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest",
+        gemini_text_model: ((env && env.GEMINI_TEXT_MODEL) || "gemini-4-hydrogen") + " (fallback: gemini-3.5-flash-lite, gemini-3.1-flash-lite)",
         keys_benched: KEY_COOLDOWN.size,
         cf_ai_quota_hit: cfAiQuotaActive(),
         cf_ai_quota_cooldown_until: CF_AI_QUOTA_HIT_UNTIL ? new Date(CF_AI_QUOTA_HIT_UNTIL).toISOString() : null,
@@ -2396,6 +2666,7 @@ async function handleStudioRequest(request, env) {
         luts_loaded: Object.keys(LUT_FILTERS).length,
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
         quote_bank_total: Object.values(VERIFIED_QUOTE_BANK).reduce((s, a) => s + a.length, 0),
+        live_quote_cache_size: LIVE_QUOTE_CACHE.items.length,
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
         caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "smart_locket",

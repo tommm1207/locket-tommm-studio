@@ -19,7 +19,7 @@ GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-s
 # API key KHÔNG để ở đây — lưu bằng: npx wrangler secret put GEMINI_API_KEY  (an toàn, không commit).
 # Dùng alias "-latest" để Google tự trỏ về bản Flash free mới nhất (khỏi phải sửa tên model khi Google đổi).
 # Nếu muốn ghim bản cụ thể (vd gemini-3.6-flash), chỉ cần đổi giá trị dưới đây rồi deploy lại.
-GEMINI_TEXT_MODEL = "gemini-flash-latest"
+GEMINI_TEXT_MODEL = "gemini-4-hydrogen"
 GEMINI_IMAGE_MODEL = "gemini-flash-image-latest"
 # ---- FALLBACK CAPTION (TEXT) — mỗi secret có thể dán NHIỀU KEY, cách nhau bằng dấu phẩy ----
 # Worker tự xoay vòng key; key nào hết quota/429 sẽ nghỉ 20' rồi dùng lại. Nhiều Gmail = nhiều key.
