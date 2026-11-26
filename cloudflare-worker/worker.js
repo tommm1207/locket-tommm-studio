@@ -1125,7 +1125,7 @@ async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
 
 // Gọi 1 endpoint CHAT tương thích OpenAI cho CAPTION (dùng chung cho NVIDIA NIM & Groq).
 // withImage=true thì gửi ảnh kiểu OpenAI image_url (model vision mới nhận); false thì text thuần.
-async function openAiChatCaption({ base, key, model, provider, systemPrompt, userText, imgBytes, imgMime, withImage }) {
+async function openAiChatCaption({ base, key, model, provider, systemPrompt, userText, imgBytes, imgMime, withImage, extra }) {
   if (!key) return { text: null, err: `no_${provider}_key` };
   let userMsg = userText;
   if (withImage && imgBytes && imgBytes.length > 0) {
@@ -1134,15 +1134,16 @@ async function openAiChatCaption({ base, key, model, provider, systemPrompt, use
       { type: "image_url", image_url: { url: `data:${imgMime || "image/jpeg"};base64,${uint8ToBase64(imgBytes)}` } },
     ];
   }
-  const payload = {
+  const payload = Object.assign({
     model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMsg },
     ],
-    max_tokens: 90,
-    temperature: 0.8,
-  };
+    // Model reasoning (gpt-oss...) tiêu tốn token để "nghĩ" -> nới max_tokens để content không rỗng.
+    max_tokens: 256,
+    temperature: 0.85,
+  }, extra || {});
   try {
     const r = await fetch(`${base}/chat/completions`, {
       method: "POST",
@@ -1154,9 +1155,16 @@ async function openAiChatCaption({ base, key, model, provider, systemPrompt, use
       return { text: null, err: `${provider}_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
     }
     const j = await r.json();
-    let txt = String(j?.choices?.[0]?.message?.content || "").trim();
-    txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
-    if (txt && txt.length >= 3) return { text: txt.slice(0, 120), err: null };
+    const msg = j?.choices?.[0]?.message || {};
+    // Lấy content; nếu rỗng (model reasoning) thì thử các field phụ.
+    let txt = String(msg.content || msg.reasoning_content || "").trim();
+    // Bỏ phần <think>...</think> nếu model nhét vào content.
+    txt = txt.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    // Lấy dòng có nội dung thật (ưu tiên dòng chứa TIN NÓNG/KHẨN CẤP, nếu không thì dòng cuối không rỗng).
+    const lines = txt.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    let pick = lines.find((l) => /tin nóng|khẩn cấp|trực tiếp/i.test(l)) || lines[lines.length - 1] || "";
+    pick = pick.replace(/^["'“”*]+|["'“”*]+$/g, "").trim();
+    if (pick && pick.length >= 3) return { text: pick.slice(0, 120), err: null };
     return { text: null, err: `${provider}_empty` };
   } catch (e) {
     return { text: null, err: String(e && e.message || e) };
@@ -1175,16 +1183,19 @@ async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
   });
 }
 
-// Groq (rất nhanh, free tier rộng). Mặc định model text; nếu đặt GROQ_MODEL là model vision thì gửi kèm ảnh.
+// Groq (rất nhanh, free tier rộng). Mặc định openai/gpt-oss-120b (đã kiểm chứng viết tiếng Việt tốt).
 async function groqGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
-  const model = (env && env.GROQ_MODEL) || "llama-3.3-70b-versatile";
+  const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
+  // Model gpt-oss là reasoning -> đặt reasoning_effort thấp để "nghĩ" ngắn, trả caption nhanh & không rỗng.
+  const extra = /gpt-oss/i.test(model) ? { reasoning_effort: "low" } : {};
   return openAiChatCaption({
     base: (env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1",
     key,
     model,
     provider: "groq",
     systemPrompt, userText, imgBytes, imgMime,
-    withImage: /vision|llava|scout|maverick/i.test(model), // chỉ gửi ảnh nếu model hỗ trợ
+    withImage: /vision|llava|scout|maverick|vl/i.test(model), // chỉ gửi ảnh nếu model hỗ trợ
+    extra,
   });
 }
 

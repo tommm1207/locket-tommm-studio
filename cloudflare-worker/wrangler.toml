@@ -16,7 +16,7 @@ GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-s
 GEMINI_TEXT_MODEL = "gemini-flash-latest"
 GEMINI_IMAGE_MODEL = "gemini-flash-image-latest"
 NVIDIA_MODEL = "meta/llama-3.2-11b-vision-instruct"
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "openai/gpt-oss-120b"
 
 [durable_objects]
 bindings = [
