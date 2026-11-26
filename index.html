@@ -146,6 +146,15 @@
       color: var(--muted);
     }
     .detail-body b { color: var(--text); font-weight: 600; }
+    .detail-body code, .app-desc code {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: inherit;
+      font-size: 12px;
+      color: var(--accent);
+    }
     .app-row {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -267,57 +276,99 @@
             <span class="sum-left"><span class="num">6</span>Cài DNS để giữ Gold khi tắt VPN</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
-          <div class="detail-body">Mở trang này bằng <b>Safari</b> → bấm <b>Cài Hồ Sơ DNS Giữ Gold</b> → <b>Cho phép</b> → vào <b>Cài đặt</b> → <b>Đã tải về hồ sơ</b> → <b>Cài đặt</b>. Từ giờ có thể tắt VPN mà vẫn giữ Gold.</div>
+          <div class="detail-body">Mở trang này bằng <b>Safari</b> → bấm <b>Cài Hồ Sơ DNS Giữ Gold</b> → <b>Cho phép</b> → vào <b>Cài đặt</b> → <b>Đã tải về hồ sơ</b> → <b>Cài đặt</b>. Khi cần cập nhật Config / Caption / Filter mới, nhớ chuyển <b>DNS về Tự động</b> trước rồi bật lại VPN Shadowrocket.</div>
         </details>
       </div>
     </section>
 
-    <div class="section-title">Ứng dụng hỗ trợ &amp; cách kích hoạt</div>
+    <div class="section-title">Lưu ý quan trọng (VPN &amp; DNS)</div>
+    <section>
+      <div class="card-list">
+        <details open>
+          <summary>
+            <span class="sum-left"><span class="num">!</span>Khi nào phải BẬT VPN Shadowrocket?</span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="detail-body">
+            • <b>Bắt buộc bật VPN</b> khi kích hoạt lần đầu, khi vừa <b>Update Config</b> mới, hoặc khi cần tải bộ <b>Caption / Filter</b> mới.<br>
+            • <b>Bắt buộc bật VPN</b> khi dùng <b>Filter AI, Mắt Cá (Fisheye), Dazz Cam, Photobooth, Khung viền</b> và <b>Caption Động (AI / LNN / Quote)</b> (vì ảnh &amp; caption cần đi qua proxy sang Worker xử lý).<br>
+            • <b>Các app khác</b> (YouTube, Spotify, SoundCloud, PicsArt, Lightroom, Alight Motion, KineMaster, CamScanner, Truecaller, BeautyPlus...) đều cần bật VPN lúc mở app hoặc lúc dùng tính năng VIP.
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <span class="sum-left"><span class="num">!</span>Tắt VPN bật DNS giữ được gì &amp; mất gì?</span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="detail-body">
+            • <b>Vẫn giữ:</b> Quyền Locket Gold, bộ Caption &amp; cấu hình đã lưu cache trong máy (do DNS chặn RevenueCat &amp; Firebase kiểm tra lại).<br>
+            • <b>Không hoạt động khi tắt VPN:</b> Filter AI, Mắt Cá, Dazz Cam, Photobooth, Caption AI/LNN, chặn quảng cáo YouTube và các app VIP cần check trực tuyến.<br>
+            • <b>Huy hiệu <code>Bạn 💛</code>:</b> Có thể còn tạm theo cache, nhưng khi Locket đồng bộ lại user từ server mà không có VPN thì <code>💛</code> sẽ mất (bật VPN lại 1 nhịp sẽ hiện lại).
+          </div>
+        </details>
+
+        <details>
+          <summary>
+            <span class="sum-left"><span class="num">!</span>Mẹo xử lý lỗi nhanh &amp; Update Config</span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="detail-body">
+            • <b>Trước khi Update Config/Module:</b> Đặt <b>Cài đặt iPhone → VPN &amp; Quản lý thiết bị → DNS = Tự động</b> → mở Shadowrocket bấm <b>Update</b> → bật VPN → vuốt tắt hẳn app muốn dùng rồi mở lại.<br>
+            • <b>Nếu dùng Module Only:</b> Không bị mất chứng chỉ CA đang có khi cập nhật.<br>
+            • <b>Không thấy tim vàng <code>Bạn 💛</code>:</b> Bật VPN Shadowrocket → tắt hẳn Locket mở lại, hoặc vào <b>Cài đặt Locket → Locket Gold → Huy hiệu</b> gạt bật lại 1 lần.<br>
+            • <b>Mạng Wi-Fi/4G bị khựng lúc chuyển mạng:</b> Tắt rồi bật lại VPN trong Shadowrocket.
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <div class="section-title">Ứng dụng hỗ trợ &amp; cách dùng VPN</div>
     <section>
       <div class="card-list">
         <div class="app-row">
           <div class="app-head"><span class="app-title">Locket</span><span class="badge">Gold VIP</span></div>
-          <div class="app-desc">Bật VPN → xóa tải lại app lần đầu → đăng nhập để lên Gold, 360+ Captions, Thứ Ngày Đa Ngôn Ngữ, Rollcall &amp; tự cập nhật Caption lễ.</div>
+          <div class="app-desc">Bật VPN → xóa tải lại app lần đầu → đăng nhập để lên Gold, 360+ Captions, Thứ Ngày, Mắt Cá, Dazz Cam &amp; Filter AI. <b>Giữ Gold cache được bằng DNS</b>, nhưng dùng Filter AI / Mắt Cá / Photobooth / tim vàng <code>Bạn 💛</code> cần bật VPN.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">YouTube</span><span class="badge">No Ads • PiP</span></div>
-          <div class="app-desc">Bật VPN → mở YouTube để tự động chặn quảng cáo và phát nền khi tắt màn hình.</div>
+          <div class="app-head"><span class="app-title">YouTube</span><span class="badge">No Ads • Cần VPN</span></div>
+          <div class="app-desc"><b>Phải bật VPN khi xem</b> để tự động chặn quảng cáo video và phát nền/PiP khi tắt màn hình. Tắt VPN sẽ có quảng cáo lại.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">Spotify</span><span class="badge">Premium</span></div>
-          <div class="app-desc">Bật VPN → đăng xuất rồi đăng nhập lại (hoặc xóa tải lại từ App Store rồi đăng nhập) để bỏ quảng cáo.</div>
+          <div class="app-head"><span class="app-title">Spotify</span><span class="badge">Premium • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN khi mở/nghe nhạc</b> (lần đầu cần đăng xuất đăng nhập lại hoặc tải mới app) để bỏ quảng cáo &amp; chọn bài tự do.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">SoundCloud</span><span class="badge">Go+</span></div>
-          <div class="app-desc">Bật VPN → đóng hẳn app SoundCloud rồi mở lại để tự động lên Go+.</div>
+          <div class="app-head"><span class="app-title">SoundCloud</span><span class="badge">Go+ • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN</b> → vuốt tắt hẳn SoundCloud rồi mở lại để lên Go+ và bỏ quảng cáo khi nghe.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">PicsArt</span><span class="badge">Gold</span></div>
-          <div class="app-desc">Bật VPN → mở app, toàn bộ công cụ và bộ lọc Gold sẽ tự động mở khóa.</div>
+          <div class="app-head"><span class="app-title">PicsArt</span><span class="badge">Gold • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN khi mở app &amp; xuất ảnh</b> để toàn bộ công cụ và bộ lọc Gold được mở khóa không bị đòi mua gói.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">Lightroom</span><span class="badge">Premium</span></div>
-          <div class="app-desc">Bật VPN → đăng nhập tài khoản Adobe (ưu tiên tài khoản từng dùng thử Premium) để mở khóa.</div>
+          <div class="app-head"><span class="app-title">Lightroom</span><span class="badge">Premium • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN</b> → đăng nhập tài khoản Adobe (ưu tiên tài khoản từng dùng thử Premium) và giữ VPN khi dùng Preset/công cụ Pro.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">Alight Motion</span><span class="badge">Pro</span></div>
-          <div class="app-desc">Bật VPN → mở app → chạm vào biểu tượng Premium để mở Pro, xuất video không watermark.</div>
+          <div class="app-head"><span class="app-title">Alight Motion</span><span class="badge">Pro • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN khi mở app &amp; xuất video</b> → chạm vào biểu tượng Premium để mở Pro, xuất video không watermark.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">KineMaster</span><span class="badge">Pro</span></div>
-          <div class="app-desc">Bật VPN → tạo dự án mới và xuất video, logo watermark sẽ tự động bị xóa.</div>
+          <div class="app-head"><span class="app-title">KineMaster</span><span class="badge">Pro • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN</b> → mở lại app, tạo dự án mới và xuất video để tự động xóa logo watermark.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">CamScanner</span><span class="badge">VIP</span></div>
-          <div class="app-desc">Bật VPN → khởi động lại app → vào mục Premium sẽ thấy đã lên VIP.</div>
+          <div class="app-head"><span class="app-title">CamScanner</span><span class="badge">VIP • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN</b> → khởi động lại app → kiểm tra mục Premium sẽ hiện VIP (nên bật VPN khi quét/xuất PDF không watermark).</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">Truecaller</span><span class="badge">Gold</span></div>
-          <div class="app-desc">Bật VPN → vào Cài đặt (Settings) → Premium để kích hoạt Truecaller Gold.</div>
+          <div class="app-head"><span class="app-title">Truecaller</span><span class="badge">Gold • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN</b> → vào Cài đặt (Settings) → Premium để kích hoạt Truecaller Gold.</div>
         </div>
         <div class="app-row">
-          <div class="app-head"><span class="app-title">BeautyPlus • Snow • Meitu • Wink</span><span class="badge">VIP</span></div>
-          <div class="app-desc">Bật VPN → mở ứng dụng và vào mục VIP/Premium để tự động mở khóa bộ lọc.</div>
+          <div class="app-head"><span class="app-title">BeautyPlus • Snow • Meitu • Wink</span><span class="badge">VIP • Cần VPN</span></div>
+          <div class="app-desc"><b>Bật VPN khi mở app &amp; lưu ảnh/video</b>, vào mục VIP/Premium để kích hoạt bộ lọc và làm đẹp trả phí.</div>
         </div>
       </div>
     </section>
