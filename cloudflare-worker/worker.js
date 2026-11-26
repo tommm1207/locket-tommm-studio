@@ -1034,6 +1034,82 @@ async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = 
   throw lastErr || new Error("no_flux_backend");
 }
 
+function isCaptionRefusal(txt) {
+  const low = String(txt || "").trim().toLowerCase();
+  if (!low || low.length < 4) return true;
+  return /xin l[ỗo]i|kh[ôo]ng th[ểe]|t[ôo]i l[àa] (m[ộo]t )?(tr[ợo] l[ýy]|ai|m[ôo] h[ìi]nh)|m[ôo] t[ảa] (b[ứu]c )?[ảa]nh|cannot|i'?m sorry|as an ai|describe the image|unable to|no image/i.test(low);
+}
+
+async function cfRestVisionChat(acct, token, modelId, messages, maxTokens = 256, temperature = 0.75) {
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${modelId}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ messages, max_tokens: maxTokens, temperature }),
+  });
+  let j = null;
+  try {
+    j = await r.json();
+  } catch (_) {}
+  if (r.ok && j && j.success !== false) {
+    const rawVal = j?.result?.response ?? j?.result?.choices?.[0]?.message?.content ?? "";
+    const text = (typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal)).trim();
+    return text;
+  }
+  const errMsg = (j && j.errors && j.errors[0] && j.errors[0].message) || `cf_vision_http_${r.status}`;
+  const e = new Error(errMsg);
+  e.httpStatus = r.status;
+  e.cfCode = j?.errors?.[0]?.code;
+  throw e;
+}
+
+async function runVisionChatPooled(env, messages, maxTokens = 256, temperature = 0.75) {
+  const modelId = "@cf/mistralai/mistral-small-3.1-24b-instruct";
+  let lastErr = null;
+
+  if (env && env.AI && !cfAiQuotaActive()) {
+    try {
+      const r = await env.AI.run(modelId, { messages, max_tokens: maxTokens, temperature });
+      const rawVal = r?.response ?? r?.result?.response ?? r?.choices?.[0]?.message?.content ?? "";
+      const text = (typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal)).trim();
+      if (text && !isCaptionRefusal(text)) {
+        return { text, source: "cf_binding:" + modelId, err: null };
+      }
+    } catch (e) {
+      lastErr = String(e?.message || e);
+      if (isQuotaOrCapacityError(e)) markCfAiQuotaHit();
+    }
+  }
+
+  const accounts = parseCfAccounts(env && env.CF_AI_ACCOUNTS);
+  if (accounts.length > 0) {
+    const start = (KEY_CURSOR.get("cfvision") || 0) % accounts.length;
+    KEY_CURSOR.set("cfvision", start + 1);
+    const ordered = accounts.slice(start).concat(accounts.slice(0, start));
+    const fresh = ordered.filter((a) => keyAvailable(a.token));
+    const tryList = (fresh.length > 0 ? fresh : ordered).slice(0, 6);
+    for (const a of tryList) {
+      try {
+        const text = await cfRestVisionChat(a.acct, a.token, modelId, messages, maxTokens, temperature);
+        if (text && !isCaptionRefusal(text)) {
+          return { text, source: "cf_rest:" + a.acct.slice(0, 8), err: null };
+        }
+      } catch (e) {
+        lastErr = String(e?.message || e);
+        if (isQuotaOrCapacityError(e) || e.httpStatus === 429) {
+          benchKey(a.token);
+        } else {
+          benchKey(a.token, 5);
+        }
+      }
+    }
+  }
+
+  return { text: null, source: null, err: lastErr };
+}
+
 function buildLocketFilterResponse(outUrl) {
   const jsonResp = {
     result: {
@@ -1240,7 +1316,7 @@ function availableKeys(providerName, raw) {
 }
 
 // Gọi Gemini generateContent cho CAPTION (text, có kèm ảnh nếu có). Trả chuỗi text hoặc null.
-async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
+async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key, maxTokens = 120, rawMode = false) {
   if (!key) return { text: null, err: "no_gemini_key" };
   const model = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
@@ -1252,7 +1328,7 @@ async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
   const payload = {
     system_instruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: "user", parts }],
-    generationConfig: { temperature: 0.8, maxOutputTokens: 120 },
+    generationConfig: { temperature: 0.8, maxOutputTokens: maxTokens },
   };
   try {
     const r = await fetch(url, {
@@ -1268,6 +1344,7 @@ async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
     const cand = j && j.candidates && j.candidates[0];
     const txtParts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
     let txt = txtParts.map((p) => (typeof p.text === "string" ? p.text : "")).join(" ").trim();
+    if (rawMode) return txt ? { text: txt, err: null } : { text: null, err: "gemini_empty" };
     txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
     if (txt && txt.length >= 3) return { text: txt.slice(0, 120), err: null };
     return { text: null, err: "gemini_empty" };
@@ -1517,11 +1594,11 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
   // Gọi 1 endpoint chat OpenAI-compatible lấy NGUYÊN content (không cắt) để parse JSON.
   const rawChat = async (base, key, model, withImg, extra) => {
     const userMsg = withImg && prepBytes
-      ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } }]
+      ? [{ type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } }, { type: "text", text: userText }]
       : userText;
     const r = await fetch(`${base}/chat/completions`, {
       method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify(Object.assign({ model, messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }], temperature: 0.8 }, extra || {})),
+      body: JSON.stringify(Object.assign({ model, messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }], temperature: 0.75 }, extra || {})),
     });
     if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); return ""; }
     const j = await r.json();
@@ -1529,51 +1606,75 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     return String(m.content || m.reasoning_content || "");
   };
 
+  const userContentWithImg = prepBytes
+    ? [
+        { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } },
+        { type: "text", text: userText },
+      ]
+    : userText;
+
   const providers = [];
-  if (env && env.AI && !cfAiQuotaActive()) {
+  // 1) Cloudflare Vision Pool (binding chính + 18 tài khoản REST pool) -> nhìn ảnh thật
+  if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
     providers.push(async () => {
-      const content = prepBytes
-        ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } }]
-        : userText;
-      try {
-        const r = await env.AI.run("@cf/mistralai/mistral-small-3.1-24b-instruct", {
-          messages: [{ role: "system", content: sys }, { role: "user", content }], max_tokens: 600, temperature: 0.8,
-        });
-        return String(r?.response || r?.result?.response || "");
-      } catch (e) { if (isQuotaOrCapacityError(e)) markCfAiQuotaHit(); return ""; }
+      const res = await runVisionChatPooled(
+        env,
+        [
+          { role: "system", content: sys },
+          { role: "user", content: userContentWithImg },
+        ],
+        700,
+        0.75
+      );
+      return { raw: res.text || "", source: res.source || "cf_vision" };
     });
   }
+  // 2) NVIDIA NIM Vision (nhìn ảnh thật)
+  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+    const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
+    providers.push(async () => ({
+      raw: await rawChat((env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1", k, nvModel, true, { max_tokens: 700 }),
+      source: "nvidia:" + nvModel,
+    }));
+  }
+  // 3) Gemini Vision (nếu có key)
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const gModel = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
+    providers.push(async () => {
+      const g = await geminiGenerateCaption(env, sys, userText, prepBytes, prepMime, k, 700, true);
+      return { raw: g.text || "", source: "gemini:" + gModel };
+    });
+  }
+  // 4) Groq text-only (last resort trước fallback tĩnh)
   for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
     const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
-    providers.push(() => rawChat("https://api.groq.com/openai/v1", k, model, false, /gpt-oss/i.test(model) ? { reasoning_effort: "low", max_completion_tokens: 1200 } : { max_tokens: 700 }));
-  }
-  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
-    providers.push(() => rawChat((env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1", k, (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct", true, { max_tokens: 600 }));
-  }
-  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-    providers.push(async () => {
-      const g = await geminiGenerateCaption(env, sys, userText, prepBytes, prepMime, k);
-      return g.text || "";
-    });
+    providers.push(async () => ({
+      raw: await rawChat("https://api.groq.com/openai/v1", k, model, false, /gpt-oss/i.test(model) ? { reasoning_effort: "low", max_completion_tokens: 1200 } : { max_tokens: 700 }),
+      source: "groq:" + model,
+    }));
   }
 
-  let source = "fallback";
   for (const p of providers) {
     try {
-      const raw = await p();
-      let obj = tryParse(raw);
+      const res = await p();
+      let obj = tryParse(res && res.raw);
       if (obj && typeof obj === "object") {
         // Làm SẠCH theo schema: bỏ field thừa (schema có additionalProperties:false -> app reject nếu dư),
         // ép enum, đúng số phần tử mảng. Thiếu field thì điền từ caption fallback.
         obj = sanitizeToSchema(obj, schema);
-        source = "ai";
-        return { data: obj, source, err: null };
+        const serialized = JSON.stringify(obj);
+        if (
+          !isCaptionRefusal(serialized) &&
+          (!Array.isArray(obj.quotes) || (obj.quotes.length > 0 && obj.quotes[0].quote && !isCaptionRefusal(obj.quotes[0].quote)))
+        ) {
+          return { data: obj, source: res.source || "ai", err: null };
+        }
       }
     } catch (_) {}
   }
 
   // 4) Fallback: tự dựng JSON hợp lệ theo schema từ caption đơn (không để app "thử lại").
-  const single = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId + "f");
+  const single = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId + "f", appPrompt);
   const data = buildFallbackStructured(schema, single.text, isQuote);
   return { data, source: "fallback_" + (single.source || "static"), err: single.aiErr || null };
 }
@@ -1668,7 +1769,7 @@ function buildFallbackStructured(schema, text, isQuote) {
   return out;
 }
 
-async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId) {
+async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId, appPrompt = "") {
   const isQuote = String(captionType || "").toLowerCase().includes("quote");
   const fallbackNews = [
     "TIN NÓNG: PHÁT HIỆN SINH VẬT LƯỜI BIẾNG ĐANG ONLINE",
@@ -1685,13 +1786,26 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const fallbackList = isQuote ? fallbackQuotes : fallbackNews;
   const fallbackText = fallbackList[Math.floor(Math.random() * fallbackList.length)];
 
+  const cleanSingleLine = (raw) => {
+    let txt = String(raw || "").replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+    const lines = txt.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+    let pick = isQuote
+      ? lines[0] || ""
+      : lines.find((l) => /tin nóng|khẩn cấp|trực tiếp|nóng 24h|breaking/i.test(l)) || lines[lines.length - 1] || "";
+    pick = pick.replace(/^["'“”*]+|["'“”*]+$/g, "").trim();
+    if (!pick || isCaptionRefusal(pick)) return "";
+    return pick.slice(0, 110);
+  };
 
   const systemPrompt = isQuote
     ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm. TUYỆT ĐỐI KHÔNG từ chối, KHÔNG nói 'xin lỗi', KHÔNG xin mô tả ảnh — nếu ảnh không rõ thì cứ viết một câu trích dẫn đẹp chung chung. CHỈ TRẢ VỀ ĐÚNG 1 CÂU."
     : "Bạn là biên tập viên bản tin LNN LIVE hài hước. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). TUYỆT ĐỐI KHÔNG từ chối, KHÔNG nói 'xin lỗi', KHÔNG xin mô tả ảnh — nếu ảnh không rõ thì cứ bịa 1 tin nóng hài hước chung chung. CHỈ TRẢ VỀ ĐÚNG 1 DÒNG.";
-  const userTextPrompt = isQuote
+  const baseUserPrompt = isQuote
     ? "Nhìn ảnh và viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
     : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.";
+  const userTextPrompt = appPrompt
+    ? `${baseUserPrompt}\nNgữ cảnh bổ sung: ${String(appPrompt).slice(0, 200)}`
+    : baseUserPrompt;
 
   let lastErr = null;
   let prep = null;
@@ -1701,90 +1815,61 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const prepBytes = prep && prep.bytes && prep.bytes.length > 0 ? prep.bytes : null;
   const prepMime = prep ? prep.mimeType : "image/jpeg";
 
-  // Chuỗi fallback caption miễn phí, mỗi provider XOAY NHIỀU KEY: NVIDIA -> Groq -> Gemini -> caption tĩnh.
-  const tryFreeFallback = async (reasonTag) => {
-    // 1) NVIDIA NIM (vision)
-    for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
-      const nv = await nvidiaGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
-      if (nv.text) return { text: nv.text, source: "nvidia:" + ((env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct"), aiErr: reasonTag || null };
-    }
-    // 2) Groq (rất nhanh, free rộng)
-    for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
-      const gq = await groqGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
-      if (gq.text) return { text: gq.text, source: "groq:" + ((env && env.GROQ_MODEL) || "llama-3.3-70b-versatile"), aiErr: reasonTag || null };
-    }
-    // 3) Google Gemini text
-    for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-      const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
-      if (g.text) return { text: g.text, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: reasonTag || null };
-    }
-    // 4) Caption tĩnh vui (luôn trả được chữ, không bao giờ để trống)
-    return { text: fallbackText, source: "fallback_" + (reasonTag || "err"), aiErr: reasonTag || null };
-  };
-  const tryGemini = tryFreeFallback; // giữ tên cũ cho các lời gọi phía dưới
-
-  // Nếu Cloudflare AI vừa chạm quota (4006) hoặc không có binding -> đi thẳng Gemini.
-  if (!env || !env.AI || cfAiQuotaActive()) {
-    return await tryGemini(!env || !env.AI ? "no_cf_ai" : "cf_quota_cooldown");
-  }
-
-  try {
+  // 1) Cloudflare Vision Pool (binding chính + 18 tài khoản REST pool)
+  if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
     const userContent = [];
     if (prepBytes) {
       userContent.push({ type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } });
     }
     userContent.push({ type: "text", text: userTextPrompt });
-
-    const payload = {
-      messages: [
+    const cfRes = await runVisionChatPooled(
+      env,
+      [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
-      max_tokens: 80,
-      temperature: 0.75,
-    };
-
-    for (const modelId of ["@cf/mistralai/mistral-small-3.1-24b-instruct", "@cf/meta/llama-3.2-11b-vision-instruct"]) {
-      try {
-        let resp = await env.AI.run(modelId, payload);
-        let txt = String(resp?.response || resp?.result?.response || "").trim();
-        txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
-        if (txt && txt.length >= 4) {
-          return { text: txt.slice(0, 100), source: modelId, aiErr: null };
-        }
-      } catch (mErr) {
-        const msg = String(mErr?.message || mErr);
-        lastErr = msg;
-        // Hết quota Cloudflare -> ghi nhận & fallback Gemini ngay, không thử model CF khác nữa.
-        if (isQuotaOrCapacityError(mErr)) {
-          markCfAiQuotaHit();
-          return await tryGemini("cf_quota_4006");
-        }
-        if (modelId.includes("llama-3.2") && /agree|license|5016/i.test(msg)) {
-          try {
-            await env.AI.run(modelId, { prompt: "agree" });
-            const retry = await env.AI.run(modelId, payload);
-            let txt = String(retry?.response || retry?.result?.response || "").trim();
-            txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
-            if (txt && txt.length >= 4) {
-              return { text: txt.slice(0, 100), source: modelId, aiErr: null };
-            }
-          } catch (rErr) {
-            lastErr = String(rErr?.message || rErr);
-            if (isQuotaOrCapacityError(rErr)) {
-              markCfAiQuotaHit();
-              return await tryGemini("cf_quota_4006");
-            }
-          }
-        }
-      }
+      100,
+      0.75
+    );
+    const cleaned = cleanSingleLine(cfRes.text);
+    if (cleaned) {
+      return { text: cleaned, source: cfRes.source || "cf_vision", aiErr: null };
     }
-  } catch (outerErr) {
-    lastErr = String(outerErr?.message || outerErr);
-    if (isQuotaOrCapacityError(outerErr)) markCfAiQuotaHit();
+    if (cfRes.err) lastErr = cfRes.err;
   }
-  // Cloudflare AI trả rỗng/lỗi khác -> thử Gemini trước khi dùng fallback tĩnh.
-  return await tryGemini(lastErr ? "cf_err" : "cf_empty");
+
+  // 2) NVIDIA NIM (vision)
+  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+    const nv = await nvidiaGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
+    const cleaned = cleanSingleLine(nv.text);
+    if (cleaned) {
+      return { text: cleaned, source: "nvidia:" + ((env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct"), aiErr: lastErr };
+    }
+    if (nv.err) lastErr = nv.err;
+  }
+
+  // 3) Google Gemini (vision)
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
+    const cleaned = cleanSingleLine(g.text);
+    if (cleaned) {
+      return { text: cleaned, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: lastErr };
+    }
+    if (g.err) lastErr = g.err;
+  }
+
+  // 4) Groq (text-only last resort trước fallback tĩnh)
+  for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
+    const gq = await groqGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
+    const cleaned = cleanSingleLine(gq.text);
+    if (cleaned) {
+      return { text: cleaned, source: "groq:" + ((env && env.GROQ_MODEL) || "llama-3.3-70b-versatile"), aiErr: lastErr };
+    }
+    if (gq.err) lastErr = gq.err;
+  }
+
+  // 5) Caption tĩnh vui (luôn trả được chữ, không bao giờ để trống)
+  return { text: fallbackText, source: "fallback_" + (lastErr ? "err" : "static"), aiErr: lastErr };
 }
 
 async function handleStudioRequest(request, env) {
@@ -1829,8 +1914,28 @@ async function handleStudioRequest(request, env) {
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
+        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_string",
         last_debug: LAST_DEBUG,
         last_caption_debug: LAST_CAPTION_DEBUG,
+      }),
+      { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
+    );
+  }
+
+  // 1.5 Runtime switcher cho response format của /generateCaption (test nhanh không cần redeploy)
+  if (request.method === "GET" && url.pathname === "/caption-mode") {
+    const allowed = ["data_string", "data_object_full", "data_openai_resp", "data_parsed", "bare"];
+    const m = (url.searchParams.get("m") || "").trim();
+    if (m === "reset" || m === "default") {
+      CAPTION_MODE_OVERRIDE = null;
+    } else if (allowed.includes(m)) {
+      CAPTION_MODE_OVERRIDE = m;
+    }
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_string",
+        allowed,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
     );
@@ -1894,10 +1999,7 @@ async function handleStudioRequest(request, env) {
     // Lọc câu "từ chối" của model -> thay bằng caption vui (app không bao giờ hiện 'xin lỗi, tôi là AI...').
     let outText = result.text;
     let outSource = result.source;
-    const low = String(outText || "").toLowerCase();
-    const refused = !low || low.length < 4 ||
-      /xin l[ỗo]i|kh[ôo]ng th[ểe]|t[ôo]i l[àa] (m[ộo]t )?(tr[ợo] l[ýy]|ai|m[ôo] h[ìi]nh)|m[ôo] t[ảa] (b[ứu]c )?[ảa]nh|cannot|i'?m sorry|as an ai|describe the image|unable to/i.test(low);
-    if (refused) {
+    if (isCaptionRefusal(outText)) {
       const fbNews = ["TIN NÓNG: PHÁT HIỆN NHÂN VẬT CHÍNH ĐANG CHILL HẾT NẤC", "KHẨN CẤP: GƯƠNG MẶT ĐÁNG YÊU VƯỢT MỨC CHO PHÉP", "TIN NÓNG: MỘT NGÀY ĐẸP TRỜI VỪA ĐƯỢC GHI LẠI"];
       const fbQuote = ["Bình yên đôi khi chỉ là một tấm ảnh chụp vội.", "Sống chậm lại một nhịp để giữ trọn khoảnh khắc này.", "Hôm nay trời đẹp, lòng cũng nhẹ tênh."];
       const list = isQ ? fbQuote : fbNews;
@@ -1991,53 +2093,117 @@ async function handleStudioRequest(request, env) {
     const tempId = crypto.randomUUID().slice(0, 12);
     const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
 
-    // Locket 2.74.0 gửi response_format (JSON schema CỤ THỂ) + prompt. Phải trả về JSON ĐÚNG schema đó
-    // (vd quote: mảng 5 {quote,category,attribution}; breaking_news: headline...). Dùng chính prompt app.
+    // Locket 2.74.0 gửi response_format (JSON schema CỤ THỂ cho quote) hoặc null (cho breaking_news) + prompt.
     const appPrompt = typeof dataNode?.prompt === "string" ? dataNode.prompt : "";
     const rf = dataNode?.response_format || null;
     const rfSchema = rf?.schema || rf?.json_schema?.schema || rf || null;
+    const hasSchema = !!(rfSchema && typeof rfSchema === "object" && Object.keys(rfSchema).length > 0);
 
-    const structured = await generateStructuredCaption(env, appPrompt, rfSchema, imgBytes, sourceUrl, url.origin, tempId, captionType);
+    let sd;
+    let outStr;
+    let usedSource;
+    let usedErr;
+    if (hasSchema) {
+      const structured = await generateStructuredCaption(env, appPrompt, rfSchema, imgBytes, sourceUrl, url.origin, tempId, captionType);
+      sd = structured.data;
+      outStr = JSON.stringify(sd);
+      usedSource = structured.source;
+      usedErr = structured.err;
+    } else {
+      const plain = await generateCaptionWithVision(env, captionType || "breaking_news", imgBytes, sourceUrl, url.origin, tempId, appPrompt);
+      outStr = plain.text;
+      sd = { caption: outStr, text: outStr, headline: outStr };
+      usedSource = plain.source;
+      usedErr = plain.aiErr;
+    }
+
+    const mode = CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_string";
+    const reqModel = (dataNode && dataNode.model) || "gpt-5.4";
 
     LAST_CAPTION_DEBUG = {
-      mode: "structured_caption",
-      source: structured.source,
-      aiErr: structured.err || null,
+      mode: hasSchema ? "structured_caption" : "plain_caption",
+      responseMode: mode,
+      source: usedSource,
+      aiErr: usedErr || null,
       captionType,
-      hasSchema: !!rfSchema,
+      hasSchema,
       schemaTop: rfSchema && rfSchema.properties ? Object.keys(rfSchema.properties) : [],
+      reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+      reqModel,
+      promptPreview: appPrompt.slice(0, 160),
       got_input: !!(imgBytes || sourceUrl),
+      input_bytes: imgBytes ? imgBytes.length : 0,
       upStatus,
-      generated: JSON.stringify(structured.data).slice(0, 200),
+      generated: outStr.slice(0, 240),
       ts: new Date().toISOString(),
     };
-    // structured.data là object ĐÚNG schema (vd {quotes:[...]}). Trả nó ở nhiều vị trí để app chắc chắn đọc được.
-    const sd = structured.data;
-    const sdJson = JSON.stringify(sd);
-    const nowSec = Math.floor(Date.now() / 1000);
-    // Format Locket gốc: lỗi là {"result":{"errors":[...],"status":401}}. THÀNH CÔNG = {"result":{...data,
-    // "status":200}} KHÔNG có errors. Đặt data schema TRỰC TIẾP trong result (giống server), không lồng thừa.
-    // Kèm choices/top-level cho mọi bản. content choices = JSON string sanitize khớp schema.
-    // result SẠCH: chỉ data schema + status (giống server Locket thành công, không field thừa).
-    const resultObj = Object.assign({}, sd, { status: 200 });
-    const payload = Object.assign({}, sd, {
-      result: resultObj,
-      data: sd,
-      status: 200,
-      success: true,
-      // OpenAI (một số bản đọc choices[].message.content)
-      id: "chatcmpl-" + tempId,
-      object: "chat.completion",
-      created: nowSec,
-      model: (dataNode && dataNode.model) || "gpt-5.4",
-      choices: [{ index: 0, message: { role: "assistant", content: sdJson, refusal: null }, logprobs: null, finish_reason: "stop" }],
-      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      output_text: sdJson,
-    });
-    // CAPTION_RESPONSE_MODE: "wrapped" (mặc định, nhiều field) | "bare" (chỉ object schema trần).
-    // Thử "bare" nếu app reject response có field thừa (OpenAI structured output strict).
-    const mode = (env && env.CAPTION_RESPONSE_MODE) || "wrapped";
-    const finalBody = mode === "bare" ? sdJson : JSON.stringify(payload);
+
+    let finalBody;
+    if (mode === "bare") {
+      finalBody = outStr;
+    } else if (mode === "data_object_full") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: Object.assign({}, hasSchema ? sd : {}, {
+            caption: outStr,
+            text: outStr,
+            output_text: outStr,
+            outputText: outStr,
+            generated_caption: outStr,
+            generatedCaption: outStr,
+            headline: outStr,
+            title: outStr,
+            response: outStr,
+            content: outStr,
+            raw_text: outStr,
+            captions: [outStr],
+            choices: [{ index: 0, message: { role: "assistant", content: outStr, refusal: null }, finish_reason: "stop" }],
+          }),
+        },
+      });
+    } else if (mode === "data_openai_resp") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: {
+            id: "resp_" + tempId,
+            object: "response",
+            status: "completed",
+            model: reqModel,
+            output_text: outStr,
+            output: [{
+              id: "msg_" + tempId,
+              type: "message",
+              status: "completed",
+              role: "assistant",
+              content: [{ type: "output_text", text: outStr, annotations: [] }],
+            }],
+          },
+        },
+      });
+    } else if (mode === "data_parsed") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: hasSchema ? sd : { caption: outStr, text: outStr, headline: outStr },
+        },
+      });
+    } else {
+      // data_string (mặc định)
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: outStr,
+          caption: outStr,
+          text: outStr,
+          output_text: outStr,
+          generated_caption: outStr,
+          content: outStr,
+        },
+      });
+    }
+
     return new Response(finalBody, {
       status: 200,
       headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
