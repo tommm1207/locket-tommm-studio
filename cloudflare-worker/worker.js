@@ -52,6 +52,8 @@ const WARP_FILTERS = {
   warp_gigachad: true,
   warp_swirl: true,
   warp_melt: true,
+  warp_fisheye: true,
+  warp_fisheye_dazz: true,
 };
 
 const SPECIAL_FX_IDS = new Set([
@@ -987,6 +989,8 @@ function applyWarpToRgb(srcRgb, w, h, warpId) {
       const nx = x * invW;
       let sx = nx;
       let sy = ny;
+      let gain = 1.0;
+      let lensBlackMix = 0.0;
 
       if (warpId === "warp_big_head") {
         [sx, sy] = radialWarp(nx, ny, 0.5, 0.36, 0.42, 0.55);
@@ -1045,6 +1049,42 @@ function applyWarpToRgb(srcRgb, w, h, warpId) {
         }
       } else if (warpId === "warp_melt") {
         sy = ny - 0.14 * (0.5 + 0.5 * Math.sin(nx * 14)) * Math.max(0, ny - 0.15);
+      } else if (warpId === "warp_fisheye") {
+        const dx = nx - 0.5;
+        const dy = ny - 0.5;
+        const r = Math.hypot(dx, dy);
+        const u = r / 0.70710678;
+        const scale = 0.42 + 0.58 * u * u;
+        sx = 0.5 + dx * scale;
+        sy = 0.5 + dy * scale;
+        gain = 1.06 - 0.24 * u * u;
+      } else if (warpId === "warp_fisheye_dazz") {
+        const dx = nx - 0.5;
+        const dy = ny - 0.5;
+        const r = Math.hypot(dx, dy);
+        const R_LENS = 0.475;
+        if (r >= R_LENS + 0.008) {
+          lensBlackMix = 1.0;
+        } else {
+          if (r > R_LENS - 0.006) {
+            lensBlackMix = (r - (R_LENS - 0.006)) / 0.014;
+          }
+          const t = Math.min(1.0, r / R_LENS);
+          const tSrc = 0.55 * ((2 / Math.PI) * Math.asin(t)) + 0.45 * (t * (0.45 + 0.55 * t * t));
+          const rSrc = 0.5 * tSrc;
+          const ratio = r > 1e-6 ? rSrc / r : 0.6;
+          sx = 0.5 + dx * ratio;
+          sy = 0.5 + dy * ratio;
+          gain = 1.05 - 0.30 * Math.pow(t, 2.4);
+        }
+      }
+
+      const di = rowOff + x * 3;
+      if (lensBlackMix >= 1.0) {
+        srcRgb[di] = 10;
+        srcRgb[di + 1] = 10;
+        srcRgb[di + 2] = 12;
+        continue;
       }
 
       const fx = Math.min(w - 1.001, Math.max(0, sx * (w - 1)));
@@ -1062,12 +1102,16 @@ function applyWarpToRgb(srcRgb, w, h, warpId) {
       const i10 = (y0 * w + x1) * 3;
       const i01 = (y1 * w + x0) * 3;
       const i11 = (y1 * w + x1) * 3;
-      const di = rowOff + x * 3;
 
       for (let c = 0; c < 3; c++) {
-        const v =
-          (copy[i00 + c] * itx + copy[i10 + c] * tx) * ity +
-          (copy[i01 + c] * itx + copy[i11 + c] * tx) * ty;
+        let v =
+          ((copy[i00 + c] * itx + copy[i10 + c] * tx) * ity +
+            (copy[i01 + c] * itx + copy[i11 + c] * tx) * ty) *
+          gain;
+        if (lensBlackMix > 0) {
+          const blackC = c === 2 ? 12 : 10;
+          v = v * (1 - lensBlackMix) + blackC * lensBlackMix;
+        }
         srcRgb[di + c] = v < 0 ? 0 : v > 255 ? 255 : v | 0;
       }
     }

@@ -200,6 +200,27 @@ def draw_warp_icon(kind, c0, c1):
         d.rounded_rectangle([154, 108, 198, 188], radius=14, fill=skin, outline=stroke, width=5)
         d.ellipse([90, 88, 108, 108], fill=stroke)
         d.ellipse([146, 94, 164, 114], fill=stroke)
+    elif kind == "warp_fisheye":
+        # 0.5x Ultra-Wide convex fisheye lens bulge grid
+        d.ellipse([44, 44, 212, 212], fill=(14, 116, 144, 255), outline=(224, 242, 254, 255), width=6)
+        for rad in (62, 36):
+            d.ellipse([128 - rad, 128 - rad, 128 + rad, 128 + rad], outline=(125, 211, 252, 200), width=4)
+        d.arc([58, 44, 198, 212], 125, 235, fill=(186, 230, 253, 210), width=4)
+        d.arc([58, 44, 198, 212], 305, 55, fill=(186, 230, 253, 210), width=4)
+        d.arc([44, 58, 212, 198], 215, 325, fill=(186, 230, 253, 210), width=4)
+        d.arc([44, 58, 212, 198], 35, 145, fill=(186, 230, 253, 210), width=4)
+        d.ellipse([104, 104, 152, 152], fill=(2, 132, 199, 255), outline=(255, 255, 255, 230), width=4)
+        d.ellipse([86, 76, 114, 104], fill=(255, 255, 255, 195))
+        draw_pill_label(d, "MẮT CÁ", cx=128, cy=204)
+    elif kind == "warp_fisheye_dazz":
+        # Dazz Cam 8mm circular fisheye glass lens with dark barrel rim
+        d.ellipse([40, 40, 216, 216], fill=(15, 23, 42, 255), outline=(248, 250, 252, 235), width=6)
+        d.ellipse([60, 60, 196, 196], fill=(30, 27, 75, 255), outline=(129, 140, 248, 230), width=4)
+        d.ellipse([84, 84, 172, 172], fill=(49, 46, 129, 255), outline=(56, 189, 248, 210), width=3)
+        d.ellipse([108, 108, 148, 148], fill=(15, 23, 42, 255))
+        d.ellipse([86, 78, 114, 104], fill=(255, 255, 255, 220))
+        d.ellipse([142, 140, 158, 156], fill=(244, 114, 182, 200))
+        draw_pill_label(d, "FISHEYE", cx=128, cy=204)
     return img
 
 
@@ -364,6 +385,8 @@ def main():
         "warp_gigachad": ("#1E293B", "#64748B"),
         "warp_swirl": ("#4338CA", "#38BDF8"),
         "warp_melt": ("#0F766E", "#A3E635"),
+        "warp_fisheye": ("#0369A1", "#38BDF8"),
+        "warp_fisheye_dazz": ("#1E1B4B", "#EC4899"),
     }
     for fid, (c0, c1) in warp_colors.items():
         rendered[fid] = draw_warp_icon(fid, c0, c1)
