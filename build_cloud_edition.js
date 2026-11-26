@@ -41,18 +41,19 @@ fs.writeFileSync(path.join(baseDir, 'js_tommm_deleteHeader.js'), deleteHeaderJs,
 // DEBUG TẠM: js_tommm_urllog.js — ghi lại MỌI URL app Locket gọi (tìm endpoint check eligibility LNN).
 // Gửi path về worker /urllog. KHÔNG đổi request. Xoá sau khi tìm xong.
 // =========================================================================
-const urlLogJs = `// Tommm DEBUG - log mọi URL Locket gọi về worker để tìm endpoint eligibility LNN
-try {
-    var u = (typeof $request !== "undefined" && $request && $request.url) ? $request.url : "";
-    if (u && typeof $httpClient !== "undefined") {
-        $httpClient.post({
-            url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/urllog",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ u: u.slice(0, 200), m: (typeof $request !== "undefined" && $request.method) || "?" })
-        }, function(e, r, b) {});
-    }
-} catch (_) {}
-$done({});
+const urlLogJs = `// Tommm DEBUG - log URL Locket về worker qua REWRITE (http-request $httpClient không chạy trên SR).
+// Rewrite request về worker /urllog?orig=<url>, worker ghi lại rồi PROXY ngược về server gốc.
+var WH = "locket-tommm-studio.khoinguyennguyen85.workers.dev";
+var u = (typeof $request !== "undefined" && $request && $request.url) ? $request.url : "";
+if (u) {
+    var newUrl = "https://" + WH + "/urllog?orig=" + encodeURIComponent(u);
+    var headers = Object.assign({}, ($request && $request.headers) || {});
+    var om = u.match(/^https?:\\/\\/([^/]+)/i);
+    delete headers["Host"]; delete headers["host"];
+    headers["Host"] = WH;
+    headers["X-Locket-Orig-Host"] = om ? om[1] : "api.locketcamera.com";
+    $done({ url: newUrl, headers: headers });
+} else { $done({}); }
 `;
 fs.writeFileSync(path.join(baseDir, 'js_tommm_urllog.js'), urlLogJs, 'utf8');
 
@@ -915,7 +916,7 @@ tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.
 tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=33, timeout=60
 tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=33, requires-body=true, max-size=-1, timeout=60
 tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=33, timeout=60
-tommm_urllog = type=http-request, pattern=^https:\/\/(us-central1-locket-4252a\.cloudfunctions\.net|api\.locketcamera\.com)\/, script-path=${ghRawBase}/js_tommm_urllog.js?v=33, timeout=10
+tommm_urllog = type=http-request, pattern=^https:\/\/(us-central1-locket-4252a\.cloudfunctions\.net|api\.locketcamera\.com)\/(fetchUser|getUser|getCurrentUser|getMe|userState|getUserState|getFeature|features|eligib|entitlement|getConfig|getAppConfig|getSettings|checkFeature|canUse)[^/]*, script-path=${ghRawBase}/js_tommm_urllog.js?v=34, timeout=15
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=33, requires-body=true, max-size=131072, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=33, requires-body=true, max-size=131072, timeout=60
 
@@ -988,7 +989,7 @@ tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.
 tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=33, timeout=60
 tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=33, requires-body=true, max-size=-1, timeout=60
 tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=33, timeout=60
-tommm_urllog = type=http-request, pattern=^https:\/\/(us-central1-locket-4252a\.cloudfunctions\.net|api\.locketcamera\.com)\/, script-path=${ghRawBase}/js_tommm_urllog.js?v=33, timeout=10
+tommm_urllog = type=http-request, pattern=^https:\/\/(us-central1-locket-4252a\.cloudfunctions\.net|api\.locketcamera\.com)\/(fetchUser|getUser|getCurrentUser|getMe|userState|getUserState|getFeature|features|eligib|entitlement|getConfig|getAppConfig|getSettings|checkFeature|canUse)[^/]*, script-path=${ghRawBase}/js_tommm_urllog.js?v=34, timeout=15
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=33, requires-body=true, max-size=131072, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=33, requires-body=true, max-size=131072, timeout=60
 

@@ -1811,14 +1811,32 @@ async function handleStudioRequest(request, env) {
     return new Response("ok", { headers: corsHeaders() });
   }
 
-  // DEBUG TẠM /urllog: nhận MỌI URL app Locket gọi (tìm endpoint eligibility LNN để chặn DNS). Xoá sau.
-  if (request.method === "POST" && url.pathname === "/urllog") {
+  // DEBUG TẠM /urllog?orig=<url>: ghi URL user-state app gọi + PROXY ngược về server gốc (để app chạy bình thường).
+  // Ghi cả 1 phần RESPONSE để tìm field eligibility LNN. Xoá sau khi tìm xong.
+  if (url.pathname === "/urllog") {
+    const orig = url.searchParams.get("orig") || "";
+    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
+    let respText = "";
+    let upStatus = 0;
     try {
-      const e = await request.json();
-      const entry = (e.m || "?") + " " + (e.u || "");
-      if (!URL_LOG.includes(entry)) { URL_LOG.unshift(entry); if (URL_LOG.length > 40) URL_LOG.pop(); }
-    } catch (_) {}
-    return new Response("ok", { headers: corsHeaders() });
+      const fwd = new Headers();
+      for (const [k, v] of request.headers.entries()) {
+        const kl = k.toLowerCase();
+        if (kl === "host" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
+        fwd.set(k, v);
+      }
+      const body = request.method === "POST" ? await request.arrayBuffer() : undefined;
+      const r = await fetch(orig, { method: request.method, headers: fwd, body });
+      upStatus = r.status;
+      respText = await r.text();
+      const entry = request.method + " [" + upStatus + "] " + orig.replace(/^https?:\/\//, "") + " => " + respText.slice(0, 300);
+      URL_LOG.unshift(entry);
+      if (URL_LOG.length > 30) URL_LOG.pop();
+      return new Response(respText, { status: upStatus, headers: corsHeaders({ "Content-Type": r.headers.get("Content-Type") || "application/json" }) });
+    } catch (e) {
+      URL_LOG.unshift(request.method + " [ERR] " + orig.replace(/^https?:\/\//, "") + " => " + String(e && e.message || e));
+      return new Response("{}", { status: 200, headers: corsHeaders({ "Content-Type": "application/json" }) });
+    }
   }
 
   // DEBUG: ghi mọi request (trừ chính /status và /ai-filters ảnh) để biết iPhone gọi gì.

@@ -1,12 +1,13 @@
-// Tommm DEBUG - log mọi URL Locket gọi về worker để tìm endpoint eligibility LNN
-try {
-    var u = (typeof $request !== "undefined" && $request && $request.url) ? $request.url : "";
-    if (u && typeof $httpClient !== "undefined") {
-        $httpClient.post({
-            url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/urllog",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ u: u.slice(0, 200), m: (typeof $request !== "undefined" && $request.method) || "?" })
-        }, function(e, r, b) {});
-    }
-} catch (_) {}
-$done({});
+// Tommm DEBUG - log URL Locket về worker qua REWRITE (http-request $httpClient không chạy trên SR).
+// Rewrite request về worker /urllog?orig=<url>, worker ghi lại rồi PROXY ngược về server gốc.
+var WH = "locket-tommm-studio.khoinguyennguyen85.workers.dev";
+var u = (typeof $request !== "undefined" && $request && $request.url) ? $request.url : "";
+if (u) {
+    var newUrl = "https://" + WH + "/urllog?orig=" + encodeURIComponent(u);
+    var headers = Object.assign({}, ($request && $request.headers) || {});
+    var om = u.match(/^https?:\/\/([^/]+)/i);
+    delete headers["Host"]; delete headers["host"];
+    headers["Host"] = WH;
+    headers["X-Locket-Orig-Host"] = om ? om[1] : "api.locketcamera.com";
+    $done({ url: newUrl, headers: headers });
+} else { $done({}); }
