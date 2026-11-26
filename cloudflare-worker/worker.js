@@ -1776,13 +1776,23 @@ async function handleStudioRequest(request, env) {
 
     const rfSchema = dataNode?.response_format?.json_schema?.schema?.properties || dataNode?.response_format?.properties || null;
     const rfKeys = rfSchema && typeof rfSchema === "object" ? Object.keys(rfSchema) : [];
+    // Bao phủ MỌI tên field caption mà các phiên bản Locket có thể đọc.
     const customData = {
       caption: cleanText,
       text: cleanText,
       headline: cleanText,
       title: cleanText,
       quote: cleanText,
-      author: "Tommm AI",
+      body: cleanText,
+      message: cleanText,
+      response: cleanText,
+      reply: cleanText,
+      output: cleanText,
+      result: cleanText,
+      generated_text: cleanText,
+      generatedText: cleanText,
+      completion: cleanText,
+      author: "",
       content: cleanText,
     };
     for (const k of rfKeys) {
@@ -1804,17 +1814,14 @@ async function handleStudioRequest(request, env) {
       ts: new Date().toISOString(),
     };
 
-    const payload = {
-      result: Object.assign({}, customData, {
-        data: customData,
-        status: 200,
-      }),
+    const payload = Object.assign({}, customData, {
+      result: Object.assign({}, customData, { data: customData, status: 200 }),
       data: customData,
-      caption: cleanText,
-      text: cleanText,
-      headline: cleanText,
       status: 200,
-    };
+      success: true,
+      // Format OpenAI chat (model "gpt-5.4") — một số client đọc choices[].message.content.
+      choices: [{ index: 0, message: { role: "assistant", content: cleanText }, finish_reason: "stop" }],
+    });
     return new Response(JSON.stringify(payload), {
       status: 200,
       headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
