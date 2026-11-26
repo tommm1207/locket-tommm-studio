@@ -930,6 +930,13 @@ async function encodeCanvasToImage(canvasRgb, origin, tempId) {
   return { bytes: finalBytes, mimeType, ext };
 }
 
+const WEEKDAY_DEPTH_PREFIX = {
+  weekday_depth: "weekday",
+  weekday_depth_en: "weekday_en",
+  weekday_depth_tw: "weekday_tw",
+  weekday_depth_de: "weekday_de",
+};
+
 function detectSpecialFilterId(dataNode, rawBodyText) {
   const candidates = [
     dataNode?.filterId,
@@ -941,9 +948,16 @@ function detectSpecialFilterId(dataNode, rawBodyText) {
     dataNode?.prompt,
   ];
   for (const c of candidates) {
-    if (typeof c === "string" && c.trim() === "weekday_depth") return "weekday_depth";
+    if (typeof c === "string") {
+      const t = c.trim();
+      if (WEEKDAY_DEPTH_PREFIX[t]) return t;
+    }
   }
-  if (rawBodyText && rawBodyText.includes('"weekday_depth"')) return "weekday_depth";
+  if (rawBodyText) {
+    for (const id of Object.keys(WEEKDAY_DEPTH_PREFIX)) {
+      if (rawBodyText.includes(`"${id}"`)) return id;
+    }
+  }
   return null;
 }
 
@@ -1245,17 +1259,18 @@ async function handleStudioRequest(request, env) {
     const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
     const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
 
-    // Priority 0: AI Subject-Mask + Crisp Vietnamese Weekday Depth Composite (weekday_depth)
+    // Priority 0: AI Subject-Mask + Crisp Weekday Depth Composite (VI / EN / TW / DE)
     const specialId = detectSpecialFilterId(dataNode, rawBodyText);
-    if (specialId === "weekday_depth") {
+    if (specialId && WEEKDAY_DEPTH_PREFIX[specialId]) {
       const t0 = Date.now();
       const tempId = crypto.randomUUID().slice(0, 12);
       const vnDay = getVietnamWeekdayIndex();
+      const binPrefix = WEEKDAY_DEPTH_PREFIX[specialId];
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
 
       const [decodedUser, weekdayRgba, preparedMaskInput] = await Promise.all([
         decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId),
-        getFrameRgba(`weekday_${vnDay}`),
+        getFrameRgba(`${binPrefix}_${vnDay}`),
         prepareAiInputImage(imgBytes, sourceUrl, url.origin, `seg_${tempId}`),
       ]);
 
@@ -1318,7 +1333,8 @@ async function handleStudioRequest(request, env) {
       });
 
       LAST_DEBUG = {
-        mode: "weekday_depth",
+        mode: specialId,
+        binPrefix,
         vnDay,
         segModelUsed,
         maskApplied,
