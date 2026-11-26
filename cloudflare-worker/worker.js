@@ -871,6 +871,114 @@ async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOve
   return { bytes, ...sniffImageFormat(bytes), aiModel, outSize };
 }
 
+// Xây FormData cho FLUX (prompt + size + input image + ref image). Dùng chung binding & REST.
+function buildFluxForm(promptText, outSize, inputImg, refImg) {
+  const form = new FormData();
+  form.append("prompt", promptText);
+  form.append("width", String(outSize));
+  form.append("height", String(outSize));
+  if (inputImg && inputImg.bytes && inputImg.bytes.length > 0) {
+    const ext = inputImg.mimeType === "image/png" ? "input.png" : "input.jpg";
+    form.append("input_image_0", new Blob([inputImg.bytes], { type: inputImg.mimeType }), ext);
+  }
+  if (refImg && refImg.bytes && refImg.bytes.length > 0) {
+    const rExt = refImg.mimeType === "image/png" ? "ref.png" : "ref.jpg";
+    form.append("input_image_1", new Blob([refImg.bytes], { type: refImg.mimeType }), rExt);
+  }
+  return form;
+}
+
+// Gọi FLUX qua REST API trên 1 tài khoản Cloudflare KHÁC (acct:token), đã verify chạy multipart.
+// Trả { bytes, mimeType, aiModel, outSize } hoặc ném lỗi (để pool thử account kế tiếp).
+async function cfRestFluxRun(acct, token, aiModel, promptText, inputImg, refImg, outSize) {
+  const form = buildFluxForm(promptText, outSize, inputImg, refImg);
+  const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${aiModel}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const ct = r.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const j = await r.json();
+    if (j && j.success && j.result && typeof j.result.image === "string") {
+      const bytes = base64ToUint8Array(j.result.image);
+      return { bytes, ...sniffImageFormat(bytes), aiModel, outSize };
+    }
+    const errMsg = (j && j.errors && j.errors[0] && j.errors[0].message) || "cf_rest_no_image";
+    const code = j && j.errors && j.errors[0] && j.errors[0].code;
+    const e = new Error(errMsg);
+    e.cfCode = code;
+    throw e;
+  }
+  // Nhị phân (ảnh trực tiếp)
+  const buf = new Uint8Array(await r.arrayBuffer());
+  if (r.ok && buf.length > 500) return { bytes: buf, ...sniffImageFormat(buf), aiModel, outSize };
+  throw new Error(`cf_rest_http_${r.status}`);
+}
+
+// Parse danh sách tài khoản Cloudflare phụ từ secret CF_AI_ACCOUNTS: "acct:token" cách nhau phẩy/xuống dòng.
+function parseCfAccounts(raw) {
+  if (!raw) return [];
+  return String(raw)
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const i = pair.indexOf(":");
+      if (i < 0) return null;
+      return { acct: pair.slice(0, i), token: pair.slice(i + 1) };
+    })
+    .filter((x) => x && x.acct && x.token);
+}
+
+// Chạy FLUX với CHIẾN LƯỢC POOL: binding account chính trước; nếu 4006/lỗi -> xoay vòng các
+// tài khoản Cloudflare phụ qua REST (mỗi account +10k neurons/ngày, cùng model, cùng chất lượng).
+// Trả { bytes, mimeType, aiModel, outSize, via } hoặc ném lỗi nếu TẤT CẢ đều fail.
+async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null) {
+  const aiModel = modelOverride || (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
+  const outSize = sizeOverride || parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
+  let lastErr = null;
+
+  // 1) Account chính qua binding (nếu còn quota)
+  if (env && env.AI && !cfAiQuotaActive()) {
+    try {
+      const out = await runCloudflareFluxEdit(env, promptText, inputImg, refImg, aiModel, outSize);
+      return { ...out, via: "binding" };
+    } catch (e) {
+      lastErr = e;
+      // runCloudflareFluxEdit đã markCfAiQuotaHit nếu 4006
+    }
+  }
+
+  // 2) Xoay vòng tài khoản phụ qua REST. "cfpool" là tên pool để round-robin & cooldown theo token.
+  const accounts = parseCfAccounts(env && env.CF_AI_ACCOUNTS);
+  if (accounts.length > 0) {
+    // Xoay điểm bắt đầu để trải tải; bỏ qua token đang cooldown (đã 4006).
+    const start = (KEY_CURSOR.get("cfpool") || 0) % accounts.length;
+    KEY_CURSOR.set("cfpool", start + 1);
+    const ordered = accounts.slice(start).concat(accounts.slice(0, start));
+    const fresh = ordered.filter((a) => keyAvailable(a.token));
+    const tryList = fresh.length > 0 ? fresh : ordered;
+    for (const a of tryList) {
+      try {
+        const out = await cfRestFluxRun(a.acct, a.token, aiModel, promptText, inputImg, refImg, outSize);
+        return { ...out, via: "cf_rest:" + a.acct.slice(0, 8) };
+      } catch (e) {
+        lastErr = e;
+        // 4006 hoặc rate limit -> cho token này nghỉ 20', thử account kế tiếp.
+        if (isQuotaOrCapacityError(e) || e.cfCode === 3030) {
+          // 3030 = output flagged (safety) -> KHÔNG phải hết quota, đừng bench; chỉ bỏ qua ảnh này.
+          if (isQuotaOrCapacityError(e)) benchKey(a.token);
+        } else {
+          benchKey(a.token, 5); // lỗi lạ -> nghỉ ngắn
+        }
+      }
+    }
+  }
+
+  throw lastErr || new Error("no_flux_backend");
+}
+
 function buildLocketFilterResponse(outUrl) {
   const jsonResp = {
     result: {
@@ -1456,6 +1564,8 @@ async function handleStudioRequest(request, env) {
         owner: "Tommm",
         ai_model: (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b",
         ai_binding_ready: !!(env && env.AI),
+        // Pool ảnh FLUX: số tài khoản Cloudflare phụ (REST) để xoay vòng khi account chính 4006.
+        cf_image_pool_accounts: parseCfAccounts(env && env.CF_AI_ACCOUNTS).length,
         // Caption fallback (text): đếm số key của mỗi provider (nhiều key = xoay vòng được).
         caption_fallback_keys: {
           nvidia: parseKeyList(env && env.NVIDIA_API_KEY).length,
@@ -1677,19 +1787,14 @@ async function handleStudioRequest(request, env) {
         const segPrompt =
           "Create a pure black-and-white binary foreground segmentation matte of this exact image. Fill the entire main foreground subject (person, face, hair, hands, clothing, bag, food dish/bowl, pet, or prominent foreground object/tower) in solid pure white (#FFFFFF) and fill the entire background behind it in solid pure black (#000000). Keep exact pixel alignment with zero cropping or shifting. Pure white subject on pure black background only.";
         let maskOut = null;
-        // Cloudflare Workers AI trước (ưu tiên 4B để tiết kiệm neurons), bỏ qua nếu đang cooldown quota 4006.
-        if (env && env.AI && !cfAiQuotaActive()) {
-          for (const candModel of [(env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b", "@cf/black-forest-labs/flux-2-klein-9b"]) {
-            try {
-              maskOut = await runCloudflareFluxEdit(env, segPrompt, preparedMaskInput, null, candModel, SIZE);
-              segModelUsed = candModel;
-              break;
-            } catch (segErr) {
-              if (isQuotaOrCapacityError(segErr)) break; // hết quota -> sang Gemini luôn
-            }
-          }
+        // FLUX tách nền: binding account chính -> xoay vòng ~N tài khoản Cloudflare phụ (REST) khi 4006.
+        if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+          try {
+            const seg = await runFluxPooled(env, segPrompt, preparedMaskInput, null, null, SIZE);
+            if (seg && seg.bytes) { maskOut = seg; segModelUsed = seg.via; }
+          } catch (_) {}
         }
-        // Fallback tách nền bằng provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare hết quota.
+        // Fallback cuối: provider ảnh ngoài (NVIDIA img2img / Gemini) nếu mọi account Cloudflare đều hết.
         if (!maskOut || !maskOut.bytes) {
           const fb = await fallbackEditImage(env, segPrompt, preparedMaskInput.bytes, preparedMaskInput.mimeType);
           if (fb && fb.bytes) { maskOut = fb; segModelUsed = fb.model; }
@@ -1911,7 +2016,7 @@ async function handleStudioRequest(request, env) {
 
     // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 4B) cho Custom AI 3D Hot / Custom Prompt,
     // kèm FALLBACK provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare hết quota 4006.
-    if (aiReq && env && (env.AI || env.NVIDIA_IMAGE_MODEL || env.GEMINI_API_KEY)) {
+    if (aiReq && env && (env.AI || env.CF_AI_ACCOUNTS || env.NVIDIA_IMAGE_MODEL || env.GEMINI_API_KEY)) {
       const t0 = Date.now();
       try {
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
@@ -1928,17 +2033,16 @@ async function handleStudioRequest(request, env) {
         let aiOut = null;
         let usedModel = null;
         let cfErr = null;
-        // Thử Cloudflare FLUX trước (nếu không đang cooldown quota).
-        if (env.AI && !cfAiQuotaActive()) {
+        // FLUX với POOL: binding account chính -> xoay vòng tài khoản Cloudflare phụ (REST) khi 4006.
+        if (env.AI || env.CF_AI_ACCOUNTS) {
           try {
-            aiOut = await runCloudflareFluxEdit(env, aiReq.prompt, preparedInput, refImg);
-            usedModel = aiOut.aiModel;
+            aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg);
+            usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
           } catch (err) {
             cfErr = String(err?.message || err);
-            // (markCfAiQuotaHit đã được gọi bên trong runCloudflareFluxEdit nếu là lỗi 4006)
           }
         }
-        // Fallback provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare không cho ảnh.
+        // Fallback cuối: provider ảnh ngoài (NVIDIA img2img / Gemini) nếu mọi account Cloudflare đều hết.
         if ((!aiOut || !aiOut.bytes) && preparedInput && preparedInput.bytes) {
           const fb = await fallbackEditImage(env, aiReq.prompt, preparedInput.bytes, preparedInput.mimeType);
           if (fb && fb.bytes) { aiOut = fb; usedModel = fb.model; }
