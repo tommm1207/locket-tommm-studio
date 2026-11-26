@@ -102,9 +102,11 @@ obj.subscriber.entitlements["effect_pack_20"] = makeEnt(pack20Product);
 
 var reqUrl = (typeof $request !== "undefined" && $request && $request.url) ? $request.url : "";
 var urlMatch = reqUrl.match(/\\/subscribers\\/([^/?#]+)/i);
-var myUid = (urlMatch && urlMatch[1]) || (obj.subscriber && obj.subscriber.original_app_user_id) || "";
-if (myUid && typeof $persistentStore !== "undefined") {
-    $persistentStore.write(String(myUid), "tommm_my_locket_uid");
+var rawRcUid = (urlMatch && urlMatch[1]) || (obj.subscriber && obj.subscriber.original_app_user_id) || "";
+var decodedRcUid = "";
+try { decodedRcUid = decodeURIComponent(String(rawRcUid)); } catch (_) { decodedRcUid = String(rawRcUid); }
+if (decodedRcUid && decodedRcUid.indexOf("RCAnonymousID") === -1 && typeof $persistentStore !== "undefined") {
+    $persistentStore.write(decodedRcUid, "tommm_my_locket_uid");
 }
 
 $done({ body: JSON.stringify(obj) });
@@ -114,7 +116,7 @@ fs.writeFileSync(path.join(baseDir, 'js_tommm_gold.js'), locketGoldJs, 'utf8');
 // =========================================================================
 // 3. TÁCH RIÊNG SCRIPT 3: js_tommm_badge.js (Smart Per-User Gold Badge - chỉ gắn đúng UID chủ máy)
 // =========================================================================
-const locketBadgeJs = `// Tommm Private - Per-User Smart Locket Gold Badge (myUid-Only, FetchUserV2 + Self Profile Merge)
+const locketBadgeJs = `// Tommm Private - Per-User Smart Locket Gold Badge (myUid-Only, Anti-Poison + Recursive User Node Stamp)
 function decodeBase64Url(str) {
     var b64 = String(str).replace(/-/g, "+").replace(/_/g, "/");
     while (b64.length % 4) b64 += "=";
@@ -148,13 +150,14 @@ function writeStore(val, key) {
 
 function resolveMyUid() {
     var uid = readStore("tommm_my_locket_uid");
+    if (uid && uid.indexOf("RCAnonymousID") !== -1) uid = "";
     try {
         var hdrs = (typeof $request !== "undefined" && $request && $request.headers) ? $request.headers : null;
         if (hdrs) {
-            var auth = hdrs["Authorization"] || hdrs["authorization"] || "";
-            var m = String(auth).match(/^Bearer\\s+[^.]+\\.([^.]+)\\.[^.]+$/i);
-            if (m && m[1]) {
-                var jwt = JSON.parse(decodeBase64Url(m[1]));
+            var auth = hdrs["Authorization"] || hdrs["authorization"] || hdrs["X-Firebase-Auth"] || hdrs["x-firebase-auth"] || "";
+            var m = String(auth).match(/(?:Bearer\\s+)?([^.\\s]+)\\.([^.\\s]+)\\.([^.\\s]+)/i);
+            if (m && m[2]) {
+                var jwt = JSON.parse(decodeBase64Url(m[2]));
                 var jwtUid = jwt.user_id || jwt.sub || "";
                 if (jwtUid) {
                     uid = String(jwtUid);
@@ -166,16 +169,61 @@ function resolveMyUid() {
     return uid;
 }
 
-function pickUserNode(uObj) {
-    if (!uObj || typeof uObj !== "object") return null;
-    if (uObj.result && typeof uObj.result === "object") {
-        if (uObj.result.data && typeof uObj.result.data === "object") return uObj.result.data;
-        if (uObj.result.uid || uObj.result.user_id || uObj.result.username || uObj.result.first_name) return uObj.result;
+function isUserLikeNode(node) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return false;
+    return !!(node.uid || node.user_id || node.username || node.first_name || typeof node.badge !== "undefined" || node.profile_picture_url);
+}
+
+function hasPrivateSelfFields(node) {
+    return !!(node && (node.email || node.phone_number || typeof node.is_temp !== "undefined" || node.fcm_tokens));
+}
+
+function stampBadgesRecursive(node, myUid, isTurnedOff, isChangeProfile, state, depth) {
+    if (!node || typeof node !== "object" || depth > 7) return;
+    if (Array.isArray(node)) {
+        for (var i = 0; i < node.length; i++) {
+            stampBadgesRecursive(node[i], myUid, isTurnedOff, isChangeProfile, state, depth + 1);
+        }
+        return;
     }
-    if (uObj.data && typeof uObj.data === "object") return uObj.data;
-    if (uObj.user && typeof uObj.user === "object") return uObj.user;
-    if (uObj.uid || uObj.user_id || uObj.username || uObj.first_name) return uObj;
-    return null;
+    if (isUserLikeNode(node)) {
+        var nodeUid = node.uid || node.user_id || node.id || "";
+        var isMine = false;
+        if (isChangeProfile && (node.username || node.first_name || nodeUid || typeof node.badge !== "undefined")) {
+            isMine = true;
+        } else if (myUid && nodeUid && String(nodeUid) === String(myUid)) {
+            isMine = true;
+        } else if (hasPrivateSelfFields(node)) {
+            isMine = true;
+            if (nodeUid && !myUid) {
+                myUid = String(nodeUid);
+                writeStore(myUid, "tommm_my_locket_uid");
+            }
+        }
+        if (isMine) {
+            if (isTurnedOff) {
+                node.badge = null;
+                node.badge_tier = null;
+                node.is_gold = false;
+            } else {
+                node.badge = "locket_gold";
+                node.badge_tier = "gold";
+                node.is_gold = true;
+            }
+            if (node.uid || node.first_name || node.username) {
+                writeStore(JSON.stringify(node), "tommm_my_user_profile");
+            }
+            state.changed = true;
+        }
+    }
+    for (var k in node) {
+        if (Object.prototype.hasOwnProperty.call(node, k)) {
+            var child = node[k];
+            if (child && typeof child === "object") {
+                stampBadgesRecursive(child, myUid, isTurnedOff, isChangeProfile, state, depth + 1);
+            }
+        }
+    }
 }
 
 var myUid = resolveMyUid();
@@ -183,7 +231,6 @@ var reqUrl = (typeof $request !== "undefined" && $request && $request.url) ? Str
 var isChangeProfile = reqUrl.indexOf("changeProfileInfo") !== -1;
 
 if (typeof $response === "undefined") {
-    // Pass through fetchUser/getUser/getAccountInfo immediately after caching myUid from Authorization JWT!
     if (!isChangeProfile) {
         $done({});
     } else {
@@ -226,31 +273,12 @@ if (typeof $response === "undefined") {
     }
 } else if ($response && $response.body) {
     var badgeState = readStore("tommm_my_badge_state") || "ON";
+    var isTurnedOff = badgeState === "OFF";
     try {
         var uObj = JSON.parse($response.body);
-        var targetNode = pickUserNode(uObj);
-        var targetUid = targetNode && (targetNode.uid || targetNode.user_id || targetNode.id);
-        var hasPrivateSelfField = !!(targetNode && (targetNode.email || targetNode.phone_number || typeof targetNode.is_temp !== "undefined" || targetNode.fcm_tokens));
-        var isMine = false;
-        if (targetNode) {
-            if (isChangeProfile) isMine = true;
-            else if (myUid && targetUid) isMine = String(targetUid) === String(myUid);
-            else if (hasPrivateSelfField) {
-                isMine = true;
-                if (targetUid) writeStore(String(targetUid), "tommm_my_locket_uid");
-            }
-        }
-        if (isMine && targetNode) {
-            if (badgeState === "OFF") {
-                targetNode.badge = null;
-                targetNode.badge_tier = null;
-                targetNode.is_gold = false;
-            } else {
-                targetNode.badge = "locket_gold";
-                targetNode.badge_tier = "gold";
-                targetNode.is_gold = true;
-            }
-            writeStore(JSON.stringify(targetNode), "tommm_my_user_profile");
+        var state = { changed: false };
+        stampBadgesRecursive(uObj, myUid, isTurnedOff, isChangeProfile, state, 0);
+        if (state.changed) {
             $done({ body: JSON.stringify(uObj) });
         } else {
             $done({});
@@ -1151,12 +1179,12 @@ AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
 [Header Rewrite]
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del x-revenuecat-etag
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del X-RevenueCat-ETag
-http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(fetchUser|getUser|getAccountInfo) header-del If-None-Match
-http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(fetchUser|getUser|getAccountInfo) header-del if-none-match
+http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments) header-del If-None-Match
+http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments) header-del if-none-match
 http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\.com(:443)?)\\/user-customization-service\\/v1\\/customize$ header-del if-none-match
 
 [URL Rewrite]
-^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters)(.*) 'https://locket-tommm-studio.khoinguyennguyen85.workers.dev/$2$3' header
+^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createLook|generateLook|generateCaption|ai-filters)(.*) 'https://locket-tommm-studio.khoinguyennguyen85.workers.dev/$2$3' header
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/(?!(dclk_video_ads|videoplayback\\?)).+&oad _ reject-200
 ^https?:\\/\\/(www|s)\\.youtube\\.com\\/api\\/stats\\/ads _ reject-200
 ^https?:\\/\\/(www|s)\\.youtube\\.com\\/(pagead|ptracking) _ reject-200
@@ -1170,12 +1198,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=42, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=42, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=42, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=42, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser|getUser|getAccountInfo), script-path=${ghRawBase}/js_tommm_badge.js?v=42, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser|getUser|getAccountInfo), script-path=${ghRawBase}/js_tommm_badge.js?v=42, requires-body=true, max-size=524288, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=43, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=43, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=43, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createLook|generateLook|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=43, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(changeProfileInfo|fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments|postMoment), script-path=${ghRawBase}/js_tommm_badge.js?v=43, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(changeProfileInfo|fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments), script-path=${ghRawBase}/js_tommm_badge.js?v=43, requires-body=true, max-size=1048576, timeout=60
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -1226,12 +1254,12 @@ AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
 [Header Rewrite]
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del x-revenuecat-etag
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del X-RevenueCat-ETag
-http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(fetchUser|getUser|getAccountInfo) header-del If-None-Match
-http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(fetchUser|getUser|getAccountInfo) header-del if-none-match
+http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments) header-del If-None-Match
+http-request ^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments) header-del if-none-match
 http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\.com(:443)?)\\/user-customization-service\\/v1\\/customize$ header-del if-none-match
 
 [URL Rewrite]
-^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters)(.*) 'https://locket-tommm-studio.khoinguyennguyen85.workers.dev/$2$3' header
+^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createLook|generateLook|generateCaption|ai-filters)(.*) 'https://locket-tommm-studio.khoinguyennguyen85.workers.dev/$2$3' header
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/(?!(dclk_video_ads|videoplayback\\?)).+&oad _ reject-200
 ^https?:\\/\\/(www|s)\\.youtube\\.com\\/api\\/stats\\/ads _ reject-200
 ^https?:\\/\\/(www|s)\\.youtube\\.com\\/(pagead|ptracking) _ reject-200
@@ -1242,12 +1270,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/initplayback.+&oad 'data-type=text data="" status-code=200'
 
 [Script]
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=42, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=42, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/(firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+), script-path=${ghRawBase}/js_tommm_rc.js?v=42, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=42, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser|getUser|getAccountInfo), script-path=${ghRawBase}/js_tommm_badge.js?v=42, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser|getUser|getAccountInfo), script-path=${ghRawBase}/js_tommm_badge.js?v=42, requires-body=true, max-size=524288, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=43, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=43, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/(firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+), script-path=${ghRawBase}/js_tommm_rc.js?v=43, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createLook|generateLook|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=43, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(changeProfileInfo|fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments|postMoment), script-path=${ghRawBase}/js_tommm_badge.js?v=43, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(changeProfileInfo|fetchUser|getUser|getAccountInfo|getLatestMoment|fetchMoments|getMoments), script-path=${ghRawBase}/js_tommm_badge.js?v=43, requires-body=true, max-size=1048576, timeout=60
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com

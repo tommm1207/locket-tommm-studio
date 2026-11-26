@@ -1255,6 +1255,45 @@ function applyPortraitBokeh(rgb, w, h) {
   }
 }
 
+async function translateCustomLookPromptToEn(env, rawText) {
+  const clean = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 500);
+  if (!clean) return "";
+  if (!/[^\x00-\x7F]/.test(clean)) return clean;
+  const sys =
+    "Translate this user photo-editing request (often in Vietnamese) into concise, vivid, photorealistic English image-editing instructions (under 45 words). Describe exact clothing, accessories, hairstyle, makeup, expression, or mood to add/change. Output ONLY the English edit instruction, no quotes or commentary.";
+  for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
+    try {
+      const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
+      const bodyObj = { model, messages: [{ role: "system", content: sys }, { role: "user", content: clean }], temperature: 0.2 };
+      if (/gpt-oss/i.test(model)) { bodyObj.reasoning_effort = "low"; bodyObj.max_completion_tokens = 140; }
+      else bodyObj.max_tokens = 90;
+      const r = await fetch(`${(env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1"}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+        body: JSON.stringify(bodyObj),
+        signal: AbortSignal.timeout(2500),
+      });
+      if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
+      const j = await r.json();
+      const out = String(j?.choices?.[0]?.message?.content || "").replace(/[\r\n]+/g, " ").trim();
+      if (out && out.length >= 4 && !/[^\x00-\x7F]/.test(out)) return out;
+    } catch (_) {}
+  }
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const g = await geminiGenerateCaption(env, sys, clean, null, null, k, 90, true, 0.2);
+    const out = String(g?.text || "").replace(/[\r\n]+/g, " ").trim();
+    if (out && out.length >= 4) return out;
+  }
+  if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+    try {
+      const res = await runCfTextChatPooled(env, [{ role: "system", content: sys }, { role: "user", content: clean }], 90, 0.2);
+      const out = String(res?.text || "").replace(/[\r\n]+/g, " ").trim();
+      if (out && out.length >= 4) return out;
+    } catch (_) {}
+  }
+  return clean;
+}
+
 function detectAiRequest(dataNode, rawBodyText) {
   let rawFilterId = firstNonEmptyString([
     dataNode?.filterId,
@@ -1295,6 +1334,7 @@ function detectAiRequest(dataNode, rawBodyText) {
   if (rawUserPrompt) {
     return {
       filterId: rawFilterId || "custom_prompt",
+      rawUserPrompt: rawUserPrompt.slice(0, 500),
       prompt: FACE_LOCK + "Apply this natural photorealistic edit: " + rawUserPrompt.slice(0, 500),
       source: "custom_prompt",
     };
@@ -3568,12 +3608,17 @@ async function handleStudioRequest(request, env) {
     });
   }
 
-  // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter
+  // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter / createFilter (Tạo diện mạo)
   if (
     request.method === "POST" &&
     (url.pathname.includes("generateFilteredImage") ||
       url.pathname.includes("generateFilter") ||
-      url.pathname.includes("applyFilter"))
+      url.pathname.includes("applyFilter") ||
+      url.pathname.includes("createFilter") ||
+      url.pathname.includes("createCustomFilter") ||
+      url.pathname.includes("generateCustomFilter") ||
+      url.pathname.includes("createLook") ||
+      url.pathname.includes("generateLook"))
   ) {
     const rawBodyText = await request.text();
     let bodyObj = {};
@@ -3583,6 +3628,42 @@ async function handleStudioRequest(request, env) {
 
     const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
     const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+
+    // Nếu Locket gọi createFilter/createCustomFilter chỉ để LƯU template (không gửi kèm ảnh), trả về filter object hợp lệ ngay!
+    const isCreateMeta = /createFilter|createCustomFilter|createLook/i.test(url.pathname);
+    if (isCreateMeta) {
+      const { bytes: peekImg, sourceUrl: peekUrl } = await getInputImageBytes(dataNode, authHeader);
+      if (!peekImg && !peekUrl) {
+        const rawPrompt = firstNonEmptyString([
+          dataNode?.customPrompt,
+          dataNode?.custom_prompt,
+          dataNode?.prompt,
+          dataNode?.description,
+          dataNode?.text,
+        ]) || "Custom AI Look";
+        const newId = "custom_" + crypto.randomUUID().slice(0, 8);
+        const name = firstNonEmptyString([dataNode?.name, dataNode?.title]) || rawPrompt.slice(0, 28);
+        const filterObj = {
+          uid: newId,
+          id: newId,
+          name,
+          prompt: rawPrompt,
+          custom_prompt: rawPrompt,
+          style: "custom",
+          type: "custom",
+          filterType: "custom",
+          overlay: true,
+          tintColor: "#F59E0B",
+          colors: ["#F59E0B", "#EC4899"],
+          captureButtonColors: ["#F59E0B", "#EC4899"],
+          icon: { emoji: "✨", sfSymbol: "sparkles" },
+        };
+        return new Response(
+          JSON.stringify({ data: filterObj, result: { status: 200, success: true, data: filterObj } }),
+          { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
+        );
+      }
+    }
 
     // Priority 0: AI Subject-Mask + Crisp 768x768 Weekday Depth Composite (VI / EN / TW / DE)
     const specialId = detectSpecialFilterId(dataNode, rawBodyText);
@@ -3913,14 +3994,20 @@ async function handleStudioRequest(request, env) {
       try {
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
         const tempId = crypto.randomUUID().slice(0, 12);
-        const [preparedInput, refImg] = await Promise.all([
+        const [preparedInput, refImg, translatedCustomEn] = await Promise.all([
           prepareAiInputImage(imgBytes, sourceUrl, url.origin, tempId, authHeader),
           REF_IMAGE_AI_IDS.has(aiReq.filterId)
             ? fetch(`https://tommm1207.github.io/locket-tommm-studio/assets/ai/${encodeURIComponent(aiReq.filterId)}.png`)
                 .then(async r => (r.ok ? { bytes: new Uint8Array(await r.arrayBuffer()), mimeType: "image/png" } : null))
                 .catch(() => null)
             : Promise.resolve(null),
+          aiReq.source === "custom_prompt" && aiReq.rawUserPrompt
+            ? translateCustomLookPromptToEn(env, aiReq.rawUserPrompt).catch(() => aiReq.rawUserPrompt)
+            : Promise.resolve(null),
         ]);
+        const effectivePrompt = translatedCustomEn
+          ? FACE_LOCK + "Apply this natural photorealistic edit: " + translatedCustomEn
+          : aiReq.prompt;
 
         let aiOut = null;
         let usedModel = null;
@@ -3936,7 +4023,7 @@ async function handleStudioRequest(request, env) {
               ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
                   strength: env.AI_3D_STRENGTH ? parseFloat(env.AI_3D_STRENGTH) : undefined }
               : null;
-            aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
+            aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
             usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
           } catch (err) {
             cfErr = String(err?.message || err);
@@ -3944,7 +4031,7 @@ async function handleStudioRequest(request, env) {
         }
         // Fallback cuối: provider ảnh ngoài (NVIDIA img2img / Gemini) nếu mọi account Cloudflare đều hết.
         if ((!aiOut || !aiOut.bytes) && preparedInput && preparedInput.bytes) {
-          const fb = await fallbackEditImage(env, aiReq.prompt, preparedInput.bytes, preparedInput.mimeType);
+          const fb = await fallbackEditImage(env, effectivePrompt, preparedInput.bytes, preparedInput.mimeType);
           if (fb && fb.bytes) { aiOut = fb; usedModel = fb.model; }
         }
 

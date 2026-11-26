@@ -1,4 +1,4 @@
-// Tommm Private - Per-User Smart Locket Gold Badge (myUid-Only, FetchUserV2 + Self Profile Merge)
+// Tommm Private - Per-User Smart Locket Gold Badge (myUid-Only, Anti-Poison + Recursive User Node Stamp)
 function decodeBase64Url(str) {
     var b64 = String(str).replace(/-/g, "+").replace(/_/g, "/");
     while (b64.length % 4) b64 += "=";
@@ -32,13 +32,14 @@ function writeStore(val, key) {
 
 function resolveMyUid() {
     var uid = readStore("tommm_my_locket_uid");
+    if (uid && uid.indexOf("RCAnonymousID") !== -1) uid = "";
     try {
         var hdrs = (typeof $request !== "undefined" && $request && $request.headers) ? $request.headers : null;
         if (hdrs) {
-            var auth = hdrs["Authorization"] || hdrs["authorization"] || "";
-            var m = String(auth).match(/^Bearer\s+[^.]+\.([^.]+)\.[^.]+$/i);
-            if (m && m[1]) {
-                var jwt = JSON.parse(decodeBase64Url(m[1]));
+            var auth = hdrs["Authorization"] || hdrs["authorization"] || hdrs["X-Firebase-Auth"] || hdrs["x-firebase-auth"] || "";
+            var m = String(auth).match(/(?:Bearer\s+)?([^.\s]+)\.([^.\s]+)\.([^.\s]+)/i);
+            if (m && m[2]) {
+                var jwt = JSON.parse(decodeBase64Url(m[2]));
                 var jwtUid = jwt.user_id || jwt.sub || "";
                 if (jwtUid) {
                     uid = String(jwtUid);
@@ -50,16 +51,61 @@ function resolveMyUid() {
     return uid;
 }
 
-function pickUserNode(uObj) {
-    if (!uObj || typeof uObj !== "object") return null;
-    if (uObj.result && typeof uObj.result === "object") {
-        if (uObj.result.data && typeof uObj.result.data === "object") return uObj.result.data;
-        if (uObj.result.uid || uObj.result.user_id || uObj.result.username || uObj.result.first_name) return uObj.result;
+function isUserLikeNode(node) {
+    if (!node || typeof node !== "object" || Array.isArray(node)) return false;
+    return !!(node.uid || node.user_id || node.username || node.first_name || typeof node.badge !== "undefined" || node.profile_picture_url);
+}
+
+function hasPrivateSelfFields(node) {
+    return !!(node && (node.email || node.phone_number || typeof node.is_temp !== "undefined" || node.fcm_tokens));
+}
+
+function stampBadgesRecursive(node, myUid, isTurnedOff, isChangeProfile, state, depth) {
+    if (!node || typeof node !== "object" || depth > 7) return;
+    if (Array.isArray(node)) {
+        for (var i = 0; i < node.length; i++) {
+            stampBadgesRecursive(node[i], myUid, isTurnedOff, isChangeProfile, state, depth + 1);
+        }
+        return;
     }
-    if (uObj.data && typeof uObj.data === "object") return uObj.data;
-    if (uObj.user && typeof uObj.user === "object") return uObj.user;
-    if (uObj.uid || uObj.user_id || uObj.username || uObj.first_name) return uObj;
-    return null;
+    if (isUserLikeNode(node)) {
+        var nodeUid = node.uid || node.user_id || node.id || "";
+        var isMine = false;
+        if (isChangeProfile && (node.username || node.first_name || nodeUid || typeof node.badge !== "undefined")) {
+            isMine = true;
+        } else if (myUid && nodeUid && String(nodeUid) === String(myUid)) {
+            isMine = true;
+        } else if (hasPrivateSelfFields(node)) {
+            isMine = true;
+            if (nodeUid && !myUid) {
+                myUid = String(nodeUid);
+                writeStore(myUid, "tommm_my_locket_uid");
+            }
+        }
+        if (isMine) {
+            if (isTurnedOff) {
+                node.badge = null;
+                node.badge_tier = null;
+                node.is_gold = false;
+            } else {
+                node.badge = "locket_gold";
+                node.badge_tier = "gold";
+                node.is_gold = true;
+            }
+            if (node.uid || node.first_name || node.username) {
+                writeStore(JSON.stringify(node), "tommm_my_user_profile");
+            }
+            state.changed = true;
+        }
+    }
+    for (var k in node) {
+        if (Object.prototype.hasOwnProperty.call(node, k)) {
+            var child = node[k];
+            if (child && typeof child === "object") {
+                stampBadgesRecursive(child, myUid, isTurnedOff, isChangeProfile, state, depth + 1);
+            }
+        }
+    }
 }
 
 var myUid = resolveMyUid();
@@ -67,7 +113,6 @@ var reqUrl = (typeof $request !== "undefined" && $request && $request.url) ? Str
 var isChangeProfile = reqUrl.indexOf("changeProfileInfo") !== -1;
 
 if (typeof $response === "undefined") {
-    // Pass through fetchUser/getUser/getAccountInfo immediately after caching myUid from Authorization JWT!
     if (!isChangeProfile) {
         $done({});
     } else {
@@ -110,31 +155,12 @@ if (typeof $response === "undefined") {
     }
 } else if ($response && $response.body) {
     var badgeState = readStore("tommm_my_badge_state") || "ON";
+    var isTurnedOff = badgeState === "OFF";
     try {
         var uObj = JSON.parse($response.body);
-        var targetNode = pickUserNode(uObj);
-        var targetUid = targetNode && (targetNode.uid || targetNode.user_id || targetNode.id);
-        var hasPrivateSelfField = !!(targetNode && (targetNode.email || targetNode.phone_number || typeof targetNode.is_temp !== "undefined" || targetNode.fcm_tokens));
-        var isMine = false;
-        if (targetNode) {
-            if (isChangeProfile) isMine = true;
-            else if (myUid && targetUid) isMine = String(targetUid) === String(myUid);
-            else if (hasPrivateSelfField) {
-                isMine = true;
-                if (targetUid) writeStore(String(targetUid), "tommm_my_locket_uid");
-            }
-        }
-        if (isMine && targetNode) {
-            if (badgeState === "OFF") {
-                targetNode.badge = null;
-                targetNode.badge_tier = null;
-                targetNode.is_gold = false;
-            } else {
-                targetNode.badge = "locket_gold";
-                targetNode.badge_tier = "gold";
-                targetNode.is_gold = true;
-            }
-            writeStore(JSON.stringify(targetNode), "tommm_my_user_profile");
+        var state = { changed: false };
+        stampBadgesRecursive(uObj, myUid, isTurnedOff, isChangeProfile, state, 0);
+        if (state.changed) {
             $done({ body: JSON.stringify(uObj) });
         } else {
             $done({});
