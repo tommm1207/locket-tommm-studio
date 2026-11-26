@@ -1785,7 +1785,7 @@ function buildQuoteBankCatalog(visionDesc = "") {
   return lines.join("\n");
 }
 
-function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null) {
+function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null, skipRemember = false) {
   const cats =
     Array.isArray(catsOverride) && catsOverride.length > 0
       ? catsOverride
@@ -1815,11 +1815,78 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null) {
     });
   });
 
-  rememberQuoteIds(selectedIds);
-  return { data: { quotes }, matchedCount };
+  if (!skipRemember) rememberQuoteIds(selectedIds);
+  return { data: { quotes }, matchedCount, selectedIds };
 }
 
-// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu từ VERIFIED_QUOTE_BANK, ...).
+async function generateFreshPhotoQuotes(env, visionDesc) {
+  if (!visionDesc || !env || (!env.AI && !env.CF_AI_ACCOUNTS)) return [];
+  const sys =
+    'Bạn là người viết câu trích dẫn tiếng Việt tinh tế, giàu cảm xúc, tự nhiên 100% đúng ngữ pháp (tuyệt đối không dịch cứng, không sai chính tả, không pha chữ Hán, không bịa tên người nổi tiếng). Dựa vào mô tả bức ảnh, hãy sáng tác ĐÚNG 2 câu trích dẫn ngắn gọn (8-18 từ mỗi câu), bám sát chi tiết thật trong ảnh:\n- c1: sâu lắng, chữa lành hoặc chill nhẹ nhàng.\n- c2: duyên dáng, tươi vui hoặc truyền cảm hứng nhẹ.\nChỉ trả về duy nhất 1 JSON hợp lệ: {"c1":"...","c2":"..."}. Không thêm chữ nào khác.';
+  const usr = `Mô tả bức ảnh: ${visionDesc}\n\nHãy sáng tác 2 câu trích dẫn tiếng Việt thật hay và tự nhiên cho bức ảnh này.`;
+  try {
+    const res = await runCfTextChatPooled(
+      env,
+      [
+        { role: "system", content: sys },
+        { role: "user", content: usr },
+      ],
+      160,
+      0.75
+    );
+    let txt = String(res?.text || "").trim().replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    const a = txt.indexOf("{");
+    const b = txt.lastIndexOf("}");
+    if (a >= 0 && b > a) txt = txt.slice(a, b + 1);
+    const j = JSON.parse(txt);
+    const cleanOne = (v) =>
+      String(v || "")
+        .replace(/[\r\n]+/g, " ")
+        .replace(/^["'“”*]+|["'“”*]+$/g, "")
+        .trim();
+    const valid = (s) => s.length >= 12 && s.length <= 125 && !isCaptionRefusal(s) && !/[\u4e00-\u9fff]/.test(s);
+    const out = [];
+    const s1 = cleanOne(j?.c1);
+    const s2 = cleanOne(j?.c2);
+    if (valid(s1)) out.push({ quote: s1, attribution: "Nhật ký hôm nay" });
+    if (valid(s2) && s2 !== s1) out.push({ quote: s2, attribution: "Locket AI" });
+    return out;
+  } catch (_) {
+    return [];
+  }
+}
+
+function mergeHybridQuotes(pickedObj, freshQuotes, seedText = "") {
+  const baseQuotes = Array.isArray(pickedObj?.data?.quotes) ? pickedObj.data.quotes : [];
+  const baseIds = Array.isArray(pickedObj?.selectedIds) ? pickedObj.selectedIds : [];
+  if (!Array.isArray(freshQuotes) || freshQuotes.length === 0 || baseQuotes.length < 5) {
+    rememberQuoteIds(baseIds);
+    return { data: pickedObj.data, hybridCount: 0 };
+  }
+  const pairChoices = [
+    [2, 4],
+    [1, 2],
+    [1, 4],
+    [2, 3],
+  ];
+  let h = 0;
+  for (let i = 0; i < seedText.length; i++) h = (h * 31 + seedText.charCodeAt(i)) >>> 0;
+  const replaceSlots = new Set(pairChoices[h % pairChoices.length].slice(0, freshQuotes.length));
+  const merged = baseQuotes.map((item) => ({ ...item }));
+  let fIdx = 0;
+  for (const slot of replaceSlots) {
+    if (slot < merged.length && freshQuotes[fIdx]) {
+      merged[slot].quote = freshQuotes[fIdx].quote;
+      merged[slot].attribution = freshQuotes[fIdx].attribution;
+      fIdx++;
+    }
+  }
+  const keptIds = baseIds.filter((_, idx) => !replaceSlots.has(idx));
+  rememberQuoteIds(keptIds);
+  return { data: { quotes: merged }, hybridCount: fIdx };
+}
+
+// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu hybrid: 3 bank thật + 2 AI theo ảnh).
 async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, sourceUrl, origin, tempId, captionType) {
   const schema = rawSchema ? normalizeSchema(rawSchema) : null;
   const isQuote = /quote/i.test(appPrompt + " " + captionType) || !!(schema && schema.properties && schema.properties.quotes);
@@ -1838,7 +1905,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     try { return JSON.parse(s); } catch (_) { return null; }
   };
 
-  // Nhánh QUOTE: chọn ID từ VERIFIED_QUOTE_BANK (200 quote thật 100%) bằng Vision AI -> không bao giờ bịa quote
+  // Nhánh QUOTE: Hybrid Mode = 3 câu VERIFIED_QUOTE_BANK (200 câu thật) + 2 câu AI sáng tác riêng theo ảnh (chạy song song)
   if (schema && schema.properties && schema.properties.quotes) {
     const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
     const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : Object.keys(VERIFIED_QUOTE_BANK);
@@ -1870,41 +1937,57 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
       }
     }
 
-    // 2) Fast 2-step: CF Llama-4-Scout Vision (~1.4s) -> Groq gpt-oss-120b (~0.6s)
+    // 2) Fast 2-step + Song song: CF Vision mô tả ảnh (~1.4s) -> [Groq chọn 3-5 ID bank || Llama 4 sáng tác 2 câu theo ảnh]
     const vision = await describeImageWithVision(env, prepBytes, prepMime);
     const pickPromptRanked = buildPickPrompt(vision.desc || "");
     const descMsg = `Photo description: ${vision.desc || "A candid everyday photo."}\n\n${pickPromptRanked}`;
 
-    for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
-      try {
-        const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
-        const groqMsg = descMsg;
-        const bodyObj = {
-          model,
-          messages: [{ role: "user", content: groqMsg }],
-          temperature: 0.35,
-        };
-        if (/gpt-oss/i.test(model)) {
-          bodyObj.reasoning_effort = "low";
-          bodyObj.max_completion_tokens = 320;
-        } else {
-          bodyObj.max_tokens = 140;
-        }
-        const r = await fetch(`${(env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1"}/chat/completions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
-          body: JSON.stringify(bodyObj),
-        });
-        if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
-        const j = await r.json();
-        const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
-        if (parsedMap && typeof parsedMap === "object") {
-          const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
-          if (picked.matchedCount >= 2) {
-            return { data: picked.data, source: (vision.source ? vision.source + "+" : "") + "groq:" + model + "_bank", err: null };
+    const pickWithGroq = async () => {
+      for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
+        try {
+          const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
+          const bodyObj = {
+            model,
+            messages: [{ role: "user", content: descMsg }],
+            temperature: 0.35,
+          };
+          if (/gpt-oss/i.test(model)) {
+            bodyObj.reasoning_effort = "low";
+            bodyObj.max_completion_tokens = 320;
+          } else {
+            bodyObj.max_tokens = 140;
           }
-        }
-      } catch (_) {}
+          const r = await fetch(`${(env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1"}/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+            body: JSON.stringify(bodyObj),
+          });
+          if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
+          const j = await r.json();
+          const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
+          if (parsedMap && typeof parsedMap === "object") {
+            const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
+            if (picked.matchedCount >= 2) {
+              return { picked, source: (vision.source ? vision.source + "+" : "") + "groq:" + model + "_bank" };
+            }
+          }
+        } catch (_) {}
+      }
+      return null;
+    };
+
+    const [groqRes, freshQuotes] = await Promise.all([
+      pickWithGroq(),
+      generateFreshPhotoQuotes(env, vision.desc || ""),
+    ]);
+
+    if (groqRes && groqRes.picked) {
+      const merged = mergeHybridQuotes(groqRes.picked, freshQuotes, tempId);
+      return {
+        data: merged.data,
+        source: groqRes.source + (merged.hybridCount > 0 ? `+hybrid_${merged.hybridCount}` : ""),
+        err: null,
+      };
     }
 
     // 3) CF Vision Pool trực tiếp fallback (Llama 4 Scout -> Mistral 3.1)
@@ -1912,9 +1995,14 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
       const res = await runVisionChatPooled(env, [{ role: "user", content: userContentPick }], 200, 0.35);
       const parsedMap = tryParse(res.text);
       if (parsedMap && typeof parsedMap === "object") {
-        const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
+        const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
         if (picked.matchedCount >= 2) {
-          return { data: picked.data, source: res.source || "cf_vision_bank", err: null };
+          const merged = mergeHybridQuotes(picked, freshQuotes, tempId);
+          return {
+            data: merged.data,
+            source: (res.source || "cf_vision_bank") + (merged.hybridCount > 0 ? `+hybrid_${merged.hybridCount}` : ""),
+            err: null,
+          };
         }
       }
     }
@@ -1933,17 +2021,27 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
         const j = await r.json();
         const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
         if (parsedMap && typeof parsedMap === "object") {
-          const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
+          const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
           if (picked.matchedCount >= 2) {
-            return { data: picked.data, source: "nvidia:" + nvModel + "_bank", err: null };
+            const merged = mergeHybridQuotes(picked, freshQuotes, tempId);
+            return {
+              data: merged.data,
+              source: "nvidia:" + nvModel + "_bank" + (merged.hybridCount > 0 ? `+hybrid_${merged.hybridCount}` : ""),
+              err: null,
+            };
           }
         }
       } catch (_) {}
     }
 
-    // 5) Varied real fallback từ VERIFIED_QUOTE_BANK
-    const fbPicked = pickVerifiedQuotesFromMap({}, tempId + String(Date.now()), cats);
-    return { data: fbPicked.data, source: "verified_bank_fallback", err: null };
+    // 5) Varied real fallback từ VERIFIED_QUOTE_BANK (kèm freshQuotes nếu có)
+    const fbPicked = pickVerifiedQuotesFromMap({}, tempId + String(Date.now()), cats, true);
+    const mergedFb = mergeHybridQuotes(fbPicked, freshQuotes, tempId);
+    return {
+      data: mergedFb.data,
+      source: "verified_bank_fallback" + (mergedFb.hybridCount > 0 ? `+hybrid_${mergedFb.hybridCount}` : ""),
+      err: null,
+    };
   }
 
   // Nhánh schema khác (dự phòng nếu app gửi schema mới ngoài quote)
