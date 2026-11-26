@@ -2321,22 +2321,20 @@ function buildQuoteBankCatalog(visionDesc = "") {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 3);
-  const seed = Math.floor(Date.now() / 1000) % 7;
   const lines = [];
   for (const [cat, list] of Object.entries(VERIFIED_QUOTE_BANK)) {
     const fresh = list.filter((q) => !RECENT_QUOTE_IDS.includes(q.id));
-    const pool = fresh.length >= 10 ? fresh : list;
-    const ranked = pool.map((q, idx) => {
+    const pool = shuffleInPlace([...(fresh.length >= 10 ? fresh : list)]);
+    const ranked = pool.map((q) => {
       const hay = `${q.tags} ${q.attribution}`.toLowerCase();
       let score = 0;
       for (const t of tokens) {
         if (hay.includes(t)) score += 2;
       }
-      const tie = ((idx + seed) % pool.length) * 0.01;
-      return { q, score: score + tie };
+      return { q, score: score + Math.random() * 2.4 };
     });
     ranked.sort((a, b) => b.score - a.score);
-    const picked = ranked.slice(0, 20).map((x) => `${x.q.id}(${x.q.tags})`);
+    const picked = shuffleInPlace(ranked.slice(0, 20)).map((x) => `${x.q.id}(${x.q.tags})`);
     lines.push(`${cat}: ${picked.join("; ")}`);
   }
   return lines.join("\n");
@@ -2345,15 +2343,12 @@ function buildQuoteBankCatalog(visionDesc = "") {
 function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null, skipRemember = false) {
   const cats =
     Array.isArray(catsOverride) && catsOverride.length > 0
-      ? catsOverride
+      ? [...catsOverride]
       : ["pop_music", "greek_philosophy", "famous_modern_figures", "film_and_tv", "athlete"];
-  let h = 0;
-  for (let i = 0; i < seedText.length; i++) h = (h * 31 + seedText.charCodeAt(i)) >>> 0;
-  const quotes = [];
-  const selectedIds = [];
+  const pairs = [];
   let matchedCount = 0;
 
-  cats.forEach((cat, idx) => {
+  for (const cat of cats) {
     const list = VERIFIED_QUOTE_BANK[cat] || VERIFIED_QUOTE_BANK.pop_music;
     const reqId = idMap && typeof idMap[cat] === "string" ? idMap[cat].trim() : "";
     let item = list.find((it) => it.id === reqId);
@@ -2362,16 +2357,21 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null, sk
     } else {
       const fresh = list.filter((it) => !RECENT_QUOTE_IDS.includes(it.id));
       const pool = fresh.length > 0 ? fresh : list;
-      item = pool[(h + idx * 3) % pool.length];
+      item = pool[Math.floor(Math.random() * pool.length)];
     }
-    selectedIds.push(item.id);
-    quotes.push({
-      quote: item.quote,
-      category: cat,
-      attribution: item.attribution,
+    pairs.push({
+      id: item.id,
+      entry: {
+        quote: item.quote,
+        category: cat,
+        attribution: item.attribution,
+      },
     });
-  });
+  }
 
+  shuffleInPlace(pairs);
+  const selectedIds = pairs.map((p) => p.id);
+  const quotes = pairs.map((p) => p.entry);
   if (!skipRemember) rememberQuoteIds(selectedIds);
   return { data: { quotes }, matchedCount, selectedIds };
 }
@@ -2424,7 +2424,7 @@ function parseViWikiquoteWikitext(wt) {
 
 async function fetchExternalRealQuotesBatch() {
   const djSkip = Math.floor(Math.random() * 1410);
-  const topic = VI_WIKIQUOTE_TOPICS[LIVE_QUOTE_CACHE.wikiIdx++ % VI_WIKIQUOTE_TOPICS.length];
+  const topic = VI_WIKIQUOTE_TOPICS[Math.floor(Math.random() * VI_WIKIQUOTE_TOPICS.length)];
 
   const djPromise = (async () => {
     const r = await fetch(`https://dummyjson.com/quotes?limit=40&skip=${djSkip}`, {
@@ -2483,7 +2483,7 @@ async function fetchExternalRealQuotesBatch() {
     if (!ct.includes("json")) return [];
     const j = await r.json();
     const wt = j?.parse?.wikitext?.["*"] || "";
-    return parseViWikiquoteWikitext(wt).slice(0, 20);
+    return shuffleInPlace(parseViWikiquoteWikitext(wt)).slice(0, 20);
   })();
 
   const results = await Promise.allSettled([djPromise, zqPromise, wkPromise]);
@@ -2642,17 +2642,10 @@ function mergeHybridQuotes(pickedObj, liveObj, seedText = "") {
   const liveVia = !Array.isArray(liveObj) && liveObj?.via ? liveObj.via : "";
   if (liveQuotes.length === 0 || baseQuotes.length < 5) {
     rememberQuoteIds(baseIds);
-    return { data: pickedObj.data, liveCount: 0, liveVia: "" };
+    return { data: { quotes: shuffleInPlace([...baseQuotes]) }, liveCount: 0, liveVia: "" };
   }
-  const pairChoices = [
-    [2, 4],
-    [1, 2],
-    [1, 4],
-    [2, 3],
-  ];
-  let h = 0;
-  for (let i = 0; i < seedText.length; i++) h = (h * 31 + seedText.charCodeAt(i)) >>> 0;
-  const candidateSlots = pairChoices[h % pairChoices.length];
+  const slotIndices = shuffleInPlace([0, 1, 2, 3, 4]);
+  const candidateSlots = slotIndices.slice(0, 2);
   const keptAttrs = new Set(
     baseQuotes
       .filter((_, idx) => !candidateSlots.includes(idx))
@@ -2666,7 +2659,7 @@ function mergeHybridQuotes(pickedObj, liveObj, seedText = "") {
   });
   if (filteredLive.length === 0) {
     rememberQuoteIds(baseIds);
-    return { data: pickedObj.data, liveCount: 0, liveVia: "" };
+    return { data: { quotes: shuffleInPlace([...baseQuotes]) }, liveCount: 0, liveVia: "" };
   }
   const replaceSlots = new Set(candidateSlots.slice(0, filteredLive.length));
   const merged = baseQuotes.map((item) => ({ ...item }));
@@ -2680,7 +2673,7 @@ function mergeHybridQuotes(pickedObj, liveObj, seedText = "") {
   }
   const keptIds = baseIds.filter((_, idx) => !replaceSlots.has(idx));
   rememberQuoteIds(keptIds);
-  return { data: { quotes: merged }, liveCount: fIdx, liveVia };
+  return { data: { quotes: shuffleInPlace(merged) }, liveCount: fIdx, liveVia };
 }
 
 // Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu hybrid: 3 bank thật + 2 danh ngôn thật kéo live).
