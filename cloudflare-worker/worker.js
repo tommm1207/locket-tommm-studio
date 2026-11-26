@@ -12,6 +12,21 @@ const GITHUB_FRAMES_BIN_BASE =
 
 const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]}};
 
+const LUT_FILTERS = {
+  dazz_cpm35: { rMul: 1.08, gMul: 1.02, bMul: 0.90, contrast: 1.12, brightness: 4, sat: 1.10, fade: 14, vig: 0.22, grain: 10 },
+  dazz_classic_u: { rMul: 1.06, gMul: 1.00, bMul: 0.93, contrast: 1.16, brightness: 2, sat: 1.14, fade: 10, vig: 0.25, grain: 8 },
+  dazz_fqs: { rMul: 0.98, gMul: 1.05, bMul: 1.02, contrast: 1.10, brightness: 3, sat: 1.08, fade: 12, vig: 0.18, grain: 7 },
+  dazz_inst_c: { rMul: 1.07, gMul: 1.03, bMul: 0.95, contrast: 0.96, brightness: 12, sat: 0.92, fade: 24, vig: 0.20, grain: 6 },
+  dazz_grd: { rMul: 1.0, gMul: 1.0, bMul: 1.0, contrast: 1.32, brightness: 0, sat: 0.0, fade: 8, vig: 0.28, grain: 14, bw: true },
+  lut_iphone_beauty: { rMul: 1.05, gMul: 1.02, bMul: 1.03, contrast: 1.03, brightness: 10, sat: 1.05, fade: 4, vig: 0.06, grain: 0 },
+  lut_film_han: { rMul: 1.05, gMul: 1.02, bMul: 1.04, contrast: 0.95, brightness: 12, sat: 0.90, fade: 18, vig: 0.10, grain: 4 },
+  lut_trang_sua: { rMul: 1.03, gMul: 1.03, bMul: 1.05, contrast: 0.97, brightness: 16, sat: 0.88, fade: 14, vig: 0.08, grain: 0 },
+  lut_kodak_am: { rMul: 1.11, gMul: 1.03, bMul: 0.87, contrast: 1.10, brightness: 5, sat: 1.15, fade: 12, vig: 0.20, grain: 8 },
+  lut_fuji_chrome: { rMul: 0.97, gMul: 1.03, bMul: 1.04, contrast: 1.14, brightness: 0, sat: 0.82, fade: 12, vig: 0.18, grain: 6 },
+  lut_phim_nhat: { rMul: 0.98, gMul: 1.05, bMul: 1.06, contrast: 0.94, brightness: 14, sat: 0.88, fade: 20, vig: 0.10, grain: 5 },
+  lut_vintage: { rMul: 1.12, gMul: 1.01, bMul: 0.84, contrast: 1.06, brightness: 3, sat: 0.78, fade: 22, vig: 0.26, grain: 11 },
+};
+
 const FACE_LOCK =
   "Edit the input photo. Strictly preserve the exact same person, identical facial features, eyes, nose, mouth, skin tone, expression, pose, camera framing, and natural lighting. ";
 
@@ -540,6 +555,108 @@ function firstNonEmptyString(values) {
   return "";
 }
 
+function detectLutId(dataNode, rawBodyText) {
+  const candidates = [
+    dataNode?.filterId,
+    dataNode?.filter_id,
+    dataNode?.uid,
+    dataNode?.id,
+    dataNode?.filter?.id,
+    dataNode?.filter?.uid,
+    dataNode?.prompt,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      const t = c.trim();
+      if (LUT_FILTERS[t]) return t;
+    }
+  }
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      for (const id of Object.keys(LUT_FILTERS)) {
+        if (c.includes(id)) return id;
+      }
+    }
+  }
+  if (rawBodyText) {
+    for (const id of Object.keys(LUT_FILTERS)) {
+      if (rawBodyText.includes('"' + id + '"') || rawBodyText.includes(id)) return id;
+    }
+  }
+  return null;
+}
+
+function applyLutToRgb(srcRgb, w, h, lut) {
+  const rMul = lut.rMul ?? 1;
+  const gMul = lut.gMul ?? 1;
+  const bMul = lut.bMul ?? 1;
+  const contrast = lut.contrast ?? 1;
+  const brightness = lut.brightness ?? 0;
+  const sat = lut.sat ?? 1;
+  const fade = lut.fade ?? 0;
+  const vig = lut.vig ?? 0;
+  const grain = lut.grain ?? 0;
+  const isBw = !!lut.bw;
+  const halfW = w * 0.5;
+  const halfH = h * 0.5;
+  const invMaxR2 = 1 / (halfW * halfW + halfH * halfH);
+  const fadeScale = fade > 0 ? (255 - fade) / 255 : 1;
+  let rng = 0x9e3779b9;
+
+  for (let y = 0; y < h; y++) {
+    const dy = y - halfH;
+    const dy2 = dy * dy;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 3;
+      let r = srcRgb[i];
+      let g = srcRgb[i + 1];
+      let b = srcRgb[i + 2];
+
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (isBw) {
+        r = g = b = lum;
+      } else if (sat !== 1) {
+        r = lum + (r - lum) * sat;
+        g = lum + (g - lum) * sat;
+        b = lum + (b - lum) * sat;
+      }
+
+      r = (r * rMul - 128) * contrast + 128 + brightness;
+      g = (g * gMul - 128) * contrast + 128 + brightness;
+      b = (b * bMul - 128) * contrast + 128 + brightness;
+
+      if (fade > 0) {
+        r = fade + r * fadeScale;
+        g = fade + g * fadeScale;
+        b = fade + b * fadeScale;
+      }
+
+      if (vig > 0) {
+        const dx = x - halfW;
+        const vFactor = 1 - vig * (dx * dx + dy2) * invMaxR2;
+        r *= vFactor;
+        g *= vFactor;
+        b *= vFactor;
+      }
+
+      if (grain > 0) {
+        rng = (rng ^ (rng << 13)) >>> 0;
+        rng = (rng ^ (rng >>> 17)) >>> 0;
+        rng = (rng ^ (rng << 5)) >>> 0;
+        if (rng === 0) rng = 0x9e3779b9;
+        const n = ((rng & 0xff) / 127.5 - 1) * grain;
+        r += n;
+        g += n;
+        b += n;
+      }
+
+      srcRgb[i] = r < 0 ? 0 : r > 255 ? 255 : r | 0;
+      srcRgb[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g | 0;
+      srcRgb[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b | 0;
+    }
+  }
+}
+
 function detectAiRequest(dataNode, rawBodyText) {
   let rawFilterId = firstNonEmptyString([
     dataNode?.filterId,
@@ -803,11 +920,12 @@ async function handleStudioRequest(request, env) {
     return new Response(
       JSON.stringify({
         status: "online",
-        platform: "Cloudflare Workers 24/7 (PNG Frame, Photobooth & FLUX.2 AI Engine)",
+        platform: "Cloudflare Workers 24/7 (PNG Frame, Photobooth, LUT & FLUX.2 AI Engine)",
         owner: "Tommm",
         ai_model: (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b",
         ai_binding_ready: !!(env && env.AI),
         ai_prompts_loaded: Object.keys(AI_FILTER_PROMPTS).length,
+        luts_loaded: Object.keys(LUT_FILTERS).length,
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
@@ -833,13 +951,12 @@ async function handleStudioRequest(request, env) {
     return new Response("Image expired", { status: 404, headers: corsHeaders() });
   }
 
-  // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter / createOverlay
+  // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter
   if (
     request.method === "POST" &&
     (url.pathname.includes("generateFilteredImage") ||
       url.pathname.includes("generateFilter") ||
-      url.pathname.includes("applyFilter") ||
-      url.pathname.includes("createOverlay"))
+      url.pathname.includes("applyFilter"))
   ) {
     const rawBodyText = await request.text();
     let bodyObj = {};
@@ -907,6 +1024,43 @@ async function handleStudioRequest(request, env) {
         decoded_user: !!decodedUser,
         out_mime: encoded.mimeType,
         out_bytes: encoded.bytes.length,
+        ts: new Date().toISOString(),
+      };
+
+      return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+    }
+
+    // Priority 1.5: Instant 0-Neuron Dazz Cam & Film LUT Color Grading (100% original face)
+    const lutId = detectLutId(dataNode, rawBodyText);
+    if (lutId && LUT_FILTERS[lutId]) {
+      const t0 = Date.now();
+      const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
+      const tempId = crypto.randomUUID().slice(0, 12);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId);
+
+      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || SIZE;
+      const srcH = decodedUser?.h || SIZE;
+      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
+      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, SIZE, SIZE]);
+      applyLutToRgb(canvasRgb, SIZE, SIZE, LUT_FILTERS[lutId]);
+
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const outId = `tommm_lut_${tempId}.${encoded.ext}`;
+      MEMORY_IMAGES.set(outId, {
+        bytes: encoded.bytes,
+        mimeType: encoded.mimeType,
+        ts: Date.now(),
+      });
+
+      LAST_DEBUG = {
+        mode: "lut_filter",
+        filterId: lutId,
+        got_input: !!imgBytes,
+        decoded_user: !!decodedUser,
+        out_mime: encoded.mimeType,
+        out_bytes: encoded.bytes.length,
+        ms: Date.now() - t0,
         ts: new Date().toISOString(),
       };
 
