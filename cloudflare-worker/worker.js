@@ -123,16 +123,9 @@ const FRAME_CACHE = new Map();
 const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
-let LAST_ANY_REQUEST = null;
-let LAST_DECODE_ERR = null;
-let LAST_CAPTION_RAW = null;
-let LAST_RC_LOG = null;
-const URL_LOG = []; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
-let REQUEST_LOG = []; // vài request gần nhất
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
-let LAST_FALLBACK_DEBUG = null;
 
 const CRC_TABLE = new Uint32Array(256);
 for (let n = 0; n < 256; n++) {
@@ -857,11 +850,7 @@ async function getSourceRgb(imgBytes, sourceUrl, authHeader) {
 // Decode ảnh đầu vào -> { w, h, rgb } ở KÍCH THƯỚC GỐC (drawCoverRgb sẽ scale khi composite).
 // Dùng jpeg-js/decodePngToRgb trong worker (KHÔNG weserv.nl, đã bị chặn Cloudflare).
 async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId, targetSize = SIZE, authHeader = "") {
-  const d = await getSourceRgb(imgBytes, sourceUrl, authHeader);
-  if (!d) {
-    LAST_DECODE_ERR = "decode_fail (src=" + (sourceUrl ? "y" : "n") + " img=" + (imgBytes ? imgBytes.length : 0) + ")";
-  }
-  return d;
+  return await getSourceRgb(imgBytes, sourceUrl, authHeader);
 }
 
 // Chuẩn bị ảnh cho AI (FLUX/segmentation): JPEG đã nén ~768px. Encode từ RGB bằng cf.image hoặc jpeg-js.
@@ -1804,56 +1793,6 @@ async function handleStudioRequest(request, env) {
   cleanupMemory();
   const url = new URL(request.url);
 
-  // DEBUG TẠM /rclog: nhận dump feature_gates + camera_filter_config server Locket trả (từ js_tommm_rc)
-  // để phân tích nút [📷] Dazz Cam. Xoá sau khi tìm xong.
-  if (request.method === "POST" && url.pathname === "/rclog") {
-    try { LAST_RC_LOG = Object.assign({ ts: new Date().toISOString() }, await request.json()); } catch (_) {}
-    return new Response("ok", { headers: corsHeaders() });
-  }
-
-  // DEBUG TẠM /urllog?orig=<url>: ghi URL user-state app gọi + PROXY ngược về server gốc (để app chạy bình thường).
-  // Ghi cả 1 phần RESPONSE để tìm field eligibility LNN. Xoá sau khi tìm xong.
-  if (url.pathname === "/urllog") {
-    const orig = url.searchParams.get("orig") || "";
-    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
-    let respText = "";
-    let upStatus = 0;
-    try {
-      const fwd = new Headers();
-      for (const [k, v] of request.headers.entries()) {
-        const kl = k.toLowerCase();
-        if (kl === "host" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
-        fwd.set(k, v);
-      }
-      const body = request.method === "POST" ? await request.arrayBuffer() : undefined;
-      const r = await fetch(orig, { method: request.method, headers: fwd, body });
-      upStatus = r.status;
-      respText = await r.text();
-      const entry = request.method + " [" + upStatus + "] " + orig.replace(/^https?:\/\//, "") + " => " + respText.slice(0, 300);
-      URL_LOG.unshift(entry);
-      if (URL_LOG.length > 30) URL_LOG.pop();
-      return new Response(respText, { status: upStatus, headers: corsHeaders({ "Content-Type": r.headers.get("Content-Type") || "application/json" }) });
-    } catch (e) {
-      URL_LOG.unshift(request.method + " [ERR] " + orig.replace(/^https?:\/\//, "") + " => " + String(e && e.message || e));
-      return new Response("{}", { status: 200, headers: corsHeaders({ "Content-Type": "application/json" }) });
-    }
-  }
-
-  // DEBUG: ghi mọi request (trừ chính /status và /ai-filters ảnh) để biết iPhone gọi gì.
-  if (url.pathname !== "/status" && url.pathname !== "/" && !url.pathname.startsWith("/ai-filters/")) {
-    const entry = {
-      method: request.method,
-      path: url.pathname,
-      origHost: request.headers.get("X-Locket-Orig-Host") || null,
-      hasAuth: !!(request.headers.get("Authorization") || request.headers.get("authorization")),
-      ua: (request.headers.get("User-Agent") || "").slice(0, 40),
-      ts: new Date().toISOString(),
-    };
-    LAST_ANY_REQUEST = entry;
-    REQUEST_LOG.unshift(entry);
-    if (REQUEST_LOG.length > 10) REQUEST_LOG.pop();
-  }
-
   // 1. Status endpoint
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/status")) {
     return new Response(
@@ -1890,13 +1829,6 @@ async function handleStudioRequest(request, env) {
         cached_images_in_ram: MEMORY_IMAGES.size,
         last_debug: LAST_DEBUG,
         last_caption_debug: LAST_CAPTION_DEBUG,
-        last_fallback_debug: LAST_FALLBACK_DEBUG,
-        last_any_request: LAST_ANY_REQUEST,
-        last_decode_err: LAST_DECODE_ERR,
-        last_caption_raw: LAST_CAPTION_RAW,
-        last_rc_log: LAST_RC_LOG,
-        url_log: URL_LOG,
-        request_log: REQUEST_LOG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
     );
@@ -1991,17 +1923,6 @@ async function handleStudioRequest(request, env) {
       upText = String(e?.message || e);
     }
 
-    // DEBUG: ghi NGUYÊN VĂN request body + headers Locket gửi (tìm flag stream/method app cần).
-    const hdrDump = {};
-    for (const [hk, hv] of request.headers.entries()) { if (!/authorization|cookie/i.test(hk)) hdrDump[hk] = hv.slice(0, 60); }
-    LAST_CAPTION_RAW = {
-      bodyFull: rawBodyText.replace(/"image_base64"\s*:\s*"[^"]*"/, '"image_base64":"<...>"').slice(0, 1500),
-      headers: hdrDump,
-      accept: request.headers.get("accept") || null,
-      upErr: upText.slice(0, 300),
-      ts: new Date().toISOString(),
-    };
-
     const tempId = crypto.randomUUID().slice(0, 12);
     const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
 
@@ -2025,10 +1946,6 @@ async function handleStudioRequest(request, env) {
       generated: JSON.stringify(structured.data).slice(0, 200),
       ts: new Date().toISOString(),
     };
-    if (structured.source && (structured.source.startsWith("fallback") || structured.source.includes("gemini"))) {
-      LAST_FALLBACK_DEBUG = { kind: "caption", source: structured.source, reason: structured.err || null, ts: new Date().toISOString() };
-    }
-
     // structured.data là object ĐÚNG schema (vd {quotes:[...]}). Trả nó ở nhiều vị trí để app chắc chắn đọc được.
     const sd = structured.data;
     const sdJson = JSON.stringify(sd);
@@ -2052,7 +1969,11 @@ async function handleStudioRequest(request, env) {
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
       output_text: sdJson,
     });
-    return new Response(JSON.stringify(payload), {
+    // CAPTION_RESPONSE_MODE: "wrapped" (mặc định, nhiều field) | "bare" (chỉ object schema trần).
+    // Thử "bare" nếu app reject response có field thừa (OpenAI structured output strict).
+    const mode = (env && env.CAPTION_RESPONSE_MODE) || "wrapped";
+    const finalBody = mode === "bare" ? sdJson : JSON.stringify(payload);
+    return new Response(finalBody, {
       status: 200,
       headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
     });
