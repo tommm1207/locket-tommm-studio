@@ -125,7 +125,8 @@ let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
 let LAST_ANY_REQUEST = null;
 let LAST_DECODE_ERR = null;
-let LAST_CAPTION_RAW = null; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
+let LAST_CAPTION_RAW = null;
+let LAST_RC_LOG = null; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
 let REQUEST_LOG = []; // vài request gần nhất
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
@@ -1755,6 +1756,13 @@ async function handleStudioRequest(request, env) {
   cleanupMemory();
   const url = new URL(request.url);
 
+  // DEBUG TẠM /rclog: nhận dump feature_gates + camera_filter_config server Locket trả (từ js_tommm_rc)
+  // để phân tích nút [📷] Dazz Cam. Xoá sau khi tìm xong.
+  if (request.method === "POST" && url.pathname === "/rclog") {
+    try { LAST_RC_LOG = Object.assign({ ts: new Date().toISOString() }, await request.json()); } catch (_) {}
+    return new Response("ok", { headers: corsHeaders() });
+  }
+
   // DEBUG: ghi mọi request (trừ chính /status và /ai-filters ảnh) để biết iPhone gọi gì.
   if (url.pathname !== "/status" && url.pathname !== "/" && !url.pathname.startsWith("/ai-filters/")) {
     const entry = {
@@ -1810,6 +1818,7 @@ async function handleStudioRequest(request, env) {
         last_any_request: LAST_ANY_REQUEST,
         last_decode_err: LAST_DECODE_ERR,
         last_caption_raw: LAST_CAPTION_RAW,
+        last_rc_log: LAST_RC_LOG,
         request_log: REQUEST_LOG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
@@ -1942,12 +1951,26 @@ async function handleStudioRequest(request, env) {
 
     // structured.data là object ĐÚNG schema (vd {quotes:[...]}). Trả nó ở nhiều vị trí để app chắc chắn đọc được.
     const sd = structured.data;
+    const sdJson = JSON.stringify(sd);
+    const nowSec = Math.floor(Date.now() / 1000);
+    // Trả CHUẨN OpenAI Chat Completions ĐẦY ĐỦ (model gpt-5.4) — content là JSON string khớp schema.
+    // Kèm luôn các field cũ (result/data/top-level) để mọi phiên bản Locket đều đọc được.
     const payload = Object.assign({}, sd, {
+      id: "chatcmpl-" + tempId,
+      object: "chat.completion",
+      created: nowSec,
+      model: (dataNode && dataNode.model) || "gpt-5.4",
+      choices: [{
+        index: 0,
+        message: { role: "assistant", content: sdJson, refusal: null },
+        logprobs: null,
+        finish_reason: "stop",
+      }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
       result: Object.assign({}, sd, { data: sd, status: 200 }),
       data: sd,
       status: 200,
       success: true,
-      choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify(sd) }, finish_reason: "stop" }],
     });
     return new Response(JSON.stringify(payload), {
       status: 200,

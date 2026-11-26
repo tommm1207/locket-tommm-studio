@@ -16,6 +16,26 @@ try {
     if (obj.entries["camera_filter_config"]) liveFilterCfg = JSON.parse(obj.entries["camera_filter_config"]);
 } catch (_) { liveFilterCfg = null; }
 
+// DEBUG TẠM: gửi camera_filter_config + feature_gates + DANH SÁCH KEY gốc server trả về worker để phân tích
+// nút [📷]. (Chỉ chạy khi có $httpClient; không ảnh hưởng config.) Xoá sau khi tìm xong.
+try {
+    if (typeof $httpClient !== "undefined") {
+        var dbgEntries = obj.entries || {};
+        var dbgPayload = {
+            state: obj.state,
+            allKeys: Object.keys(dbgEntries),
+            feature_gates: dbgEntries["feature_gates"] || null,
+            camera: dbgEntries["camera"] || null,
+            camera_filter_config: (dbgEntries["camera_filter_config"] || "").slice(0, 4000)
+        };
+        $httpClient.post({
+            url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/rclog",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dbgPayload)
+        }, function(e, r, b) {});
+    }
+} catch (_) {}
+
 // 2. Áp dụng toàn bộ cấu hình Locket Gold (Video 30s, Digicam Viewfinder [📷], Rollcall Strip, Tắt quảng cáo, Popup chào mừng Tommm)
 try {
     var liveStreak = JSON.parse(obj.entries["streak_config"] || "{}");
