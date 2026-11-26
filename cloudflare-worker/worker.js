@@ -7,6 +7,7 @@
 // =========================================================================
 
 const SIZE = 512;
+const WD_SIZE = 768;
 const GITHUB_FRAMES_BIN_BASE =
   "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/frames_bin";
 
@@ -519,7 +520,7 @@ async function getFrameRgba(filterId) {
   return rgba;
 }
 
-function drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box) {
+function drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box, canvasSize = SIZE) {
   const [x1, y1, x2, y2] = box;
   const winW = x2 - x1;
   const winH = y2 - y1;
@@ -534,7 +535,7 @@ function drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box) {
 
   for (let dy = 0; dy < winH; dy++) {
     const sy = Math.min(srcH - 1, Math.max(0, (offY + dy * invScale) | 0));
-    const dstRowOff = (y1 + dy) * SIZE * 3;
+    const dstRowOff = (y1 + dy) * canvasSize * 3;
     const srcRowOff = sy * srcW * 3;
     for (let dx = 0; dx < winW; dx++) {
       const sx = Math.min(srcW - 1, Math.max(0, (offX + dx * invScale) | 0));
@@ -547,8 +548,8 @@ function drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box) {
   }
 }
 
-function alphaCompositeRgbaOverRgb(canvasRgb, frameRgba) {
-  const totalPixels = SIZE * SIZE;
+function alphaCompositeRgbaOverRgb(canvasRgb, frameRgba, canvasSize = SIZE) {
+  const totalPixels = canvasSize * canvasSize;
   for (let p = 0, i3 = 0, i4 = 0; p < totalPixels; p++, i3 += 3, i4 += 4) {
     const a = frameRgba[i4 + 3];
     if (a === 0) continue;
@@ -763,15 +764,16 @@ async function fetchBytesViaWsrv(targetUrl, query, minBytes = 200) {
   return null;
 }
 
-async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId) {
+async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId, targetSize = SIZE) {
   let pngBytes = null;
+  const qStr = `w=${targetSize}&h=${targetSize}&fit=cover&output=png&af=false`;
 
   // Prefer fetching via temp MEMORY_IMAGES URL first (per plan), falling back cleanly
   if (imgBytes && imgBytes.length > 0) {
     const rawKey = `raw_${tempId}.jpg`;
     MEMORY_IMAGES.set(rawKey, { bytes: imgBytes, mimeType: "image/jpeg", ts: Date.now() });
     try {
-      pngBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, "w=512&h=512&fit=cover&output=png&af=false", 200);
+      pngBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, qStr, 200);
     } finally {
       MEMORY_IMAGES.delete(rawKey);
     }
@@ -779,7 +781,7 @@ async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId) {
 
   // Secondary fallback: if sourceUrl is directly accessible to wsrv.nl
   if (!pngBytes && sourceUrl && sourceUrl.startsWith("http")) {
-    pngBytes = await fetchBytesViaWsrv(sourceUrl, "w=512&h=512&fit=cover&output=png&af=false", 200);
+    pngBytes = await fetchBytesViaWsrv(sourceUrl, qStr, 200);
   }
 
   if (pngBytes) {
@@ -897,8 +899,8 @@ function buildLocketFilterResponse(outUrl) {
   });
 }
 
-async function encodeCanvasToImage(canvasRgb, origin, tempId) {
-  const bmpBytes = encodeBmpRgb24(SIZE, SIZE, canvasRgb);
+async function encodeCanvasToImage(canvasRgb, origin, tempId, canvasSize = SIZE) {
+  const bmpBytes = encodeBmpRgb24(canvasSize, canvasSize, canvasRgb);
   const bmpKey = `bmp_${tempId}.bmp`;
   MEMORY_IMAGES.set(bmpKey, { bytes: bmpBytes, mimeType: "image/bmp", ts: Date.now() });
   const bmpUrl = `${origin}/ai-filters/${bmpKey}`;
@@ -908,7 +910,7 @@ async function encodeCanvasToImage(canvasRgb, origin, tempId) {
   let ext = "jpg";
 
   try {
-    const jRes = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(bmpUrl)}&output=jpg&q=92`);
+    const jRes = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(bmpUrl)}&output=jpg&q=94`);
     if (jRes.ok) {
       const ab = await jRes.arrayBuffer();
       const candidate = new Uint8Array(ab);
@@ -922,7 +924,7 @@ async function encodeCanvasToImage(canvasRgb, origin, tempId) {
   }
 
   if (!finalBytes) {
-    finalBytes = encodeFastPngRgb(SIZE, SIZE, canvasRgb);
+    finalBytes = encodeFastPngRgb(canvasSize, canvasSize, canvasRgb);
     mimeType = "image/png";
     ext = "png";
   }
@@ -1161,6 +1163,10 @@ async function handleStudioRequest(request, env) {
       dataNode?.overlay_id,
       dataNode?.overlayId,
       dataNode?.style,
+      dataNode?.analytics?.caption_type,
+      dataNode?.analytics?.overlay_id,
+      typeof dataNode?.prompt === "string" && /quote|trích dẫn/i.test(dataNode.prompt) ? "quote" : "",
+      typeof dataNode?.prompt === "string" && /news|breaking|headline|tin nóng/i.test(dataNode.prompt) ? "breaking_news" : "",
     ]);
 
     let upStatus = 0;
@@ -1169,24 +1175,25 @@ async function handleStudioRequest(request, env) {
       const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText });
       upStatus = upRes.status;
       upText = await upRes.text();
-      const upOk =
-        upRes.ok &&
-        upText.trim().startsWith("{") &&
-        !/requires_gold|permission-denied|unauthenticated|"error"\s*:/i.test(upText);
-      if (upOk) {
+      let parsedUp = null;
+      try { parsedUp = JSON.parse(upText); } catch (_) {}
+      const upResult = parsedUp?.result || parsedUp || {};
+      const hasErrors =
+        !upRes.ok ||
+        !parsedUp ||
+        !!upResult.error ||
+        !!parsedUp.error ||
+        (Array.isArray(upResult.errors) && upResult.errors.length > 0) ||
+        (Array.isArray(parsedUp.errors) && parsedUp.errors.length > 0) ||
+        (typeof upResult.status === "number" && upResult.status >= 400) ||
+        /requires_gold|permission-denied|unauthenticated/i.test(upText);
+      if (!hasErrors) {
         LAST_CAPTION_DEBUG = {
           mode: "official_passthrough",
           captionType,
           reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
           upStatus,
-          upKeys: (() => {
-            try {
-              const j = JSON.parse(upText);
-              return Object.keys(j?.result?.data || j?.result || j || {});
-            } catch (_) {
-              return [];
-            }
-          })(),
+          upKeys: Object.keys(upResult.data || upResult || {}),
           ts: new Date().toISOString(),
         };
         return new Response(upText, {
@@ -1205,12 +1212,29 @@ async function handleStudioRequest(request, env) {
     const gen = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, url.origin, tempId);
     const cleanText = gen.text;
 
+    const rfSchema = dataNode?.response_format?.json_schema?.schema?.properties || dataNode?.response_format?.properties || null;
+    const rfKeys = rfSchema && typeof rfSchema === "object" ? Object.keys(rfSchema) : [];
+    const customData = {
+      caption: cleanText,
+      text: cleanText,
+      headline: cleanText,
+      title: cleanText,
+      quote: cleanText,
+      author: "Tommm AI",
+      content: cleanText,
+    };
+    for (const k of rfKeys) {
+      if (!(k in customData)) customData[k] = cleanText;
+    }
+
     LAST_CAPTION_DEBUG = {
       mode: "ai_vision_caption",
       source: gen.source,
       aiErr: gen.aiErr || null,
       captionType,
       reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+      rfKeys,
+      promptPreview: typeof dataNode?.prompt === "string" ? dataNode.prompt.slice(0, 120) : "",
       got_input: !!(imgBytes || sourceUrl),
       upStatus,
       upErrPreview: upText.slice(0, 220),
@@ -1219,19 +1243,11 @@ async function handleStudioRequest(request, env) {
     };
 
     const payload = {
-      result: {
-        caption: cleanText,
-        text: cleanText,
-        headline: cleanText,
-        title: cleanText,
-        data: {
-          caption: cleanText,
-          text: cleanText,
-          headline: cleanText,
-          title: cleanText,
-        },
+      result: Object.assign({}, customData, {
+        data: customData,
         status: 200,
-      },
+      }),
+      data: customData,
       caption: cleanText,
       text: cleanText,
       headline: cleanText,
@@ -1259,7 +1275,7 @@ async function handleStudioRequest(request, env) {
     const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
     const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
 
-    // Priority 0: AI Subject-Mask + Crisp Weekday Depth Composite (VI / EN / TW / DE)
+    // Priority 0: AI Subject-Mask + Crisp 768x768 Weekday Depth Composite (VI / EN / TW / DE)
     const specialId = detectSpecialFilterId(dataNode, rawBodyText);
     if (specialId && WEEKDAY_DEPTH_PREFIX[specialId]) {
       const t0 = Date.now();
@@ -1269,20 +1285,20 @@ async function handleStudioRequest(request, env) {
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
 
       const [decodedUser, weekdayRgba, preparedMaskInput] = await Promise.all([
-        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId),
+        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, WD_SIZE),
         getFrameRgba(`${binPrefix}_${vnDay}`),
         prepareAiInputImage(imgBytes, sourceUrl, url.origin, `seg_${tempId}`),
       ]);
 
-      const baseRgb = new Uint8Array(SIZE * SIZE * 3);
+      const baseRgb = new Uint8Array(WD_SIZE * WD_SIZE * 3);
       if (decodedUser?.rgb) {
-        drawCoverRgb(baseRgb, decodedUser.rgb, decodedUser.w, decodedUser.h, [0, 0, SIZE, SIZE]);
+        drawCoverRgb(baseRgb, decodedUser.rgb, decodedUser.w, decodedUser.h, [0, 0, WD_SIZE, WD_SIZE], WD_SIZE);
       } else {
         baseRgb.fill(28);
       }
 
       const canvasRgb = new Uint8Array(baseRgb);
-      alphaCompositeRgbaOverRgb(canvasRgb, weekdayRgba);
+      alphaCompositeRgbaOverRgb(canvasRgb, weekdayRgba, WD_SIZE);
 
       let maskApplied = false;
       let fgRatio = 0;
@@ -1291,31 +1307,50 @@ async function handleStudioRequest(request, env) {
         const segPrompt =
           "Create a pure black-and-white binary foreground segmentation matte of this exact image. Fill the entire main foreground subject (person, face, hair, hands, clothing, bag, food dish/bowl, pet, or prominent foreground object/tower) in solid pure white (#FFFFFF) and fill the entire background behind it in solid pure black (#000000). Keep exact pixel alignment with zero cropping or shifting. Pure white subject on pure black background only.";
         let maskOut = null;
-        for (const candModel of ["@cf/black-forest-labs/flux-2-klein-9b", (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b"]) {
+        // Prefer fast 4B model first to save daily free neurons (~3x cheaper than 9B)
+        for (const candModel of [(env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b", "@cf/black-forest-labs/flux-2-klein-9b"]) {
           try {
-            maskOut = await runCloudflareFluxEdit(env, segPrompt, preparedMaskInput, null, candModel, 512);
+            maskOut = await runCloudflareFluxEdit(env, segPrompt, preparedMaskInput, null, candModel, SIZE);
             segModelUsed = candModel;
             break;
           } catch (_) {}
         }
         if (maskOut && maskOut.bytes) {
-          const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, url.origin, `msk_${tempId}`);
+          const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, url.origin, `msk_${tempId}`, SIZE);
           if (decodedMask?.rgb && decodedMask.w === SIZE && decodedMask.h === SIZE) {
             const { alpha, fgRatio: ratio } = buildSmoothedForegroundMask(decodedMask.rgb);
             fgRatio = Number(ratio.toFixed(3));
             if (ratio > 0.02 && ratio < 0.94) {
-              for (let p = 0, i3 = 0; p < SIZE * SIZE; p++, i3 += 3) {
-                const a = alpha[p];
-                if (a === 0) continue;
-                if (a === 255) {
-                  canvasRgb[i3] = baseRgb[i3];
-                  canvasRgb[i3 + 1] = baseRgb[i3 + 1];
-                  canvasRgb[i3 + 2] = baseRgb[i3 + 2];
-                } else {
-                  const invA = 255 - a;
-                  canvasRgb[i3] = (baseRgb[i3] * a + canvasRgb[i3] * invA + 128) >> 8;
-                  canvasRgb[i3 + 1] = (baseRgb[i3 + 1] * a + canvasRgb[i3 + 1] * invA + 128) >> 8;
-                  canvasRgb[i3 + 2] = (baseRgb[i3 + 2] * a + canvasRgb[i3 + 2] * invA + 128) >> 8;
+              const scaleM = (SIZE - 1) / (WD_SIZE - 1);
+              for (let y = 0; y < WD_SIZE; y++) {
+                const myF = y * scaleM;
+                const my0 = myF | 0;
+                const my1 = my0 < SIZE - 1 ? my0 + 1 : SIZE - 1;
+                const fy = myF - my0;
+                const row0 = my0 * SIZE;
+                const row1 = my1 * SIZE;
+                for (let x = 0; x < WD_SIZE; x++) {
+                  const mxF = x * scaleM;
+                  const mx0 = mxF | 0;
+                  const mx1 = mx0 < SIZE - 1 ? mx0 + 1 : SIZE - 1;
+                  const fx = mxF - mx0;
+                  const a00 = alpha[row0 + mx0];
+                  const a10 = alpha[row0 + mx1];
+                  const a01 = alpha[row1 + mx0];
+                  const a11 = alpha[row1 + mx1];
+                  const a = ((a00 * (1 - fx) + a10 * fx) * (1 - fy) + (a01 * (1 - fx) + a11 * fx) * fy + 0.5) | 0;
+                  if (a === 0) continue;
+                  const i3 = (y * WD_SIZE + x) * 3;
+                  if (a >= 255) {
+                    canvasRgb[i3] = baseRgb[i3];
+                    canvasRgb[i3 + 1] = baseRgb[i3 + 1];
+                    canvasRgb[i3 + 2] = baseRgb[i3 + 2];
+                  } else {
+                    const invA = 255 - a;
+                    canvasRgb[i3] = (baseRgb[i3] * a + canvasRgb[i3] * invA + 128) >> 8;
+                    canvasRgb[i3 + 1] = (baseRgb[i3 + 1] * a + canvasRgb[i3 + 1] * invA + 128) >> 8;
+                    canvasRgb[i3 + 2] = (baseRgb[i3 + 2] * a + canvasRgb[i3 + 2] * invA + 128) >> 8;
+                  }
                 }
               }
               maskApplied = true;
@@ -1324,7 +1359,7 @@ async function handleStudioRequest(request, env) {
         }
       }
 
-      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, WD_SIZE);
       const outId = `tommm_wd_${tempId}.${encoded.ext}`;
       MEMORY_IMAGES.set(outId, {
         bytes: encoded.bytes,

@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRAMES_DIR = os.path.join(BASE_DIR, "assets", "frames")
 OUT_BIN_DIR = os.path.join(BASE_DIR, "assets", "frames_bin")
-SIZE = 512
+SIZE = 768
 
 LANG_CONFIGS = [
     {
@@ -57,16 +57,16 @@ LANG_CONFIGS = [
 
 def render_weekday_rgba(text: str, font_path: str, variation, stroke: int, v_stretch: float) -> Image.Image:
     """Render tall condensed bold white weekday text for depth compositing."""
-    font = ImageFont.truetype(font_path, 160)
+    font = ImageFont.truetype(font_path, 220)
     if variation:
         try:
             font.set_variation_by_name(variation)
         except Exception:
             pass
 
-    tmp = Image.new("RGBA", (1500, 440), (0, 0, 0, 0))
+    tmp = Image.new("RGBA", (2200, 620), (0, 0, 0, 0))
     dt = ImageDraw.Draw(tmp)
-    dt.text((40, 80), text, font=font, fill=(255, 255, 255, 255), stroke_width=stroke, stroke_fill=(255, 255, 255, 255))
+    dt.text((60, 110), text, font=font, fill=(255, 255, 255, 255), stroke_width=stroke + 1, stroke_fill=(255, 255, 255, 255))
     bbox = tmp.getbbox()
     if not bbox:
         raise RuntimeError(f"Empty glyph bbox for {text}")
@@ -155,10 +155,7 @@ def main():
             out_bin = os.path.join(OUT_BIN_DIR, f"{cfg['prefix']}_{idx}.bin")
             with open(out_bin, "wb") as f:
                 f.write(comp)
-            if idx == 1 and cfg["prefix"] in ("weekday_en", "weekday_tw", "weekday_de"):
-                bg = Image.new("RGBA", (SIZE, SIZE), (55, 65, 81, 255))
-                Image.alpha_composite(bg, im).save(os.path.join(OUT_BIN_DIR, f"_preview_{cfg['prefix']}_1.png"))
-        print(f"Built 7 bins for {cfg['prefix']}")
+        print(f"Built 7 HD (768x768) bins for {cfg['prefix']}")
 
 
 if __name__ == "__main__":
