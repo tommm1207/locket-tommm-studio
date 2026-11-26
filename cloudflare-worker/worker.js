@@ -223,7 +223,6 @@ let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
 const SKIP_GEMINI_MODELS = new Map(); // modelId -> timestamp until skip (on 503 high demand / 404 / timeout)
 const RECENT_QUOTE_IDS = [];
-const CUSTOM_CREATED_FILTERS = [];
 function rememberQuoteIds(ids) {
   for (const id of ids) {
     if (!id) continue;
@@ -3615,54 +3614,6 @@ async function handleStudioRequest(request, env) {
     });
   }
 
-  // 2.9 Handle Locket getFilters / fetchFilters / getCustomFilters (merge custom filters created via Tạo diện mạo)
-  if (
-    (request.method === "GET" || request.method === "POST") &&
-    /(getFilters|fetchFilters|getCustomFilters|fetchCustomFilters|getCameraFilters|listFilters)/i.test(url.pathname)
-  ) {
-    const rawBodyText = request.method === "POST" ? await request.text() : "";
-    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
-    const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
-    const fwdHeaders = new Headers();
-    for (const [k, v] of request.headers.entries()) {
-      const kl = k.toLowerCase();
-      if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
-      fwdHeaders.set(k, v);
-    }
-    let upFilters = [];
-    let upStatus = 0;
-    try {
-      const upRes = await fetch(upstreamUrl, {
-        method: request.method,
-        headers: fwdHeaders,
-        body: request.method === "POST" ? rawBodyText : undefined,
-        signal: AbortSignal.timeout(4000),
-      });
-      upStatus = upRes.status;
-      const upTxt = await upRes.text();
-      let upJson = null;
-      try { upJson = JSON.parse(upTxt); } catch (_) {}
-      const list = upJson?.result?.data?.filters || upJson?.result?.filters || upJson?.data?.filters || upJson?.filters || [];
-      if (Array.isArray(list)) upFilters = list;
-    } catch (_) {}
-    const merged = [...CUSTOM_CREATED_FILTERS, ...upFilters];
-    LAST_DEBUG = {
-      mode: "get_filters",
-      path: url.pathname,
-      upStatus,
-      customCount: CUSTOM_CREATED_FILTERS.length,
-      upCount: upFilters.length,
-      ts: new Date().toISOString(),
-    };
-    return new Response(
-      JSON.stringify({
-        data: { filters: merged, custom_filters: CUSTOM_CREATED_FILTERS },
-        result: { status: 200, success: true, data: { filters: merged, custom_filters: CUSTOM_CREATED_FILTERS } },
-      }),
-      { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
-    );
-  }
-
   // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter / createFilter (Tạo diện mạo)
   if (
     request.method === "POST" &&
@@ -3778,11 +3729,6 @@ async function handleStudioRequest(request, env) {
           productUrl: null,
           textColor: "#FFFFFF",
           referenceImages: [],
-          is_custom: true,
-          isCustom: true,
-          status: "ready",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
           requires_gold: false,
           requiresGold: false,
           is_gold: false,
@@ -3796,8 +3742,6 @@ async function handleStudioRequest(request, env) {
           tryButtonEnabled: true,
           try_button_enabled: true,
         };
-        CUSTOM_CREATED_FILTERS.unshift(filterObj);
-        while (CUSTOM_CREATED_FILTERS.length > 30) CUSTOM_CREATED_FILTERS.pop();
         LAST_DEBUG = {
           mode: "create_filter_meta_fallback",
           path: url.pathname,
