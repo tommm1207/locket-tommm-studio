@@ -1011,12 +1011,13 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const fallbackList = isQuote ? fallbackQuotes : fallbackNews;
   const fallbackText = fallbackList[Math.floor(Math.random() * fallbackList.length)];
 
-  if (!env || !env.AI) return { text: fallbackText, source: "fallback_no_ai" };
+  if (!env || !env.AI) return { text: fallbackText, source: "fallback_no_ai", aiErr: null };
 
+  let lastErr = null;
   try {
     const prep = await prepareAiInputImage(imgBytes, sourceUrl, origin, tempId);
     const systemPrompt = isQuote
-      ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh Locket. Dựa vào bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm."
+      ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh Locket. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm."
       : "Bạn là biên tập viên bản tin LNN LIVE hài hước trên Locket. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). Không giải thích thêm.";
 
     const userContent = [];
@@ -1029,25 +1030,49 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
     userContent.push({
       type: "text",
       text: isQuote
-        ? "Viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
+        ? "Nhìn ảnh và viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
         : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.",
     });
 
-    const resp = await env.AI.run("@cf/meta/llama-3.2-11b-vision-instruct", {
+    const payload = {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userContent },
       ],
-      max_tokens: 60,
-      temperature: 0.8,
-    });
-    let txt = String(resp?.response || resp?.result?.response || "").trim();
-    txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
-    if (txt && txt.length >= 4) {
-      return { text: txt.slice(0, 90), source: "llama_vision" };
+      max_tokens: 80,
+      temperature: 0.75,
+    };
+
+    for (const modelId of ["@cf/mistralai/mistral-small-3.1-24b-instruct", "@cf/meta/llama-3.2-11b-vision-instruct"]) {
+      try {
+        let resp = await env.AI.run(modelId, payload);
+        let txt = String(resp?.response || resp?.result?.response || "").trim();
+        txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
+        if (txt && txt.length >= 4) {
+          return { text: txt.slice(0, 100), source: modelId, aiErr: null };
+        }
+      } catch (mErr) {
+        const msg = String(mErr?.message || mErr);
+        lastErr = msg;
+        if (modelId.includes("llama-3.2") && /agree|license|5016/i.test(msg)) {
+          try {
+            await env.AI.run(modelId, { prompt: "agree" });
+            const retry = await env.AI.run(modelId, payload);
+            let txt = String(retry?.response || retry?.result?.response || "").trim();
+            txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
+            if (txt && txt.length >= 4) {
+              return { text: txt.slice(0, 100), source: modelId, aiErr: null };
+            }
+          } catch (rErr) {
+            lastErr = String(rErr?.message || rErr);
+          }
+        }
+      }
     }
-  } catch (_) {}
-  return { text: fallbackText, source: "fallback_err" };
+  } catch (outerErr) {
+    lastErr = String(outerErr?.message || outerErr);
+  }
+  return { text: fallbackText, source: "fallback_err", aiErr: lastErr };
 }
 
 async function handleStudioRequest(request, env) {
@@ -1169,6 +1194,7 @@ async function handleStudioRequest(request, env) {
     LAST_CAPTION_DEBUG = {
       mode: "ai_vision_caption",
       source: gen.source,
+      aiErr: gen.aiErr || null,
       captionType,
       reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
       got_input: !!(imgBytes || sourceUrl),
