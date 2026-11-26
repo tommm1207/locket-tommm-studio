@@ -124,6 +124,7 @@ const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
 let CAPTION_MODE_OVERRIDE = null;
+let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -1579,6 +1580,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     "You are a Locket caption generator. Look at the photo and follow the user's instruction. " +
     "You MUST reply with ONLY a single valid JSON object (no markdown, no code fence, no extra text) " +
     (schema ? "that strictly matches this JSON schema: " + schemaStr + ". " : "") +
+    "If the schema has a `quotes` array with `category` enum values, return EXACTLY 1 concise quote per unique category (5 unique categories total), with non-empty `quote` and `attribution`. " +
     "Write in Vietnamese where the text is user-facing. Return pure JSON only.";
   const userText = (appPrompt || "Write a caption for this photo.").slice(0, 1200);
 
@@ -1623,7 +1625,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
           { role: "system", content: sys },
           { role: "user", content: userContentWithImg },
         ],
-        700,
+        480,
         0.75
       );
       return { raw: res.text || "", source: res.source || "cf_vision" };
@@ -1633,7 +1635,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
   for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
     const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
     providers.push(async () => ({
-      raw: await rawChat((env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1", k, nvModel, true, { max_tokens: 700 }),
+      raw: await rawChat((env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1", k, nvModel, true, { max_tokens: 480 }),
       source: "nvidia:" + nvModel,
     }));
   }
@@ -1641,7 +1643,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
   for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
     const gModel = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
     providers.push(async () => {
-      const g = await geminiGenerateCaption(env, sys, userText, prepBytes, prepMime, k, 700, true);
+      const g = await geminiGenerateCaption(env, sys, userText, prepBytes, prepMime, k, 480, true);
       return { raw: g.text || "", source: "gemini:" + gModel };
     });
   }
@@ -1662,6 +1664,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
         // Làm SẠCH theo schema: bỏ field thừa (schema có additionalProperties:false -> app reject nếu dư),
         // ép enum, đúng số phần tử mảng. Thiếu field thì điền từ caption fallback.
         obj = sanitizeToSchema(obj, schema);
+        obj = ensureValidQuoteOptions(obj, schema);
         const serialized = JSON.stringify(obj);
         if (
           !isCaptionRefusal(serialized) &&
@@ -1675,7 +1678,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
 
   // 4) Fallback: tự dựng JSON hợp lệ theo schema từ caption đơn (không để app "thử lại").
   const single = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId + "f", appPrompt);
-  const data = buildFallbackStructured(schema, single.text, isQuote);
+  const data = ensureValidQuoteOptions(buildFallbackStructured(schema, single.text, isQuote), schema);
   return { data, source: "fallback_" + (single.source || "static"), err: single.aiErr || null };
 }
 
@@ -1722,6 +1725,61 @@ function sanitizeToSchema(obj, schema) {
   if (type === "number" || type === "integer") return typeof obj === "number" ? obj : Number(obj) || 0;
   if (type === "boolean") return !!obj;
   return obj;
+}
+
+function ensureValidQuoteOptions(obj, schema) {
+  if (!schema || !schema.properties || !schema.properties.quotes || !Array.isArray(obj?.quotes)) {
+    return obj;
+  }
+  const defaultCats = ["pop_music", "greek_philosophy", "famous_modern_figures", "film_and_tv", "athlete"];
+  const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
+  const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : defaultCats;
+  const fallbackByCat = {
+    pop_music: { quote: "Sống chậm lại để thấy đời đáng yêu hơn.", category: "pop_music", attribution: "Sơn Tùng M-TP" },
+    greek_philosophy: { quote: "Hạnh phúc phụ thuộc vào chính chúng ta.", category: "greek_philosophy", attribution: "Aristotle" },
+    famous_modern_figures: { quote: "Mỗi khoảnh khắc đều đáng được trân trọng.", category: "famous_modern_figures", attribution: "Steve Jobs" },
+    film_and_tv: { quote: "Cuộc sống giống như một hộp sô-cô-la.", category: "film_and_tv", attribution: "Forrest Gump" },
+    athlete: { quote: "Không có gì là không thể nếu ta không bỏ cuộc.", category: "athlete", attribution: "Muhammad Ali" },
+  };
+
+  const rawItems = obj.quotes
+    .map((it) => ({
+      quote: String(it?.quote || "").trim().slice(0, 140),
+      category: String(it?.category || "").trim(),
+      attribution: String(it?.attribution || "").trim().slice(0, 80),
+    }))
+    .filter((it) => it.quote.length >= 3 && !isCaptionRefusal(it.quote));
+
+  const usedIndices = new Set();
+  const finalQuotes = [];
+
+  for (const cat of cats) {
+    let pickIdx = rawItems.findIndex((it, idx) => !usedIndices.has(idx) && it.category === cat);
+    if (pickIdx < 0) {
+      pickIdx = rawItems.findIndex((it, idx) => !usedIndices.has(idx) && !cats.includes(it.category));
+    }
+    if (pickIdx < 0) {
+      pickIdx = rawItems.findIndex((_, idx) => !usedIndices.has(idx));
+    }
+    const fb = fallbackByCat[cat] || { quote: "Giữ trọn khoảnh khắc này.", category: cat, attribution: "Khuyết danh" };
+    if (pickIdx >= 0) {
+      usedIndices.add(pickIdx);
+      const picked = rawItems[pickIdx];
+      finalQuotes.push({
+        quote: picked.quote,
+        category: cat,
+        attribution: picked.attribution || fb.attribution,
+      });
+    } else {
+      finalQuotes.push({
+        quote: fb.quote,
+        category: cat,
+        attribution: fb.attribution,
+      });
+    }
+  }
+
+  return { quotes: finalQuotes };
 }
 
 function buildFallbackStructured(schema, text, isQuote) {
@@ -1914,7 +1972,7 @@ async function handleStudioRequest(request, env) {
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
-        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_object_full",
+        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "smart_locket",
         last_debug: LAST_DEBUG,
         last_caption_debug: LAST_CAPTION_DEBUG,
       }),
@@ -1925,13 +1983,14 @@ async function handleStudioRequest(request, env) {
   // 1.5 Runtime switcher cho response format của /generateCaption (test nhanh không cần redeploy)
   if (request.method === "GET" && url.pathname === "/caption-mode") {
     const allowed = [
-      "data_object_full",
-      "data_string",
-      "data_openai_resp",
-      "data_parsed",
-      "result_openai_resp",
+      "smart_locket",
+      "quote_caption_obj",
+      "quote_pure_parsed",
+      "quote_caption_str",
       "result_data_caption_only",
-      "bare",
+      "data_object_full",
+      "data_parsed",
+      "data_string",
     ];
     const m = (url.searchParams.get("m") || "").trim();
     if (m === "reset" || m === "default") {
@@ -1942,7 +2001,7 @@ async function handleStudioRequest(request, env) {
     return new Response(
       JSON.stringify({
         ok: true,
-        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_object_full",
+        caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "smart_locket",
         allowed,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
@@ -2061,42 +2120,48 @@ async function handleStudioRequest(request, env) {
 
     let upStatus = 0;
     let upText = "";
-    try {
-      // Forward lên server gốc với timeout NGẮN (800ms) — nếu account có quyền thì passthrough thật;
-      // nếu chậm/401 (thường gặp) thì bỏ qua ngay, generate bằng AI để app không bị timeout -> "thử lại".
-      const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText, signal: AbortSignal.timeout(800) });
-      upStatus = upRes.status;
-      upText = await upRes.text();
-      let parsedUp = null;
-      try { parsedUp = JSON.parse(upText); } catch (_) {}
-      const upResult = parsedUp?.result || parsedUp || {};
-      const hasErrors =
-        !upRes.ok ||
-        !parsedUp ||
-        !!upResult.error ||
-        !!parsedUp.error ||
-        (Array.isArray(upResult.errors) && upResult.errors.length > 0) ||
-        (Array.isArray(parsedUp.errors) && parsedUp.errors.length > 0) ||
-        (typeof upResult.status === "number" && upResult.status >= 400) ||
-        /requires_gold|permission-denied|unauthenticated/i.test(upText);
-      if (!hasErrors) {
-        LAST_CAPTION_DEBUG = {
-          mode: "official_passthrough",
-          captionType,
-          reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
-          upStatus,
-          upKeys: Object.keys(upResult.data || upResult || {}),
-          ts: new Date().toISOString(),
-        };
-        return new Response(upText, {
-          status: upRes.status,
-          headers: corsHeaders({
-            "Content-Type": upRes.headers.get("Content-Type") || "application/json; charset=utf-8",
-          }),
-        });
+    if (Date.now() >= UPSTREAM_CAPTION_BLOCKED_UNTIL) {
+      try {
+        // Forward lên server gốc với timeout NGẮN (800ms) — nếu account có quyền thì passthrough thật;
+        // nếu chậm/401 (thường gặp) thì cache block 30' để các request sau bỏ qua ngay, giảm độ trễ.
+        const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText, signal: AbortSignal.timeout(800) });
+        upStatus = upRes.status;
+        upText = await upRes.text();
+        let parsedUp = null;
+        try { parsedUp = JSON.parse(upText); } catch (_) {}
+        const upResult = parsedUp?.result || parsedUp || {};
+        const hasErrors =
+          !upRes.ok ||
+          !parsedUp ||
+          !!upResult.error ||
+          !!parsedUp.error ||
+          (Array.isArray(upResult.errors) && upResult.errors.length > 0) ||
+          (Array.isArray(parsedUp.errors) && parsedUp.errors.length > 0) ||
+          (typeof upResult.status === "number" && upResult.status >= 400) ||
+          /requires_gold|permission-denied|unauthenticated/i.test(upText);
+        if (!hasErrors) {
+          LAST_CAPTION_DEBUG = {
+            mode: "official_passthrough",
+            captionType,
+            reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+            upStatus,
+            upKeys: Object.keys(upResult.data || upResult || {}),
+            ts: new Date().toISOString(),
+          };
+          return new Response(upText, {
+            status: upRes.status,
+            headers: corsHeaders({
+              "Content-Type": upRes.headers.get("Content-Type") || "application/json; charset=utf-8",
+            }),
+          });
+        }
+        UPSTREAM_CAPTION_BLOCKED_UNTIL = Date.now() + 30 * 60 * 1000;
+      } catch (e) {
+        upText = String(e?.message || e);
+        UPSTREAM_CAPTION_BLOCKED_UNTIL = Date.now() + 30 * 60 * 1000;
       }
-    } catch (e) {
-      upText = String(e?.message || e);
+    } else {
+      upText = "skipped_cached_block";
     }
 
     const tempId = crypto.randomUUID().slice(0, 12);
@@ -2126,7 +2191,7 @@ async function handleStudioRequest(request, env) {
       usedErr = plain.aiErr;
     }
 
-    const mode = CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "data_object_full";
+    const mode = CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "smart_locket";
     const reqModel = (dataNode && dataNode.model) || "gpt-5.4";
 
     LAST_CAPTION_DEBUG = {
@@ -2146,12 +2211,54 @@ async function handleStudioRequest(request, env) {
       upStatus,
       upBody: upText.slice(0, 300),
       ms: Date.now() - t0,
-      generated: outStr.slice(0, 240),
+      generated: outStr.slice(0, 1200),
       ts: new Date().toISOString(),
     };
 
     let finalBody;
-    if (mode === "bare") {
+    if (!hasSchema && (mode === "smart_locket" || mode.startsWith("quote_") || mode === "result_data_caption_only")) {
+      // Định dạng ĐÃ XÁC NHẬN CHẠY THẬT cho LNN LIVE trên Locket 2.74.0
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: { caption: outStr },
+        },
+      });
+    } else if (hasSchema && mode === "smart_locket") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: Object.assign({}, sd, {
+            caption: outStr,
+            structured_output: sd,
+            structured_caption: sd,
+            parsed: sd,
+            response: sd,
+          }),
+        },
+      });
+    } else if (hasSchema && mode === "quote_caption_obj") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: Object.assign({ caption: sd }, sd),
+        },
+      });
+    } else if (hasSchema && mode === "quote_pure_parsed") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: sd,
+        },
+      });
+    } else if (mode === "quote_caption_str" || mode === "result_data_caption_only") {
+      finalBody = JSON.stringify({
+        result: {
+          status: 200,
+          data: { caption: outStr },
+        },
+      });
+    } else if (mode === "bare") {
       finalBody = outStr;
     } else if (mode === "result_openai_resp") {
       finalBody = JSON.stringify({
