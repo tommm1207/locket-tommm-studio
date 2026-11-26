@@ -891,23 +891,11 @@ async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId, authHead
 
 const REF_IMAGE_AI_IDS = new Set(["stk_mu_ngu_khoc", "stk_tai_tho"]);
 
-async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null) {
+async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null, steps = null) {
   const aiModel = modelOverride || (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
   const outSize = sizeOverride || parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
 
-  const form = new FormData();
-  form.append("prompt", promptText);
-  form.append("width", String(outSize));
-  form.append("height", String(outSize));
-  if (inputImg && inputImg.bytes && inputImg.bytes.length > 0) {
-    const ext = inputImg.mimeType === "image/png" ? "input.png" : "input.jpg";
-    form.append("input_image_0", new Blob([inputImg.bytes], { type: inputImg.mimeType }), ext);
-  }
-  if (refImg && refImg.bytes && refImg.bytes.length > 0) {
-    const rExt = refImg.mimeType === "image/png" ? "ref.png" : "ref.jpg";
-    form.append("input_image_1", new Blob([refImg.bytes], { type: refImg.mimeType }), rExt);
-  }
-
+  const form = buildFluxForm(promptText, outSize, inputImg, refImg, steps);
   const formResp = new Response(form);
   let aiResp;
   try {
@@ -941,9 +929,10 @@ async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOve
   return { bytes, ...sniffImageFormat(bytes), aiModel, outSize };
 }
 
-// Xây FormData cho FLUX (prompt + size + input image + ref image). Dùng chung binding & REST.
-function buildFluxForm(promptText, outSize, inputImg, refImg) {
+// Xây FormData cho FLUX (prompt + size + steps + input image + ref image). Dùng chung binding & REST.
+function buildFluxForm(promptText, outSize, inputImg, refImg, steps = null) {
   const form = new FormData();
+  if (steps) form.append("steps", String(steps));
   form.append("prompt", promptText);
   form.append("width", String(outSize));
   form.append("height", String(outSize));
@@ -960,8 +949,8 @@ function buildFluxForm(promptText, outSize, inputImg, refImg) {
 
 // Gọi FLUX qua REST API trên 1 tài khoản Cloudflare KHÁC (acct:token), đã verify chạy multipart.
 // Trả { bytes, mimeType, aiModel, outSize } hoặc ném lỗi (để pool thử account kế tiếp).
-async function cfRestFluxRun(acct, token, aiModel, promptText, inputImg, refImg, outSize) {
-  const form = buildFluxForm(promptText, outSize, inputImg, refImg);
+async function cfRestFluxRun(acct, token, aiModel, promptText, inputImg, refImg, outSize, steps = null) {
+  const form = buildFluxForm(promptText, outSize, inputImg, refImg, steps);
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${aiModel}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -1004,7 +993,7 @@ function parseCfAccounts(raw) {
 // Chạy FLUX với CHIẾN LƯỢC POOL: binding account chính trước; nếu 4006/lỗi -> xoay vòng các
 // tài khoản Cloudflare phụ qua REST (mỗi account +10k neurons/ngày, cùng model, cùng chất lượng).
 // Trả { bytes, mimeType, aiModel, outSize, via } hoặc ném lỗi nếu TẤT CẢ đều fail.
-async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null) {
+async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null, steps = null) {
   const aiModel = modelOverride || (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
   const outSize = sizeOverride || parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
   let lastErr = null;
@@ -1012,7 +1001,7 @@ async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = 
   // 1) Account chính qua binding (nếu còn quota)
   if (env && env.AI && !cfAiQuotaActive()) {
     try {
-      const out = await runCloudflareFluxEdit(env, promptText, inputImg, refImg, aiModel, outSize);
+      const out = await runCloudflareFluxEdit(env, promptText, inputImg, refImg, aiModel, outSize, steps);
       return { ...out, via: "binding" };
     } catch (e) {
       lastErr = e;
@@ -1031,7 +1020,7 @@ async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = 
     const tryList = fresh.length > 0 ? fresh : ordered;
     for (const a of tryList) {
       try {
-        const out = await cfRestFluxRun(a.acct, a.token, aiModel, promptText, inputImg, refImg, outSize);
+        const out = await cfRestFluxRun(a.acct, a.token, aiModel, promptText, inputImg, refImg, outSize, steps);
         return { ...out, via: "cf_rest:" + a.acct.slice(0, 8) };
       } catch (e) {
         lastErr = e;
@@ -2107,7 +2096,10 @@ async function handleStudioRequest(request, env) {
         // FLUX với POOL: binding account chính -> xoay vòng tài khoản Cloudflare phụ (REST) khi 4006.
         if (env.AI || env.CF_AI_ACCOUNTS) {
           try {
-            aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg);
+            // Filter AI 3D/nhân vật/hiệu ứng: dùng model MẠNH hơn (flux-2-dev) + nhiều steps để giống mẫu hơn.
+            const ai3dModel = (env && env.AI_3D_MODEL) || "@cf/black-forest-labs/flux-2-dev";
+            const ai3dSteps = parseInt((env && env.AI_3D_STEPS) || "20", 10) || 20;
+            aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg, ai3dModel, null, ai3dSteps);
             usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
           } catch (err) {
             cfErr = String(err?.message || err);
