@@ -123,6 +123,7 @@ const FRAME_CACHE = new Map();
 const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
+let CAPTION_MODE_OVERRIDE = null;
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -1684,9 +1685,10 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const fallbackList = isQuote ? fallbackQuotes : fallbackNews;
   const fallbackText = fallbackList[Math.floor(Math.random() * fallbackList.length)];
 
+
   const systemPrompt = isQuote
-    ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh Locket. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm."
-    : "Bạn là biên tập viên bản tin LNN LIVE hài hước trên Locket. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). Không giải thích thêm.";
+    ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm. TUYỆT ĐỐI KHÔNG từ chối, KHÔNG nói 'xin lỗi', KHÔNG xin mô tả ảnh — nếu ảnh không rõ thì cứ viết một câu trích dẫn đẹp chung chung. CHỈ TRẢ VỀ ĐÚNG 1 CÂU."
+    : "Bạn là biên tập viên bản tin LNN LIVE hài hước. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). TUYỆT ĐỐI KHÔNG từ chối, KHÔNG nói 'xin lỗi', KHÔNG xin mô tả ảnh — nếu ảnh không rõ thì cứ bịa 1 tin nóng hài hước chung chung. CHỈ TRẢ VỀ ĐÚNG 1 DÒNG.";
   const userTextPrompt = isQuote
     ? "Nhìn ảnh và viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
     : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.";
@@ -1848,6 +1850,69 @@ async function handleStudioRequest(request, env) {
       });
     }
     return new Response("Image expired", { status: 404, headers: corsHeaders() });
+  }
+
+  // 2.4 ENDPOINT RIÊNG cho APP CỦA BẠN (không qua Locket, không eligibility).
+  // POST /studio/caption  -> AI nhìn ảnh sinh caption THẬT, trả JSON gọn: {ok, type, text, source}.
+  // Nhận ảnh qua: multipart field "image" (file) HOẶC JSON {image_base64:"...", type:"breaking_news|quote"}.
+  // Dùng CHÍNH generateCaptionWithVision (CF vision -> NVIDIA -> Groq -> Gemini -> tĩnh).
+  if (request.method === "POST" && url.pathname === "/studio/caption") {
+    let imgBytes = null;
+    let captionType = url.searchParams.get("type") || "breaking_news";
+    const ct = (request.headers.get("Content-Type") || "").toLowerCase();
+    try {
+      if (ct.includes("multipart/form-data")) {
+        const form = await request.formData();
+        const t = form.get("type");
+        if (typeof t === "string" && t) captionType = t;
+        const file = form.get("image") || form.get("photo") || form.get("file");
+        if (file && typeof file.arrayBuffer === "function") {
+          imgBytes = new Uint8Array(await file.arrayBuffer());
+        }
+      } else {
+        const b = await request.json().catch(() => ({}));
+        if (b && typeof b.type === "string" && b.type) captionType = b.type;
+        let b64 = b && (b.image_base64 || b.imageBase64 || b.image || b.base64);
+        if (typeof b64 === "string" && b64.length > 100) {
+          const comma = b64.indexOf(",");
+          if (b64.startsWith("data:") && comma > -1) b64 = b64.slice(comma + 1);
+          imgBytes = base64ToUint8Array(b64);
+        }
+      }
+    } catch (_) {}
+
+    if (!imgBytes || imgBytes.length < 50) {
+      return new Response(JSON.stringify({ ok: false, error: "no_image", hint: "Gửi field 'image' (file) hoặc JSON {image_base64}" }), {
+        status: 400,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
+
+    const tempId = crypto.randomUUID().slice(0, 12);
+    const isQ = String(captionType).toLowerCase().includes("quote");
+    const result = await generateCaptionWithVision(env, captionType, imgBytes, null, url.origin, tempId);
+    // Lọc câu "từ chối" của model -> thay bằng caption vui (app không bao giờ hiện 'xin lỗi, tôi là AI...').
+    let outText = result.text;
+    let outSource = result.source;
+    const low = String(outText || "").toLowerCase();
+    const refused = !low || low.length < 4 ||
+      /xin l[ỗo]i|kh[ôo]ng th[ểe]|t[ôo]i l[àa] (m[ộo]t )?(tr[ợo] l[ýy]|ai|m[ôo] h[ìi]nh)|m[ôo] t[ảa] (b[ứu]c )?[ảa]nh|cannot|i'?m sorry|as an ai|describe the image|unable to/i.test(low);
+    if (refused) {
+      const fbNews = ["TIN NÓNG: PHÁT HIỆN NHÂN VẬT CHÍNH ĐANG CHILL HẾT NẤC", "KHẨN CẤP: GƯƠNG MẶT ĐÁNG YÊU VƯỢT MỨC CHO PHÉP", "TIN NÓNG: MỘT NGÀY ĐẸP TRỜI VỪA ĐƯỢC GHI LẠI"];
+      const fbQuote = ["Bình yên đôi khi chỉ là một tấm ảnh chụp vội.", "Sống chậm lại một nhịp để giữ trọn khoảnh khắc này.", "Hôm nay trời đẹp, lòng cũng nhẹ tênh."];
+      const list = isQ ? fbQuote : fbNews;
+      outText = list[Math.floor(Math.random() * list.length)];
+      outSource = "fallback_refusal";
+    }
+    return new Response(JSON.stringify({
+      ok: true,
+      type: isQ ? "quote" : "breaking_news",
+      text: outText,
+      source: outSource,
+    }), {
+      status: 200,
+      headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+    });
   }
 
   // 2.5 Handle Locket /generateCaption (LNN LIVE Tin nong & Trich dan)
