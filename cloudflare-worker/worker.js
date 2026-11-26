@@ -7,6 +7,7 @@
 // =========================================================================
 
 import jpeg from "jpeg-js";
+import { VERIFIED_QUOTE_BANK } from "./quotes_bank.js";
 
 const SIZE = 512;
 const WD_SIZE = 768;
@@ -126,6 +127,14 @@ let LAST_CAPTION_DEBUG = null;
 let CAPTION_MODE_OVERRIDE = null;
 let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
+const RECENT_QUOTE_IDS = [];
+function rememberQuoteIds(ids) {
+  for (const id of ids) {
+    if (!id) continue;
+    RECENT_QUOTE_IDS.push(id);
+  }
+  while (RECENT_QUOTE_IDS.length > 40) RECENT_QUOTE_IDS.shift();
+}
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -1563,6 +1572,43 @@ async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
   });
 }
 
+// NVIDIA NIM text writer (mặc định meta/llama-3.3-70b-instruct — 70B viết tiếng Việt hài hước & tự nhiên hơn hẳn)
+async function nvidiaTextWriter(env, systemPrompt, userText, maxTokens = 140, temperature = 0.85) {
+  const model = (env && env.NVIDIA_TEXT_MODEL) || "meta/llama-3.3-70b-instruct";
+  const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
+  let lastErr = null;
+  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+    try {
+      const r = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userText },
+          ],
+          max_tokens: maxTokens,
+          temperature,
+        }),
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!r.ok) {
+        if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k);
+        lastErr = `nvidia_http_${r.status}`;
+        continue;
+      }
+      const j = await r.json();
+      const txt = String(j?.choices?.[0]?.message?.content || "").trim();
+      if (txt) return { text: txt, source: "nvidia:" + model, err: null };
+      lastErr = "nvidia_empty";
+    } catch (e) {
+      lastErr = String(e?.message || e);
+    }
+  }
+  return { text: null, source: null, err: lastErr };
+}
+
 // Groq (rất nhanh, free tier rộng). Mặc định openai/gpt-oss-120b (đã kiểm chứng viết tiếng Việt tốt).
 async function groqGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
   const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
@@ -1713,83 +1759,28 @@ function normalizeSchema(node) {
   return out;
 }
 
-const VERIFIED_QUOTE_BANK = {
-  pop_music: [
-    { id: "pm_1", quote: "Có chắc yêu là đây?", attribution: "Sơn Tùng M-TP", tags: "love, smile, cute, happy" },
-    { id: "pm_2", quote: "Đi về nhà, đi về nhà, hạnh phúc đi về nhà.", attribution: "Đen Vâu", tags: "cozy, home, room, family, peaceful" },
-    { id: "pm_3", quote: "Em ơi đi trốn với anh, mình đi đến nơi có biển bạc núi xanh.", attribution: "Đen Vâu", tags: "travel, outdoor, nature, road, adventure" },
-    { id: "pm_4", quote: "Lạ lùng em tới, hãy nói tôi nghe một câu.", attribution: "Vũ.", tags: "dreamy, portrait, selfie, calm, chill" },
-    { id: "pm_5", quote: "Anh nhà ở đâu thế? Cứ tới lui trong tim tôi chẳng nhớ đường về.", attribution: "AMEE", tags: "cute, cafe, sweet, drink, food, smile" },
-    { id: "pm_6", quote: "Mưa vẫn mưa bay trên tầng tháp cổ.", attribution: "Trịnh Công Sơn", tags: "rain, window, moody, calm, alone" },
-    { id: "pm_7", quote: "Mang tiền về cho mẹ, đừng mang ưu phiền về cho mẹ.", attribution: "Đen Vâu", tags: "work, laptop, study, desk, hustle, funny" },
-    { id: "pm_8", quote: "Ước gì anh ở đây giờ này.", attribution: "Mỹ Tâm", tags: "sunset, night, cozy, missing, window" },
-    { id: "pm_9", quote: "Tháng tư là lời nói dối của em.", attribution: "Hà Anh Tuấn", tags: "sky, flowers, outdoor, poetic, gentle" },
-    { id: "pm_10", quote: "Bay lên nào, em bay lên nào!", attribution: "Thu Minh", tags: "party, fireworks, energy, hype, night, celebration" },
-    { id: "pm_11", quote: "Sống trong đời sống cần có một tấm lòng.", attribution: "Trịnh Công Sơn", tags: "friends, warm, meal, sharing, kindness, food" },
-    { id: "pm_12", quote: "Cầm tay anh, dựa vai anh, kề bên anh nơi này có anh.", attribution: "Sơn Tùng M-TP", tags: "couple, love, warm, together, smile" },
-  ],
-  greek_philosophy: [
-    { id: "gp_1", quote: "Hạnh phúc phụ thuộc vào chính chúng ta.", attribution: "Aristotle", tags: "happy, smile, joy, positive" },
-    { id: "gp_2", quote: "Hãy tự biết chính mình.", attribution: "Socrates", tags: "selfie, mirror, portrait, reflection" },
-    { id: "gp_3", quote: "Cuộc sống không được chiêm nghiệm là cuộc sống không đáng sống.", attribution: "Socrates", tags: "thoughtful, desk, study, book" },
-    { id: "gp_4", quote: "Hãy để thức ăn là thuốc của bạn, và thuốc là thức ăn của bạn.", attribution: "Hippocrates", tags: "food, meal, eating, burger, drink" },
-    { id: "gp_5", quote: "Tình bạn là một tâm hồn ngự trị trong hai thể xác.", attribution: "Aristotle", tags: "friends, group, together, duo" },
-    { id: "gp_6", quote: "Trong vạn vật của thiên nhiên luôn ẩn chứa điều kỳ diệu.", attribution: "Aristotle", tags: "nature, sky, tree, flowers, pet, outdoor, fireworks" },
-    { id: "gp_7", quote: "Kiên nhẫn thì đắng, nhưng quả ngọt của nó lại vô cùng ngọt ngào.", attribution: "Aristotle", tags: "tired, study, laptop, work, waiting" },
-    { id: "gp_8", quote: "Không ai tắm hai lần trên cùng một dòng sông.", attribution: "Heraclitus", tags: "travel, street, motion, moment" },
-    { id: "gp_9", quote: "Giàu có không phải là sở hữu thật nhiều, mà là mong cầu thật ít.", attribution: "Epictetus", tags: "minimal, room, simple, cozy, coffee" },
-    { id: "gp_10", quote: "Sự xuất sắc không phải là hành động nhất thời, mà là một thói quen.", attribution: "Aristotle", tags: "workout, study, routine, focus" },
-    { id: "gp_11", quote: "Đừng làm hỏng những gì bạn đang có bằng cách khao khát điều chưa có.", attribution: "Epicurus", tags: "chill, peaceful, relaxed, sunset" },
-    { id: "gp_12", quote: "Sự giàu có lớn nhất là biết sống đủ với những điều giản dị.", attribution: "Plato", tags: "calm, everyday, cozy, cute" },
-  ],
-  famous_modern_figures: [
-    { id: "fm_1", quote: "Hãy cứ khát khao, hãy cứ dại khờ.", attribution: "Steve Jobs", tags: "ambition, food, youth, hustle, laptop" },
-    { id: "fm_2", quote: "Cách duy nhất để làm việc tuyệt vời là yêu những gì bạn làm.", attribution: "Steve Jobs", tags: "work, desk, smiling, craft, uniform" },
-    { id: "fm_3", quote: "Trí tưởng tượng quan trọng hơn kiến thức.", attribution: "Albert Einstein", tags: "creative, art, study, glasses, clever" },
-    { id: "fm_4", quote: "Cuộc sống giống như đi xe đạp, muốn giữ thăng bằng bạn phải tiếp tục tiến lên.", attribution: "Albert Einstein", tags: "outdoor, street, travel, bike, motion" },
-    { id: "fm_5", quote: "Càng trân trọng và ăn mừng cuộc sống, bạn càng có nhiều lý do để vui.", attribution: "Oprah Winfrey", tags: "happy, party, celebration, smiling, fireworks" },
-    { id: "fm_6", quote: "Những người thích ăn ngon luôn là những người tuyệt vời nhất.", attribution: "Julia Child", tags: "food, eating, burger, snack, restaurant" },
-    { id: "fm_7", quote: "Để trở thành người không thể thay thế, bạn phải luôn khác biệt.", attribution: "Coco Chanel", tags: "fashion, outfit, selfie, style, unique" },
-    { id: "fm_8", quote: "Bình yên bắt đầu bằng một nụ cười.", attribution: "Mẹ Teresa", tags: "smile, warm, gentle, portrait, cute" },
-    { id: "fm_9", quote: "Tương lai thuộc về những ai tin vào vẻ đẹp của ước mơ.", attribution: "Eleanor Roosevelt", tags: "sky, sunset, hopeful, window, dreamy, fireworks" },
-    { id: "fm_10", quote: "Không phải ai lang thang cũng đều lạc lối.", attribution: "J.R.R. Tolkien", tags: "travel, road, nature, adventure, walking" },
-    { id: "fm_11", quote: "Hãy là chính mình, vì tất cả những người khác đều đã có chủ rồi.", attribution: "Oscar Wilde", tags: "funny, quirky, selfie, costume, casual" },
-    { id: "fm_12", quote: "Mọi chuyện luôn có vẻ bất khả thi cho đến khi nó được hoàn thành.", attribution: "Nelson Mandela", tags: "late night, deadline, study, tired, effort" },
-  ],
-  film_and_tv: [
-    { id: "ft_1", quote: "Cuộc đời giống như một hộp sô-cô-la, bạn chẳng bao giờ biết mình sẽ bốc phải viên nào.", attribution: "Forrest Gump", tags: "food, sweet, candid, everyday, surprise" },
-    { id: "ft_2", quote: "Tôi là vua của thế giới!", attribution: "Titanic", tags: "happy, epic, outdoor, sky, excited, fireworks" },
-    { id: "ft_3", quote: "Vươn tới vô cực và xa hơn nữa!", attribution: "Toy Story", tags: "fun, playful, adventure, sky, energetic" },
-    { id: "ft_4", quote: "Hakuna Matata! Nghĩa là đừng lo âu gì cả.", attribution: "Vua Sư Tử", tags: "chill, relaxed, friends, laughing, carefree" },
-    { id: "ft_5", quote: "Hạnh phúc có thể tìm thấy ngay cả trong thời khắc tăm tối nhất, chỉ cần ta nhớ bật đèn lên.", attribution: "Harry Potter", tags: "night, cozy light, lamp, dark, warm" },
-    { id: "ft_6", quote: "Tôi sẽ quay trở lại.", attribution: "Kẻ Hủy Diệt", tags: "cool, sunglasses, serious, night, dramatic" },
-    { id: "ft_7", quote: "Cứ tiếp tục bơi đi, cứ tiếp tục bơi đi.", attribution: "Đi Tìm Nemo", tags: "tired, study, work, deadline, keep going" },
-    { id: "ft_8", quote: "Ai cũng có thể nấu ăn.", attribution: "Ratatouille", tags: "food, kitchen, restaurant, burger, meal" },
-    { id: "ft_9", quote: "Sao phải nghiêm túc thế?", attribution: "Hiệp Sĩ Bóng Đêm", tags: "serious face, moody, funny, costume, edgy" },
-    { id: "ft_10", quote: "Tôi không có bạn bè, tôi chỉ có gia đình.", attribution: "Fast & Furious", tags: "friends, group, car, hangout, squad" },
-    { id: "ft_11", quote: "Thanh xuân giống như một cơn mưa rào, dù bị cảm lạnh vẫn muốn đắm mình thêm lần nữa.", attribution: "Cô Gái Năm Ấy Chúng Ta Cùng Theo Đuổi", tags: "youth, school, rain, nostalgic, portrait, smile" },
-    { id: "ft_12", quote: "Với sức mạnh càng lớn, trách nhiệm càng cao.", attribution: "Spider-Man", tags: "hero, bold, costume, energy, cool, desk" },
-  ],
-  athlete: [
-    { id: "at_1", quote: "Bay nhẹ như bướm, chích đau như ong.", attribution: "Muhammad Ali", tags: "cool, confident, pose, energy, sharp" },
-    { id: "at_2", quote: "Tôi có thể chấp nhận thất bại, nhưng tôi không thể chấp nhận việc không cố gắng.", attribution: "Michael Jordan", tags: "study, hustle, effort, grind" },
-    { id: "at_3", quote: "Áp lực và thử thách chính là cơ hội để tôi vươn lên.", attribution: "Kobe Bryant", tags: "late night, serious, focus, dark, work" },
-    { id: "at_4", quote: "Bạn sẽ trượt 100% những cú sút mà bạn không dám thực hiện.", attribution: "Wayne Gretzky", tags: "bold, playful, selfie, camera, fun" },
-    { id: "at_5", quote: "Thà hối tiếc vì đã dám thử còn hơn tiếc nuối những cơ hội mình bỏ lỡ.", attribution: "Simone Biles", tags: "adventure, travel, outdoor, brave, smile, fireworks" },
-    { id: "at_6", quote: "Tài năng giúp thắng trận đấu, nhưng tinh thần đồng đội mang về chức vô địch.", attribution: "Michael Jordan", tags: "friends, team, group, service, together" },
-    { id: "at_7", quote: "Chăm chỉ sẽ đánh bại tài năng khi tài năng không chịu chăm chỉ.", attribution: "Kevin Durant", tags: "laptop, desk, gym, workout, focus" },
-    { id: "at_8", quote: "Chiến thắng càng khó khăn, niềm vui khi giành được nó càng lớn lao.", attribution: "Pelé", tags: "happy, proud, celebration, smiling" },
-    { id: "at_9", quote: "Đừng bao giờ nói không thể, vì giới hạn cũng như nỗi sợ, thường chỉ là ảo giác.", attribution: "Michael Jordan", tags: "sky, freedom, upbeat, food, joyful" },
-    { id: "at_10", quote: "Bạn phải chiến đấu và hy sinh mỗi ngày để chạm tới ước mơ.", attribution: "Lionel Messi", tags: "tired, dedication, night, goal" },
-    { id: "at_11", quote: "Nhà vô địch cứ tiếp tục chơi cho đến khi làm đúng.", attribution: "Billie Jean King", tags: "practice, focus, everyday, smile" },
-    { id: "at_12", quote: "Tài năng mà không rèn luyện thì chẳng là gì cả.", attribution: "Cristiano Ronaldo", tags: "workout, gym, confident, selfie, hustle" },
-  ],
-};
-
-function buildQuoteBankCatalog() {
+function buildQuoteBankCatalog(visionDesc = "") {
+  const tokens = String(visionDesc || "")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 3);
+  const seed = Math.floor(Date.now() / 1000) % 7;
   const lines = [];
   for (const [cat, list] of Object.entries(VERIFIED_QUOTE_BANK)) {
-    lines.push(`${cat}: ` + list.map((q) => `${q.id}(${q.tags})`).join("; "));
+    const fresh = list.filter((q) => !RECENT_QUOTE_IDS.includes(q.id));
+    const pool = fresh.length >= 10 ? fresh : list;
+    const ranked = pool.map((q, idx) => {
+      const hay = `${q.tags} ${q.attribution}`.toLowerCase();
+      let score = 0;
+      for (const t of tokens) {
+        if (hay.includes(t)) score += 2;
+      }
+      const tie = ((idx + seed) % pool.length) * 0.01;
+      return { q, score: score + tie };
+    });
+    ranked.sort((a, b) => b.score - a.score);
+    const picked = ranked.slice(0, 20).map((x) => `${x.q.id}(${x.q.tags})`);
+    lines.push(`${cat}: ${picked.join("; ")}`);
   }
   return lines.join("\n");
 }
@@ -1802,6 +1793,7 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null) {
   let h = 0;
   for (let i = 0; i < seedText.length; i++) h = (h * 31 + seedText.charCodeAt(i)) >>> 0;
   const quotes = [];
+  const selectedIds = [];
   let matchedCount = 0;
 
   cats.forEach((cat, idx) => {
@@ -1811,8 +1803,11 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null) {
     if (item) {
       matchedCount++;
     } else {
-      item = list[(h + idx * 3) % list.length];
+      const fresh = list.filter((it) => !RECENT_QUOTE_IDS.includes(it.id));
+      const pool = fresh.length > 0 ? fresh : list;
+      item = pool[(h + idx * 3) % pool.length];
     }
+    selectedIds.push(item.id);
     quotes.push({
       quote: item.quote,
       category: cat,
@@ -1820,6 +1815,7 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null) {
     });
   });
 
+  rememberQuoteIds(selectedIds);
   return { data: { quotes }, matchedCount };
 }
 
@@ -1842,25 +1838,29 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     try { return JSON.parse(s); } catch (_) { return null; }
   };
 
-  // Nhánh QUOTE: chọn ID từ VERIFIED_QUOTE_BANK (60 quote thật 100%) bằng Vision AI -> không bao giờ bịa quote
+  // Nhánh QUOTE: chọn ID từ VERIFIED_QUOTE_BANK (200 quote thật 100%) bằng Vision AI -> không bao giờ bịa quote
   if (schema && schema.properties && schema.properties.quotes) {
     const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
     const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : Object.keys(VERIFIED_QUOTE_BANK);
-    const pickPrompt =
+    const avoidNote = RECENT_QUOTE_IDS.length > 0 ? `\nAvoid recently used IDs if possible: ${RECENT_QUOTE_IDS.join(",")}` : "";
+    const buildPickPrompt = (descForRank) =>
       "Look closely at this photo (subject, clothing, objects, food, setting, expression, mood). " +
       "Pick the SINGLE best-matching quote ID for EACH of the 5 categories from the catalog below. " +
-      'Reply with ONLY a valid JSON object mapping each category name to one ID from that category, e.g. {"pop_music":"pm_7","greek_philosophy":"gp_4","famous_modern_figures":"fm_6","film_and_tv":"ft_10","athlete":"at_6"}. No extra text.\n\n' +
-      buildQuoteBankCatalog();
+      'Reply with ONLY a valid JSON object mapping each category name to one ID from that category, e.g. {"pop_music":"pm_7","greek_philosophy":"gp_4","famous_modern_figures":"fm_6","film_and_tv":"ft_20","athlete":"at_6"}. No extra text.' +
+      avoidNote +
+      "\n\n" +
+      buildQuoteBankCatalog(descForRank);
+    const pickPromptDirect = buildPickPrompt("");
     const userContentPick = prepBytes
       ? [
-          { type: "text", text: pickPrompt },
+          { type: "text", text: pickPromptDirect },
           { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } },
         ]
-      : pickPrompt;
+      : pickPromptDirect;
 
     // 1) Gemini Vision (nếu có key — nhanh & chính xác nhất)
     for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-      const g = await geminiGenerateCaption(env, "Return only JSON mapping category names to quote IDs.", pickPrompt, prepBytes, prepMime, k, 160, true);
+      const g = await geminiGenerateCaption(env, "Return only JSON mapping category names to quote IDs.", pickPromptDirect, prepBytes, prepMime, k, 160, true);
       const parsedMap = tryParse(g.text);
       if (parsedMap && typeof parsedMap === "object") {
         const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
@@ -1870,12 +1870,15 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
       }
     }
 
-    // 2) Fast 2-step: CF Llama-4-Scout Vision (~1.5s) -> Groq gpt-oss-120b (~0.5s) chọn 5 ID khớp nhất
+    // 2) Fast 2-step: CF Llama-4-Scout Vision (~1.4s) -> Groq gpt-oss-120b (~0.6s)
     const vision = await describeImageWithVision(env, prepBytes, prepMime);
+    const pickPromptRanked = buildPickPrompt(vision.desc || "");
+    const descMsg = `Photo description: ${vision.desc || "A candid everyday photo."}\n\n${pickPromptRanked}`;
+
     for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
       try {
         const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
-        const groqMsg = `Photo description: ${vision.desc || "A candid everyday photo."}\n\n${pickPrompt}`;
+        const groqMsg = descMsg;
         const bodyObj = {
           model,
           messages: [{ role: "user", content: groqMsg }],
@@ -2155,6 +2158,7 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
       .replace(/^["'“”*]+|["'“”*]+$/g, "")
       .trim();
     if (!pick || isCaptionRefusal(pick) || /[\u4e00-\u9fff]/.test(pick)) return "";
+    if (!isQuote) pick = pick.toUpperCase();
     return pick.slice(0, 110);
   };
 
@@ -2293,6 +2297,7 @@ async function handleStudioRequest(request, env) {
         ai_prompts_loaded: Object.keys(AI_FILTER_PROMPTS).length,
         luts_loaded: Object.keys(LUT_FILTERS).length,
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
+        quote_bank_total: Object.values(VERIFIED_QUOTE_BANK).reduce((s, a) => s + a.length, 0),
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
         caption_response_mode: CAPTION_MODE_OVERRIDE || (env && env.CAPTION_RESPONSE_MODE) || "smart_locket",
