@@ -3611,14 +3611,9 @@ async function handleStudioRequest(request, env) {
   // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter / createFilter (Tạo diện mạo)
   if (
     request.method === "POST" &&
-    (url.pathname.includes("generateFilteredImage") ||
-      url.pathname.includes("generateFilter") ||
-      url.pathname.includes("applyFilter") ||
-      url.pathname.includes("createFilter") ||
-      url.pathname.includes("createCustomFilter") ||
-      url.pathname.includes("generateCustomFilter") ||
-      url.pathname.includes("createLook") ||
-      url.pathname.includes("generateLook"))
+    /(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter)/i.test(
+      url.pathname
+    )
   ) {
     const rawBodyText = await request.text();
     let bodyObj = {};
@@ -3629,8 +3624,10 @@ async function handleStudioRequest(request, env) {
     const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
     const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
 
-    // Nếu Locket gọi createFilter/createCustomFilter chỉ để LƯU template (không gửi kèm ảnh), trả về filter object hợp lệ ngay!
-    const isCreateMeta = /createFilter|createCustomFilter|createLook/i.test(url.pathname);
+    // Nếu Locket gọi createFilter/createCustomFilter chỉ để LƯU template (không gửi kèm ảnh), trả về filter object đủ field!
+    const isCreateMeta = /(createFilter|createCustomFilter|createCameraFilter|createAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|customFilter|customFilters|userFilters|validateFilter|checkFilter)/i.test(
+      url.pathname
+    );
     if (isCreateMeta) {
       const { bytes: peekImg, sourceUrl: peekUrl } = await getInputImageBytes(dataNode, authHeader);
       if (!peekImg && !peekUrl) {
@@ -3643,20 +3640,56 @@ async function handleStudioRequest(request, env) {
         ]) || "Custom AI Look";
         const newId = "custom_" + crypto.randomUUID().slice(0, 8);
         const name = firstNonEmptyString([dataNode?.name, dataNode?.title]) || rawPrompt.slice(0, 28);
+        const iconImg = "https://tommm1207.github.io/locket-tommm-studio/assets/filters_v2/ai_cartoon_3d.png?v=2";
         const filterObj = {
           uid: newId,
           id: newId,
           name,
+          category: "Tạo diện mạo ✨",
           prompt: rawPrompt,
           custom_prompt: rawPrompt,
-          style: "custom",
-          type: "custom",
-          filterType: "custom",
+          style: "cutout",
+          type: "normal",
+          filterType: "normal",
           overlay: true,
+          imageUrl: iconImg,
+          iconUrl: iconImg,
+          overlayImageUrl: iconImg,
+          overlayImageURL: iconImg,
           tintColor: "#F59E0B",
           colors: ["#F59E0B", "#EC4899"],
           captureButtonColors: ["#F59E0B", "#EC4899"],
-          icon: { emoji: "✨", sfSymbol: "sparkles" },
+          icon: {
+            url: iconImg,
+            iconUrl: iconImg,
+            remoteImage: iconImg,
+            sfSymbol: "sparkles",
+            symbol: "sparkles",
+            emoji: "✨",
+          },
+          outputUrl: null,
+          productUrl: null,
+          textColor: "#FFFFFF",
+          referenceImages: [],
+          requires_gold: false,
+          requiresGold: false,
+          is_gold: false,
+          isGold: false,
+          unlocked: true,
+          is_unlocked: true,
+          isUnlocked: true,
+          free: true,
+          allowsTryFilter: true,
+          allows_try_filter: true,
+          tryButtonEnabled: true,
+          try_button_enabled: true,
+        };
+        LAST_DEBUG = {
+          mode: "create_filter_meta",
+          path: url.pathname,
+          reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+          filterId: newId,
+          ts: new Date().toISOString(),
         };
         return new Response(
           JSON.stringify({ data: filterObj, result: { status: 200, success: true, data: filterObj } }),
