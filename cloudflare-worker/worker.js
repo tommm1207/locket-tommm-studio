@@ -1305,7 +1305,13 @@ function detectAiRequest(dataNode, rawBodyText) {
     dataNode?.effectId,
     dataNode?.effect_id,
   ]);
+  const ui = dataNode?.user_input || dataNode?.userInput;
   const rawUserPrompt = firstNonEmptyString([
+    typeof ui === "string" ? ui : "",
+    ui?.prompt,
+    ui?.text,
+    ui?.description,
+    ui?.look,
     dataNode?.customPrompt,
     dataNode?.custom_prompt,
     dataNode?.prompt,
@@ -3624,31 +3630,83 @@ async function handleStudioRequest(request, env) {
     const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
     const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
 
-    // Nếu Locket gọi createFilter/createCustomFilter chỉ để LƯU template (không gửi kèm ảnh), trả về filter object đủ field!
+    // Nếu Locket gọi createFilter/createCustomFilter (Tạo diện mạo):
+    // Thử forward lên server gốc Locket trước (nếu thành công trả nguyên phản hồi thật!),
+    // nếu server gốc từ chối (requires_gold/403/401/error) mới tạo template custom trên Worker và lưu chi tiết vào LAST_DEBUG.
     const isCreateMeta = /(createFilter|createCustomFilter|createCameraFilter|createAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|customFilter|customFilters|userFilters|validateFilter|checkFilter)/i.test(
       url.pathname
     );
     if (isCreateMeta) {
       const { bytes: peekImg, sourceUrl: peekUrl } = await getInputImageBytes(dataNode, authHeader);
       if (!peekImg && !peekUrl) {
+        const ui = dataNode?.user_input || dataNode?.userInput || {};
         const rawPrompt = firstNonEmptyString([
+          typeof ui === "string" ? ui : "",
+          ui?.prompt,
+          ui?.text,
+          ui?.description,
+          ui?.look,
+          ui?.custom_prompt,
+          ui?.customPrompt,
           dataNode?.customPrompt,
           dataNode?.custom_prompt,
           dataNode?.prompt,
           dataNode?.description,
           dataNode?.text,
         ]) || "Custom AI Look";
+        const origHostMeta = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
+        const upUrlMeta = `https://${origHostMeta}${url.pathname}${url.search}`;
+        const fwdMetaHdrs = new Headers();
+        for (const [k, v] of request.headers.entries()) {
+          const kl = k.toLowerCase();
+          if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
+          fwdMetaHdrs.set(k, v);
+        }
+        let upStatus = 0;
+        let upKeys = [];
+        let upErrSnippet = "";
+        try {
+          const upRes = await fetch(upUrlMeta, { method: "POST", headers: fwdMetaHdrs, body: rawBodyText, signal: AbortSignal.timeout(4500) });
+          upStatus = upRes.status;
+          const upTxt = await upRes.text();
+          let upJson = null;
+          try { upJson = JSON.parse(upTxt); } catch (_) {}
+          const upNode = upJson?.result?.data || upJson?.result || upJson?.data || upJson || {};
+          if (upNode && typeof upNode === "object") upKeys = Object.keys(upNode);
+          const blocked = !upRes.ok || !upJson || !!upJson.error || !!upJson.result?.error || (typeof upJson.result?.status === "number" && upJson.result.status >= 400) || /requires_gold|permission-denied|unauthenticated|error/i.test(upTxt);
+          if (!blocked) {
+            LAST_DEBUG = {
+              mode: "create_filter_upstream_ok",
+              path: url.pathname,
+              upStatus,
+              upKeys,
+              reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+              uiKeys: ui && typeof ui === "object" ? Object.keys(ui) : typeof ui,
+              ts: new Date().toISOString(),
+            };
+            return new Response(upTxt, {
+              status: upRes.status,
+              headers: corsHeaders({ "Content-Type": upRes.headers.get("Content-Type") || "application/json; charset=utf-8" }),
+            });
+          }
+          upErrSnippet = upTxt.slice(0, 220);
+        } catch (e) {
+          upErrSnippet = String(e?.message || e).slice(0, 140);
+        }
+
         const newId = "custom_" + crypto.randomUUID().slice(0, 8);
-        const name = firstNonEmptyString([dataNode?.name, dataNode?.title]) || rawPrompt.slice(0, 28);
+        const name = firstNonEmptyString([dataNode?.name, dataNode?.title, ui?.name, ui?.title]) || rawPrompt.slice(0, 28);
         const iconImg = "https://tommm1207.github.io/locket-tommm-studio/assets/filters_v2/ai_cartoon_3d.png?v=2";
         const filterObj = {
           uid: newId,
           id: newId,
+          filter_id: newId,
+          filterId: newId,
           name,
           category: "Tạo diện mạo ✨",
           prompt: rawPrompt,
           custom_prompt: rawPrompt,
-          style: "cutout",
+          style: dataNode?.style || "cutout",
           type: "normal",
           filterType: "normal",
           overlay: true,
@@ -3685,14 +3743,22 @@ async function handleStudioRequest(request, env) {
           try_button_enabled: true,
         };
         LAST_DEBUG = {
-          mode: "create_filter_meta",
+          mode: "create_filter_meta_fallback",
           path: url.pathname,
+          upStatus,
+          upErrSnippet,
           reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+          uiKeys: ui && typeof ui === "object" ? Object.keys(ui) : typeof ui,
+          styleType: typeof dataNode?.style,
           filterId: newId,
           ts: new Date().toISOString(),
         };
         return new Response(
-          JSON.stringify({ data: filterObj, result: { status: 200, success: true, data: filterObj } }),
+          JSON.stringify({
+            data: filterObj,
+            filter: filterObj,
+            result: { status: 200, success: true, data: filterObj, filter: filterObj },
+          }),
           { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
         );
       }
