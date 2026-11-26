@@ -1482,6 +1482,153 @@ async function fallbackEditImage(env, promptText, imgBytes, imgMime) {
   return null;
 }
 
+// Chuẩn hóa schema Locket (số dạng {value, @type} của protobuf) về JSON schema thường.
+function normalizeSchema(node) {
+  if (node == null || typeof node !== "object") return node;
+  if (node["@type"] && node.value !== undefined) return node.value; // {value, @type} -> value
+  if (Array.isArray(node)) return node.map(normalizeSchema);
+  const out = {};
+  for (const k of Object.keys(node)) out[k] = normalizeSchema(node[k]);
+  return out;
+}
+
+// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu, breaking_news headline...).
+// Gọi AI (CF -> NVIDIA -> Groq -> Gemini) ép JSON; nếu fail thì tự dựng JSON hợp lệ từ caption đơn.
+async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, sourceUrl, origin, tempId, captionType) {
+  const schema = rawSchema ? normalizeSchema(rawSchema) : null;
+  const isQuote = /quote/i.test(appPrompt + " " + captionType);
+
+  // 1) Chuẩn bị ảnh (cho model vision)
+  let prep = null;
+  try { prep = await prepareAiInputImage(imgBytes, sourceUrl, origin, tempId); } catch (_) {}
+  const prepBytes = prep && prep.bytes ? prep.bytes : null;
+  const prepMime = prep ? prep.mimeType : "image/jpeg";
+
+  // 2) System prompt: yêu cầu trả DUY NHẤT JSON đúng schema
+  const schemaStr = schema ? JSON.stringify(schema).slice(0, 1500) : "";
+  const sys =
+    "You are a Locket caption generator. Look at the photo and follow the user's instruction. " +
+    "You MUST reply with ONLY a single valid JSON object (no markdown, no code fence, no extra text) " +
+    (schema ? "that strictly matches this JSON schema: " + schemaStr + ". " : "") +
+    "Write in Vietnamese where the text is user-facing. Return pure JSON only.";
+  const userText = (appPrompt || "Write a caption for this photo.").slice(0, 1200);
+
+  // 3) Thử các provider, parse JSON từ kết quả
+  const tryParse = (txt) => {
+    if (!txt) return null;
+    let s = String(txt).trim().replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
+    const a = s.indexOf("{"); const b = s.lastIndexOf("}");
+    if (a >= 0 && b > a) s = s.slice(a, b + 1);
+    try { return JSON.parse(s); } catch (_) { return null; }
+  };
+
+  // Gọi 1 endpoint chat OpenAI-compatible lấy NGUYÊN content (không cắt) để parse JSON.
+  const rawChat = async (base, key, model, withImg, extra) => {
+    const userMsg = withImg && prepBytes
+      ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } }]
+      : userText;
+    const r = await fetch(`${base}/chat/completions`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify(Object.assign({ model, messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }], temperature: 0.8 }, extra || {})),
+    });
+    if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); return ""; }
+    const j = await r.json();
+    const m = j?.choices?.[0]?.message || {};
+    return String(m.content || m.reasoning_content || "");
+  };
+
+  const providers = [];
+  if (env && env.AI && !cfAiQuotaActive()) {
+    providers.push(async () => {
+      const content = prepBytes
+        ? [{ type: "text", text: userText }, { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } }]
+        : userText;
+      try {
+        const r = await env.AI.run("@cf/mistralai/mistral-small-3.1-24b-instruct", {
+          messages: [{ role: "system", content: sys }, { role: "user", content }], max_tokens: 600, temperature: 0.8,
+        });
+        return String(r?.response || r?.result?.response || "");
+      } catch (e) { if (isQuotaOrCapacityError(e)) markCfAiQuotaHit(); return ""; }
+    });
+  }
+  for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
+    const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
+    providers.push(() => rawChat("https://api.groq.com/openai/v1", k, model, false, /gpt-oss/i.test(model) ? { reasoning_effort: "low", max_completion_tokens: 1200 } : { max_tokens: 700 }));
+  }
+  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+    providers.push(() => rawChat((env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1", k, (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct", true, { max_tokens: 600 }));
+  }
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    providers.push(async () => {
+      const g = await geminiGenerateCaption(env, sys, userText, prepBytes, prepMime, k);
+      return g.text || "";
+    });
+  }
+
+  let source = "fallback";
+  for (const p of providers) {
+    try {
+      const raw = await p();
+      const obj = tryParse(raw);
+      if (obj && typeof obj === "object") {
+        source = "ai";
+        return { data: obj, source, err: null };
+      }
+    } catch (_) {}
+  }
+
+  // 4) Fallback: tự dựng JSON hợp lệ theo schema từ caption đơn (không để app "thử lại").
+  const single = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId + "f");
+  const data = buildFallbackStructured(schema, single.text, isQuote);
+  return { data, source: "fallback_" + (single.source || "static"), err: single.aiErr || null };
+}
+
+// Dựng object JSON hợp lệ theo schema khi AI không trả JSON. Điền caption vào các field string.
+function buildFallbackStructured(schema, text, isQuote) {
+  const quotesVi = [
+    { quote: text || "Mỗi khoảnh khắc là một câu chuyện chưa kể.", category: "famous_modern_figures", attribution: "Khuyết danh" },
+    { quote: "Sống chậm lại để thấy đời đáng yêu hơn.", category: "pop_music", attribution: "Vô danh" },
+    { quote: "Hạnh phúc là hành trình, không phải đích đến.", category: "greek_philosophy", attribution: "Aristotle" },
+    { quote: "Giữ lấy khoảnh khắc này, vì nó không trở lại.", category: "film_and_tv", attribution: "Khuyết danh" },
+    { quote: "Cứ bước đi, ánh sáng ở cuối con đường.", category: "athlete", attribution: "Vô danh" },
+  ];
+  if (!schema || typeof schema !== "object") {
+    return isQuote ? { quotes: quotesVi } : { headline: text, caption: text, text };
+  }
+  const props = schema.properties || {};
+  // Nếu schema có mảng "quotes" (hoặc mảng bất kỳ) -> điền mảng
+  for (const key of Object.keys(props)) {
+    const p = props[key];
+    if (p && p.type === "array") {
+      const n = Number(p.minItems || p.maxItems || 5) || 5;
+      const itemProps = (p.items && p.items.properties) || {};
+      const arr = [];
+      for (let i = 0; i < n; i++) {
+        const base = quotesVi[i % quotesVi.length];
+        const item = {};
+        for (const ik of Object.keys(itemProps)) {
+          const ip = itemProps[ik];
+          if (/quote|text|caption|headline|line/i.test(ik)) item[ik] = i === 0 ? (text || base.quote) : base.quote;
+          else if (/categor/i.test(ik)) item[ik] = (ip.enum && ip.enum[0]) || base.category;
+          else if (/attribut|author|source/i.test(ik)) item[ik] = base.attribution;
+          else item[ik] = (ip.enum && ip.enum[0]) || base.quote;
+        }
+        if (Object.keys(itemProps).length === 0) item.value = base.quote;
+        arr.push(item);
+      }
+      const out = {}; out[key] = arr;
+      // điền các field top-level string khác nếu có
+      for (const k2 of Object.keys(props)) if (props[k2].type === "string") out[k2] = text;
+      return out;
+    }
+  }
+  // Schema toàn string -> điền caption vào mọi field
+  const out = {};
+  for (const key of Object.keys(props)) out[key] = text;
+  if (Object.keys(out).length === 0) out.caption = text;
+  return out;
+}
+
 async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId) {
   const isQuote = String(captionType || "").toLowerCase().includes("quote");
   const fallbackNews = [
@@ -1768,59 +1915,39 @@ async function handleStudioRequest(request, env) {
 
     const tempId = crypto.randomUUID().slice(0, 12);
     const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
-    const gen = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, url.origin, tempId);
-    const cleanText = gen.text;
-    if (gen.source && (gen.source.startsWith("gemini") || gen.source.startsWith("fallback"))) {
-      LAST_FALLBACK_DEBUG = { kind: "caption", source: gen.source, reason: gen.aiErr || null, ts: new Date().toISOString() };
-    }
 
-    const rfSchema = dataNode?.response_format?.json_schema?.schema?.properties || dataNode?.response_format?.properties || null;
-    const rfKeys = rfSchema && typeof rfSchema === "object" ? Object.keys(rfSchema) : [];
-    // Bao phủ MỌI tên field caption mà các phiên bản Locket có thể đọc.
-    const customData = {
-      caption: cleanText,
-      text: cleanText,
-      headline: cleanText,
-      title: cleanText,
-      quote: cleanText,
-      body: cleanText,
-      message: cleanText,
-      response: cleanText,
-      reply: cleanText,
-      output: cleanText,
-      result: cleanText,
-      generated_text: cleanText,
-      generatedText: cleanText,
-      completion: cleanText,
-      author: "",
-      content: cleanText,
-    };
-    for (const k of rfKeys) {
-      if (!(k in customData)) customData[k] = cleanText;
-    }
+    // Locket 2.74.0 gửi response_format (JSON schema CỤ THỂ) + prompt. Phải trả về JSON ĐÚNG schema đó
+    // (vd quote: mảng 5 {quote,category,attribution}; breaking_news: headline...). Dùng chính prompt app.
+    const appPrompt = typeof dataNode?.prompt === "string" ? dataNode.prompt : "";
+    const rf = dataNode?.response_format || null;
+    const rfSchema = rf?.schema || rf?.json_schema?.schema || rf || null;
+
+    const structured = await generateStructuredCaption(env, appPrompt, rfSchema, imgBytes, sourceUrl, url.origin, tempId, captionType);
 
     LAST_CAPTION_DEBUG = {
-      mode: "ai_vision_caption",
-      source: gen.source,
-      aiErr: gen.aiErr || null,
+      mode: "structured_caption",
+      source: structured.source,
+      aiErr: structured.err || null,
       captionType,
-      reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
-      rfKeys,
-      promptPreview: typeof dataNode?.prompt === "string" ? dataNode.prompt.slice(0, 120) : "",
+      hasSchema: !!rfSchema,
+      schemaTop: rfSchema && rfSchema.properties ? Object.keys(rfSchema.properties) : [],
       got_input: !!(imgBytes || sourceUrl),
       upStatus,
-      upErrPreview: upText.slice(0, 220),
-      generated: cleanText,
+      generated: JSON.stringify(structured.data).slice(0, 200),
       ts: new Date().toISOString(),
     };
+    if (structured.source && (structured.source.startsWith("fallback") || structured.source.includes("gemini"))) {
+      LAST_FALLBACK_DEBUG = { kind: "caption", source: structured.source, reason: structured.err || null, ts: new Date().toISOString() };
+    }
 
-    const payload = Object.assign({}, customData, {
-      result: Object.assign({}, customData, { data: customData, status: 200 }),
-      data: customData,
+    // structured.data là object ĐÚNG schema (vd {quotes:[...]}). Trả nó ở nhiều vị trí để app chắc chắn đọc được.
+    const sd = structured.data;
+    const payload = Object.assign({}, sd, {
+      result: Object.assign({}, sd, { data: sd, status: 200 }),
+      data: sd,
       status: 200,
       success: true,
-      // Format OpenAI chat (model "gpt-5.4") — một số client đọc choices[].message.content.
-      choices: [{ index: 0, message: { role: "assistant", content: cleanText }, finish_reason: "stop" }],
+      choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify(sd) }, finish_reason: "stop" }],
     });
     return new Response(JSON.stringify(payload), {
       status: 200,
