@@ -259,6 +259,18 @@ for (var rfIdx = 0; rfIdx < combinedRemote.length; rfIdx++) {
     }
 }
 activeFilterCfg.remote_filters = mergedRemote;
-obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
+
+// === TEST nút [📷]: nếu bật cờ, GIỮ NGUYÊN camera_filter_config GỐC của server (không chèn custom),
+// để xem app có hiện lại nút Dazz Cam [📷] + LUT native không. Đổi về false để chèn filter custom lại. ===
+var TOMMM_KEEP_NATIVE_CFC = true;
+if (TOMMM_KEEP_NATIVE_CFC && liveFilterCfg && typeof liveFilterCfg === "object") {
+    // Giữ đúng config server trả về, chỉ bật cờ hiển thị filter button (không thêm/bớt filter nào).
+    obj.entries["camera_filter_config"] = JSON.stringify(liveFilterCfg);
+} else if (TOMMM_KEEP_NATIVE_CFC) {
+    // Server không trả camera_filter_config (NO_CHANGE) -> KHÔNG set, để app dùng cache native của nó.
+    delete obj.entries["camera_filter_config"];
+} else {
+    obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
+}
 
 $done({ body: JSON.stringify(obj) });
