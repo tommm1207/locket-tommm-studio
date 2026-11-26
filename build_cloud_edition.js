@@ -311,7 +311,30 @@ if (fs.existsSync(cloudArchivePath)) {
 const cloudArchiveSection = cloudArchivedItems.length > 0
     ? [{ section: "✨ Kho Caption Lễ Locket (Cloud)", items: cloudArchivedItems }]
     : [];
-const customExtraSections = cloudArchiveSection.concat([weekdayCaptionsSection]).concat(
+const ANIM_BASE = `${ghRawBase}/assets/captions_anim`;
+const animatedCaptionsSection = {
+    section: "✨ Caption Động (Animated) ❄️",
+    items: [
+        { overlay_id: "caption:anim_xinchao_muadong", source: "remote", caption: { type: "static_content", text: "Xin Chào Mùa Đông", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "❄️" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: `${ANIM_BASE}/snow_blue.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_emy_muadong", source: "remote", caption: { type: "static_content", text: "Em Yêu Mùa Đông", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "⛄" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: `${ANIM_BASE}/snow_blue.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_dong_nho_anh", source: "remote", caption: { type: "static_content", text: "Đông Nhớ Anh", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🩵" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: `${ANIM_BASE}/snow_blue.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_lanh_ve_lo", source: "remote", caption: { type: "static_content", text: "Lạnh Vê Lờ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🥶" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: `${ANIM_BASE}/snow_blue.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_lanh_the_nho", source: "remote", caption: { type: "static_content", text: "Lạnh Thế Nhờ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🧣" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: `${ANIM_BASE}/snow_blue.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_dong_nho_em", source: "remote", caption: { type: "static_content", text: "Đông Nhớ Em", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "✨" }, background: { colors: ["#2A1459", "#7C3AED"], image: { type: "image", data: `${ANIM_BASE}/snow_purple.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_mua_nhan_ma", source: "remote", caption: { type: "static_content", text: "Mùa Nhãn Mã", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🪄" }, background: { colors: ["#2A1459", "#7C3AED"], image: { type: "image", data: `${ANIM_BASE}/snow_purple.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_yeuthuong_dongday", source: "remote", caption: { type: "static_content", text: "Yêu thương đong đầy", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "💗" }, background: { colors: ["#9D174D", "#F472B6"], image: { type: "image", data: `${ANIM_BASE}/heart_pink.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_day_qua_yeu", source: "remote", caption: { type: "static_content", text: "Đây Quá Yêu", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "💘" }, background: { colors: ["#9D174D", "#F472B6"], image: { type: "image", data: `${ANIM_BASE}/heart_pink.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_tinh_yeu_la_gi", source: "remote", caption: { type: "static_content", text: "Tình yêu là gì", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🖤" }, background: { colors: ["#9D174D", "#F472B6"], image: { type: "image", data: `${ANIM_BASE}/heart_pink.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_top1_locket", source: "remote", caption: { type: "static_content", text: "Top 1 Locket", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🎄" }, background: { colors: ["#7F1D1D", "#EF4444"], image: { type: "image", data: `${ANIM_BASE}/sparkle_red.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_duong_de_tho", source: "remote", caption: { type: "static_content", text: "Đường Dễ Thở", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🎀" }, background: { colors: ["#7F1D1D", "#EF4444"], image: { type: "image", data: `${ANIM_BASE}/sparkle_red.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_xa_kho_tinh", source: "remote", caption: { type: "static_content", text: "Xa Khó Tính", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🌶️" }, background: { colors: ["#7F1D1D", "#EF4444"], image: { type: "image", data: `${ANIM_BASE}/sparkle_red.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_tommm_gold_vip", source: "remote", caption: { type: "static_content", text: "Tommm Gold VIP", max_lines: 1, text_color: "#FEF08A", icon: { type: "emoji", data: "👑" }, background: { colors: ["#291C06", "#B45309"], image: { type: "image", data: `${ANIM_BASE}/gold_shimmer.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_dem_khong_ngu", source: "remote", caption: { type: "static_content", text: "Đêm Không Ngủ", max_lines: 1, text_color: "#22D3EE", icon: { type: "emoji", data: "🎧" }, background: { colors: ["#0F172A", "#6D28D9"], image: { type: "image", data: `${ANIM_BASE}/neon_cyber.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_xuan_ve_roi", source: "remote", caption: { type: "static_content", text: "Xuân Về Rồi", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🌸" }, background: { colors: ["#831843", "#F9A8D4"], image: { type: "image", data: `${ANIM_BASE}/sakura_fall.gif`, source: "url" } } } },
+        { overlay_id: "caption:anim_quay_het_minh", source: "remote", caption: { type: "static_content", text: "Quẩy Hết Mình", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🎆" }, background: { colors: ["#090D26", "#312E81"], image: { type: "image", data: `${ANIM_BASE}/fireworks_night.gif`, source: "url" } } } },
+    ],
+};
+const customExtraSections = [animatedCaptionsSection].concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
     dvOverlays.filter(s => !s.section.includes("General") && !s.section.includes("Decorative by Locket"))
 );
 
@@ -351,19 +374,37 @@ delete baseRcEntries["journal_activity_bar_enabled"];
 delete baseRcEntries["invite_link_preview_variant"];
 delete baseRcEntries["friend_limit_geo_override"];
 
-// Video 45s (khớp RC gốc server Locket 2.74.0 — gate video_60s bật nhưng duration khóa 45s).
-baseRcEntries["camera"] = JSON.stringify({ "gold_max_duration": 45, "max_duration": 45, "ultra_wide": true, "volume_button": true, "flash_button": true, "telephoto": true, "srgb": true, "lanczos": true, "quality_mbps": 0.6 });
-// camera_config: biến thể snake + camelCase mà binary Locket 2.74.0 đọc (đối chiếu RC gốc vps)
-baseRcEntries["camera_config"] = JSON.stringify({ "gold_max_duration": 45, "goldMaxDuration": 45, "max_duration": 45, "maxDuration": 45, "ultra_wide": true, "ultraWide": true, "volume_button": true, "volumeButton": true, "flash_button": true, "telephoto": true, "lanczos": true, "quality_mbps": 0.7, "qualityMbps": 0.7 });
-// camera_roll: đủ cả snake + camelCase + các khoá bật video thư viện (giúp up video dài KHÔNG báo "Thử lại")
-baseRcEntries["camera_roll"] = JSON.stringify({ "gold_max_duration": 45, "goldMaxDuration": 45, "video_max_duration": 45, "videoMaxDuration": 45, "max_duration": 45, "maxDuration": 45, "trim_max_duration": 45, "camera_roll_max_duration": 45, "cameraRollMaxDuration": 45, "camera_roll_video_max_duration": 45, "quality_mbps": 0.6, "qualityMbps": 0.6, "flash_button": true });
+delete baseRcEntries["camera"];
+delete baseRcEntries["camera_roll"];
+delete baseRcEntries["camera_config"];
+delete baseRcEntries["live_photos"];
+delete baseRcEntries["moment_upload_queue_persistence_v2"];
+
+// Move infrastructure/upload keys to default-only map so live server upload pipeline is never overwritten blindly
+const defaultOnlyRcEntries = {};
+for (const dk of [
+    "upload_main",
+    "cdn_domain_replacements",
+    "cdn_domain_replacements_video",
+    "storage_bucket",
+    "storage_bucket_video",
+    "camera_filter_storage_bucket",
+    "firestore_refresh_v2",
+    "firestore_refresh_v3",
+]) {
+    if (baseRcEntries[dk] !== undefined) {
+        defaultOnlyRcEntries[dk] = baseRcEntries[dk];
+        delete baseRcEntries[dk];
+    }
+}
+
+// Video 45s & Clean Camera Roll Video RC keys (camera, camera_roll, camera_config, live_photos được JSON-merge runtime).
 baseRcEntries["longer_camera_roll_videos_enabled"] = "true";
 baseRcEntries["camera_roll_preview_enabled"] = "true";
 baseRcEntries["camera_roll_video_enabled"] = "true";
 baseRcEntries["camera_roll_video_upload_enabled"] = "true";
 baseRcEntries["internal_camera_roll_video_upload_enabled"] = "true";
 baseRcEntries["can_record_long_video"] = "true";
-// Mọi key SỐ độ dài video mà Locket 2.74.0 đọc (đối chiếu RC gốc vps = 45s). Thiếu key -> app khóa độ dài.
 baseRcEntries["camera_roll_video_max_duration"] = "45";
 baseRcEntries["camera_roll_max_duration"] = "45";
 baseRcEntries["camera_roll_duration"] = "45";
@@ -377,9 +418,6 @@ baseRcEntries["longer_video_max_duration"] = "45";
 baseRcEntries["trim_max_duration"] = "45";
 baseRcEntries["video_trim_max_duration"] = "45";
 baseRcEntries["gold_max_duration"] = "45";
-// Bitrate/quality video = 0.6mbps (KHỚP object camera/camera_roll gốc server Locket = 0.6). Giá trị thấp
-// giúp app NÉN mạnh khi transcode video từ THƯ VIỆN (bitrate gốc cao -> file >6MB -> Locket reject "Thử lại").
-// Lưu ý: cap cứng ~6MB/video nằm ở phía Locket; hạ bitrate chỉ giúp NẾU app đọc RC để nén (chưa chắc).
 baseRcEntries["quality_mbps"] = "0.6";
 baseRcEntries["qualityMbps"] = "0.6";
 baseRcEntries["camera_quality_mbps"] = "0.6";
@@ -453,13 +491,101 @@ const photoboothIds = [
 
 const singleFrameIds = Object.keys(framesManifest).filter(id => !photoboothIds.includes(id));
 
+const v2FilterSpecs = [
+    // Tính Năng Locket (Special FX)
+    ["clock_weekday_overlay", "Giờ & Thứ Trên Ảnh", "#1E3A8A", "#38BDF8", "clock.fill", "🕒"],
+    ["portrait_bokeh", "Xóa Phông Chân Dung", "#7C2D12", "#F59E0B", "camera.aperture", "📸"],
+    ["cctv_camera", "Camera An Ninh CCTV", "#064E3B", "#10B981", "video.fill", "📹"],
+    ["triple_clone", "Phân Thân 3 Bóng", "#4C1D95", "#EC4899", "sparkles", "👥"],
+    // Meme Giải Trí (AI)
+    ["ai_cong_chua_phong_tro", "Công Chúa Phòng Trọ", "#BE185D", "#F9A8D4", "crown.fill", "👸"],
+    ["ai_hoang_tu_ktx", "Hoàng Tử KTX", "#1D4ED8", "#60A5FA", "crown.fill", "🤴"],
+    ["ai_lop_truong", "Lớp Trưởng", "#0F766E", "#2DD4BF", "book.fill", "📚"],
+    ["ai_di_phu_ho", "Đi Phụ Hồ", "#B45309", "#FBBF24", "hammer.fill", "🧱"],
+    ["ai_ve_que_nuoi_ca", "Về Quê Nuôi Cá", "#15803D", "#4ADE80", "leaf.fill", "🐟"],
+    // Trend Hot Mạng Xã Hội (AI)
+    ["ai_figure_1_7", "Mô Hình Figure 1/7", "#EA580C", "#FDBA74", "cube.fill", "🗿"],
+    ["ai_action_figure_box", "Hộp Action Figure", "#0284C7", "#38BDF8", "shippingbox.fill", "📦"],
+    ["ai_lego_figure", "Nhân Vật LEGO", "#D97706", "#FDE047", "square.grid.2x2", "🧱"],
+    ["ai_cartoon_3d", "Hoạt Hình 3D", "#7E22CE", "#C084FC", "sparkles", "🎨"],
+    ["ai_polaroid_string", "Polaroid Treo Dây", "#9A3412", "#FB923C", "photo.on.rectangle", "🖼️"],
+    // Nghề Nghiệp & Shipper (AI)
+    ["ai_shipper_giao_hang", "Shipper Giao Hàng", "#DC2626", "#FB923C", "box.truck.fill", "🛵"],
+    ["ai_grab_driver", "Tài Xế Grab", "#15803D", "#22C55E", "car.fill", "🏍️"],
+    ["ai_xanh_sm", "Tài Xế Xanh SM", "#0E7490", "#22D3EE", "bolt.car.fill", "🚕"],
+    ["ai_bac_si", "Bác Sĩ Tận Tâm", "#0369A1", "#7DD3FC", "cross.case.fill", "🩺"],
+    // Tổng Tài & Phú Bà (AI)
+    ["ai_tong_tai", "Tổng Tài Bá Đạo", "#111827", "#4B5563", "briefcase.fill", "💼"],
+    ["ai_phu_ba", "Phú Bà Sang Chảnh", "#78350F", "#F59E0B", "diamond.fill", "💎"],
+    ["ai_thieu_gia", "Thiếu Gia Sành Điệu", "#991B1B", "#EF4444", "star.fill", "🕶️"],
+    ["ai_du_thuyen", "Du Thuyền Triệu Đô", "#1E40AF", "#38BDF8", "sailboat.fill", "🛥️"],
+    ["ai_old_money", "Phong Cách Old Money", "#57534E", "#D6D3D1", "crown.fill", "🥂"],
+    // Xinh Lung Linh & Hóa Trang (AI)
+    ["ai_makeup_idol", "Makeup Idol Hàn Quốc", "#DB2777", "#F472B6", "sparkles", "💄"],
+    ["ai_trang_diem_duyen", "Trang Điểm Douyin", "#9F1239", "#FB7185", "sparkles", "🌸"],
+    ["ai_doi_kieu_toc", "Thay Đổi Kiểu Tóc", "#7C3AED", "#A78BFA", "scissors", "💇"],
+    ["ai_doi_mau_toc", "Thay Đổi Màu Tóc", "#0D9488", "#5EEAD4", "paintpalette.fill", "🎨"],
+    ["ai_cosplay_wibu", "Cosplay Wibu", "#4338CA", "#818CF8", "wand.and.stars", "🎭"],
+    ["ai_hau_gai", "Trang Phục Hầu Gái", "#1E293B", "#F43F5E", "heart.fill", "🎀"],
+    ["ai_hoang_thuong", "Hoàng Thượng", "#B45309", "#FDE047", "crown.fill", "🐉"],
+    ["ai_idol_kpop", "Idol KPOP", "#9333EA", "#F472B6", "music.note", "🎤"],
+    // Hiệu Ứng Méo Mặt & Hài Hước (0-AI)
+    ["warp_big_head", "Đầu To Khổng Lồ", "#2563EB", "#60A5FA", "face.smiling", "🤯"],
+    ["warp_tiny_face", "Mặt Nhỏ Tí Hon", "#7C3AED", "#C084FC", "face.smiling", "🤏"],
+    ["warp_alien_vline", "Mặt Dài V-Line Alien", "#059669", "#34D399", "sparkles", "👽"],
+    ["warp_hamster", "Má Phính Hamster", "#D97706", "#FBBF24", "face.smiling", "🐹"],
+    ["warp_bug_eyes", "Mắt Trố Cá Vàng", "#DC2626", "#F87171", "eye.fill", "👀"],
+    ["warp_wide_mouth", "Miệng Rộng Ngoác", "#DB2777", "#F472B6", "mouth.fill", "👄"],
+    ["warp_chubby", "Mặt Phệ Béo Ú", "#EA580C", "#FDBA74", "face.smiling", "🐷"],
+    ["warp_gigachad", "Mặt Vuông GigaChad", "#334155", "#94A3B8", "square.fill", "🗿"],
+    ["warp_swirl", "Mặt Xoắn Ốc", "#4F46E5", "#38BDF8", "tornado", "🌀"],
+    ["warp_melt", "Mặt Tan Chảy", "#0D9488", "#A3E635", "drop.fill", "🫠"],
+    // Máy Ảnh Dazz Cam & Màu Film (0-AI LUT)
+    ["dazz_cpm35", "Dazz CPM35", "#92400E", "#F59E0B", "camera.fill", "📷"],
+    ["dazz_classic_u", "Dazz Classic U", "#1F2937", "#6B7280", "camera.fill", "📸"],
+    ["dazz_fqs", "Dazz FQS", "#065F46", "#34D399", "camera.fill", "🎞️"],
+    ["dazz_inst_c", "Dazz Inst C", "#9D174D", "#F472B6", "camera.fill", "🕹️"],
+    ["dazz_grd", "Dazz GRD Đen Trắng", "#111827", "#D1D5DB", "camera.fill", "🖤"],
+    ["lut_kodak_portra", "Kodak Portra 400", "#B45309", "#FDE68A", "camera.filters", "🎞️"],
+    ["lut_fuji_superia", "Fuji Superia 200", "#047857", "#6EE7B7", "camera.filters", "📷"],
+    ["lut_kodak_gold", "Kodak Gold 200", "#CA8A04", "#FEF08A", "camera.filters", "✨"],
+    ["lut_cinestill_800t", "Cinestill 800T", "#1E3A8A", "#F43F5E", "camera.filters", "🌃"],
+    ["lut_kodak_am", "Kodak Ấm Áp", "#9A3412", "#FDBA74", "camera.filters", "🌅"],
+    ["lut_fuji_chrome", "Fuji Chrome", "#0F766E", "#99F6E4", "camera.filters", "🏞️"],
+    ["lut_vintage", "Vintage Cổ Điển", "#78350F", "#D6D3D1", "camera.filters", "🕰️"],
+    // Làm Đẹp & Tone Da (0-AI LUT)
+    ["lut_iphone_beauty", "Sáng Mịn Tự Nhiên", "#0284C7", "#BAE6FD", "sparkles", "✨"],
+    ["lut_film_han", "Film Hàn Quốc", "#BE185D", "#FBCFE8", "sparkles", "🎀"],
+    ["lut_trang_sua", "Trắng Sữa Mịn", "#9333EA", "#E9D5FF", "sparkles", "🥛"],
+    ["lut_phim_nhat", "Fuji Nhật Bản", "#0F766E", "#CCFBF1", "sparkles", "🌸"],
+    ["lut_hong_dao", "Hồng Đào Sữa", "#E11D48", "#FECDD3", "sparkles", "🍑"],
+    ["lut_matcha", "Matcha Trong Trẻo", "#16A34A", "#BBF7D0", "sparkles", "🍵"],
+    ["lut_ulzzang_pink", "Hồng Phấn Ulzzang", "#EC4899", "#FCE7F3", "sparkles", "🌷"],
+    ["lut_nang_ban_mai", "Nắng Ban Mai", "#EA580C", "#FEF3C7", "sun.max.fill", "☀️"],
+    ["lut_tone_lanh", "Tone Lạnh Chảnh Sả", "#2563EB", "#DBEAFE", "snowflake", "❄️"],
+    ["lut_kem_bo", "Kem Bơ Creamy", "#D97706", "#FEF9C3", "sparkles", "🧁"],
+];
+
 const customFrameGroups = [
+    { id: "group_locket_tools", title: { en: "✨ Tính Năng Locket Hot", vi: "✨ Tính Năng Locket Hot" }, filter_ids: ["clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone", "weekday_depth"] },
     { id: "group_hot_ai_3d", title: { en: "Hiệu Ứng AI 3D Hot 🔥", vi: "Hiệu Ứng AI 3D Hot 🔥" }, filter_ids: aiHotIds },
+    { id: "group_meme_ai", title: { en: "😂 Meme Giải Trí", vi: "😂 Meme Giải Trí" }, filter_ids: ["ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_lop_truong", "ai_di_phu_ho", "ai_ve_que_nuoi_ca"] },
+    { id: "group_trend_ai", title: { en: "🔥 Trend Hot Mạng Xã Hội", vi: "🔥 Trend Hot Mạng Xã Hội" }, filter_ids: ["ai_figure_1_7", "ai_action_figure_box", "ai_lego_figure", "ai_cartoon_3d", "ai_polaroid_string"] },
+    { id: "group_job_ai", title: { en: "🛵 Nghề Nghiệp & Shipper", vi: "🛵 Nghề Nghiệp & Shipper" }, filter_ids: ["ai_shipper_giao_hang", "stk_shopee_food", "ai_grab_driver", "ai_xanh_sm", "ai_bac_si"] },
+    { id: "group_luxury_ai", title: { en: "👑 Tổng Tài & Phú Bà", vi: "👑 Tổng Tài & Phú Bà" }, filter_ids: ["ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen", "ai_old_money"] },
+    { id: "group_beauty_ai", title: { en: "💖 Xinh Lung Linh & Hóa Trang", vi: "💖 Xinh Lung Linh & Hóa Trang" }, filter_ids: ["ai_makeup_idol", "ai_trang_diem_duyen", "ai_doi_kieu_toc", "ai_doi_mau_toc", "ai_cosplay_wibu", "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop"] },
+    { id: "group_warp_fun", title: { en: "🤪 Hiệu Ứng Méo Mặt & Hài Hước", vi: "🤪 Hiệu Ứng Méo Mặt & Hài Hước" }, filter_ids: ["warp_big_head", "warp_tiny_face", "warp_alien_vline", "warp_hamster", "warp_bug_eyes", "warp_wide_mouth", "warp_chubby", "warp_gigachad", "warp_swirl", "warp_melt"] },
+    { id: "group_retro_lut", title: { en: "📷 Máy Ảnh Retro & Màu Film", vi: "📷 Máy Ảnh Retro & Màu Film" }, filter_ids: ["dazz_cpm35", "dazz_classic_u", "dazz_fqs", "dazz_inst_c", "dazz_grd", "lut_kodak_portra", "lut_fuji_superia", "lut_kodak_gold", "lut_cinestill_800t", "lut_kodak_am", "lut_fuji_chrome", "lut_vintage"] },
+    { id: "group_beauty_lut", title: { en: "🌸 Làm Đẹp & Tone Da", vi: "🌸 Làm Đẹp & Tone Da" }, filter_ids: ["lut_iphone_beauty", "lut_film_han", "lut_trang_sua", "lut_phim_nhat", "lut_hong_dao", "lut_matcha", "lut_ulzzang_pink", "lut_nang_ban_mai", "lut_tone_lanh", "lut_kem_bo"] },
     { id: "group_photobooth", title: { en: "Khung & Photobooth 📸", vi: "Khung & Photobooth 📸" }, filter_ids: photoboothIds },
     { id: "group_frames", title: { en: "Khung Viền & Hot Trend 🖼️", vi: "Khung Viền & Hot Trend 🖼️" }, filter_ids: ["weekday_depth", "weekday_depth_en", "weekday_depth_tw", "weekday_depth_de"].concat(singleFrameIds) }
 ];
 const frameOnlyIds = photoboothIds.concat(singleFrameIds);
-const customFrameIds = ["weekday_depth", "weekday_depth_en", "weekday_depth_tw", "weekday_depth_de"].concat(aiHotIds.slice(0, 4), photoboothIds.slice(0, 4));
+const customFrameIds = [
+    "clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone",
+    "weekday_depth", "weekday_depth_en", "weekday_depth_tw", "weekday_depth_de",
+    "dazz_cpm35", "lut_iphone_beauty", "warp_big_head", "ai_cong_chua_phong_tro"
+].concat(aiHotIds.slice(0, 4), photoboothIds.slice(0, 4));
 
 const customRemoteFilters = frameOnlyIds.map(id => {
     const src = filterMetaById.get(id) || {};
@@ -545,6 +671,10 @@ const TOMMM_FORCE_GATES = [
     "camera_roll", "camera_roll_video", "camera_roll_video_30s", "camera_roll_video_upload",
     "photo_library_video", "can_upload_30s_video", "can_record_30s_video",
     "video", "video_30s", "video_60s", "longer_video", "longer_video_30s", "extended_video_30s",
+    "camera_timer", "self_timer", "timer", "countdown_timer",
+    "digicam", "retro_camera", "retro_cameras", "film_camera", "film_cameras",
+    "camera_lenses", "lenses", "camera_modes", "dazz_cam", "vintage_camera",
+    "camera_zoom", "zoom",
     "camera_filter_sheet", "camera_filters", "camera_filter", "filter", "filters",
     "photo_filters", "ai_filters", "ar_filters", "face_filters",
     "camera_filter_button", "custom_filters", "create_filter",
@@ -589,20 +719,125 @@ try {
     obj.entries["streak_config"] = JSON.stringify(liveStreak);
 } catch (_) {}
 
-// 2b. MERGE feature_gates: GIỮ NGUYÊN toàn bộ gate native mà server Locket 2.74.0 trả về
-// (camera_roll_video, photo_library_video, Dazz Cam, v.v.), chỉ ÉP BẬT thêm các gate Gold cần.
-// Đây là điểm mấu chốt giữ nút [📷] Dazz Cam & cho up video 10s từ thư viện (giống khi chặn DNS).
+// 2b. MERGE feature_gates: GIỮ NGUYÊN toàn bộ gate native mà server Locket 2.74.0 trả về,
+// ÉP BẬT các gate Gold + tự động mở khóa mọi gate có tên liên quan timer/dazz/retro/film/lens/video/zoom.
 var TOMMM_FORCE_GATES = ${JSON.stringify(TOMMM_FORCE_GATES)};
 var liveGates = {};
 try { liveGates = JSON.parse(obj.entries["feature_gates"] || "{}"); } catch (_) { liveGates = {}; }
 if (!liveGates || typeof liveGates !== "object") liveGates = {};
+for (var gk in liveGates) {
+    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && /timer|dazz|digi|retro|film|lens|camera_mode|camera_roll|video|zoom|countdown/i.test(gk)) {
+        var gv = liveGates[gk];
+        if (gv === "disabled" || gv === "off" || gv === false) liveGates[gk] = "enabled";
+    }
+}
 for (var fgi = 0; fgi < TOMMM_FORCE_GATES.length; fgi++) {
     liveGates[TOMMM_FORCE_GATES[fgi]] = "enabled";
 }
 obj.entries["feature_gates"] = JSON.stringify(liveGates);
 
+// Tự động bật các key top-level nếu server trả false/disabled cho timer/dazz/retro/film/lens
+for (var ek in obj.entries) {
+    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && /timer|dazz|digi|retro|film|lens|camera_mode|countdown/i.test(ek)) {
+        if (obj.entries[ek] === "false") obj.entries[ek] = "true";
+        else if (obj.entries[ek] === "disabled") obj.entries[ek] = "enabled";
+    }
+}
+
+// Điền default-only cho các key hạ tầng upload/storage nếu server chưa trả
+var TOMMM_DEFAULTS = ${JSON.stringify(defaultOnlyRcEntries)};
+for (var dk in TOMMM_DEFAULTS) {
+    if (Object.prototype.hasOwnProperty.call(TOMMM_DEFAULTS, dk) && typeof obj.entries[dk] === "undefined") {
+        obj.entries[dk] = TOMMM_DEFAULTS[dk];
+    }
+}
+
 var TOMMM_ENTRIES = ${JSON.stringify(baseRcEntries)};
 Object.assign(obj.entries, TOMMM_ENTRIES);
+
+// JSON-merge camera, camera_config, camera_roll, live_photos (giữ lại key native của server, chỉ bổ sung/cập nhật chuẩn)
+try {
+    var camObj = {};
+    try { camObj = JSON.parse(obj.entries["camera"] || "{}"); } catch (_) { camObj = {}; }
+    if (!camObj || typeof camObj !== "object") camObj = {};
+    Object.assign(camObj, {
+        gold_max_duration: 45,
+        max_duration: 45,
+        ultra_wide: true,
+        telephoto: true,
+        flash_button: true,
+        volume_button: true,
+        srgb: true,
+        lanczos: true,
+        quality_mbps: 0.6,
+        timer_enabled: true,
+        self_timer_enabled: true,
+        timer: true,
+        digicam: true,
+        retro_cameras: true,
+        camera_lenses: true
+    });
+    obj.entries["camera"] = JSON.stringify(camObj);
+} catch (_) {}
+
+try {
+    var camCfgObj = {};
+    try { camCfgObj = JSON.parse(obj.entries["camera_config"] || "{}"); } catch (_) { camCfgObj = {}; }
+    if (!camCfgObj || typeof camCfgObj !== "object") camCfgObj = {};
+    Object.assign(camCfgObj, {
+        gold_max_duration: 45,
+        goldMaxDuration: 45,
+        max_duration: 45,
+        maxDuration: 45,
+        ultra_wide: true,
+        ultraWide: true,
+        volume_button: true,
+        volumeButton: true,
+        flash_button: true,
+        telephoto: true,
+        lanczos: true,
+        quality_mbps: 0.7,
+        qualityMbps: 0.7,
+        timer_enabled: true,
+        self_timer_enabled: true,
+        digicam: true
+    });
+    obj.entries["camera_config"] = JSON.stringify(camCfgObj);
+} catch (_) {}
+
+try {
+    var crObj = {};
+    try { crObj = JSON.parse(obj.entries["camera_roll"] || "{}"); } catch (_) { crObj = {}; }
+    if (!crObj || typeof crObj !== "object") crObj = {};
+    delete crObj["goldMaxDuration"];
+    delete crObj["videoMaxDuration"];
+    delete crObj["maxDuration"];
+    delete crObj["cameraRollMaxDuration"];
+    delete crObj["qualityMbps"];
+    delete crObj["flash_button"];
+    Object.assign(crObj, {
+        gold_max_duration: 45,
+        max_duration: 45,
+        video_max_duration: 45,
+        quality_mbps: 0.6
+    });
+    obj.entries["camera_roll"] = JSON.stringify(crObj);
+} catch (_) {}
+
+try {
+    var lpObj = {};
+    try { lpObj = JSON.parse(obj.entries["live_photos"] || "{}"); } catch (_) { lpObj = {}; }
+    if (!lpObj || typeof lpObj !== "object") lpObj = {};
+    Object.assign(lpObj, {
+        capture: true,
+        video: true,
+        viewing: true,
+        catch_up: true,
+        widget_playback: true,
+        widget_looping_mode: "unseen"
+    });
+    obj.entries["live_photos"] = JSON.stringify(lpObj);
+} catch (_) {}
 
 // 3. Tự động lưu vĩnh viễn mọi Caption LỄ/SỰ KIỆN mới chính chủ của Locket (chỉ ghi $persistentStore khi thật sự có ID mới!)
 var EXTRA_SECTIONS = ${JSON.stringify(customExtraSections)};
@@ -722,11 +957,13 @@ obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
 var ASSETS_BASE = "https://tommm1207.github.io/locket-tommm-studio/assets/";
 var ABASE = ASSETS_BASE + "ai/";
 var FBASE = ASSETS_BASE + "frames/";
+var F2BASE = ASSETS_BASE + "filters_v2/";
 var CUSTOM_FRAME_GROUPS = ${JSON.stringify(customFrameGroups)};
 var CUSTOM_FRAME_IDS = ${JSON.stringify(customFrameIds)};
 var CUSTOM_AI_SPECS = ${JSON.stringify(compactAiFilters)};
 var CUSTOM_LUT_SPECS = ${JSON.stringify(compactLutFilters)};
 var CUSTOM_FRAME_SPECS = ${JSON.stringify(compactFrames)};
+var CUSTOM_V2_SPECS = ${JSON.stringify(v2FilterSpecs)};
 var CUSTOM_REMOTE_FILTERS = [];
 function pushCustomFilter(id, name, c0, c1, fUrl, sfSym, emoji) {
     CUSTOM_REMOTE_FILTERS.push({
@@ -771,6 +1008,10 @@ for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
     var sp = CUSTOM_FRAME_SPECS[cf];
     var is4 = sp[4] === 1;
     pushCustomFilter(sp[0], sp[1], sp[2], sp[3], FBASE + sp[0] + ".png", is4 ? "square.grid.2x2" : "photo.on.rectangle", is4 ? "📸" : "🖼️");
+}
+for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
+    var vp = CUSTOM_V2_SPECS[cv];
+    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png", "calendar", "🇬🇧");
@@ -880,12 +1121,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=38, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=38, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=38, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=38, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=38, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=38, requires-body=true, max-size=131072, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=39, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=39, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=39, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=39, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=39, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=39, requires-body=true, max-size=131072, timeout=60
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -950,12 +1191,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/initplayback.+&oad 'data-type=text data="" status-code=200'
 
 [Script]
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=38, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=38, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=38, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=38, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=38, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=38, requires-body=true, max-size=131072, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=39, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=39, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=39, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=39, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=39, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=39, requires-body=true, max-size=131072, timeout=60
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com

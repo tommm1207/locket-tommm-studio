@@ -29,7 +29,37 @@ const LUT_FILTERS = {
   lut_fuji_chrome: { rMul: 0.97, gMul: 1.03, bMul: 1.04, contrast: 1.14, brightness: 0, sat: 0.82, fade: 12, vig: 0.18, grain: 6 },
   lut_phim_nhat: { rMul: 0.98, gMul: 1.05, bMul: 1.06, contrast: 0.94, brightness: 14, sat: 0.88, fade: 20, vig: 0.10, grain: 5 },
   lut_vintage: { rMul: 1.12, gMul: 1.01, bMul: 0.84, contrast: 1.06, brightness: 3, sat: 0.78, fade: 22, vig: 0.26, grain: 11 },
+  lut_kodak_portra: { rMul: 1.07, gMul: 1.02, bMul: 0.94, contrast: 0.98, brightness: 8, sat: 1.04, fade: 12, vig: 0.12, grain: 5 },
+  lut_fuji_superia: { rMul: 0.98, gMul: 1.06, bMul: 1.04, contrast: 1.12, brightness: 4, sat: 1.12, fade: 10, vig: 0.16, grain: 6 },
+  lut_kodak_gold: { rMul: 1.12, gMul: 1.05, bMul: 0.86, contrast: 1.08, brightness: 8, sat: 1.14, fade: 14, vig: 0.18, grain: 8 },
+  lut_cinestill_800t: { rMul: 0.96, gMul: 1.02, bMul: 1.14, contrast: 1.16, brightness: 2, sat: 1.06, fade: 12, vig: 0.24, grain: 9 },
+  lut_hong_dao: { rMul: 1.09, gMul: 1.01, bMul: 1.03, contrast: 0.96, brightness: 14, sat: 1.06, fade: 12, vig: 0.08, grain: 0 },
+  lut_matcha: { rMul: 0.97, gMul: 1.06, bMul: 0.97, contrast: 0.94, brightness: 12, sat: 0.92, fade: 16, vig: 0.10, grain: 3 },
+  lut_ulzzang_pink: { rMul: 1.08, gMul: 1.00, bMul: 1.05, contrast: 0.97, brightness: 16, sat: 0.96, fade: 14, vig: 0.06, grain: 0 },
+  lut_nang_ban_mai: { rMul: 1.10, gMul: 1.04, bMul: 0.90, contrast: 1.04, brightness: 12, sat: 1.10, fade: 10, vig: 0.10, grain: 2 },
+  lut_tone_lanh: { rMul: 0.94, gMul: 1.01, bMul: 1.10, contrast: 1.05, brightness: 6, sat: 0.92, fade: 10, vig: 0.12, grain: 2 },
+  lut_kem_bo: { rMul: 1.06, gMul: 1.05, bMul: 0.93, contrast: 0.93, brightness: 15, sat: 0.90, fade: 20, vig: 0.08, grain: 3 },
 };
+
+const WARP_FILTERS = {
+  warp_big_head: true,
+  warp_tiny_face: true,
+  warp_alien_vline: true,
+  warp_hamster: true,
+  warp_bug_eyes: true,
+  warp_wide_mouth: true,
+  warp_chubby: true,
+  warp_gigachad: true,
+  warp_swirl: true,
+  warp_melt: true,
+};
+
+const SPECIAL_FX_IDS = new Set([
+  "clock_weekday_overlay",
+  "portrait_bokeh",
+  "cctv_camera",
+  "triple_clone",
+]);
 
 const FACE_LOCK =
   "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
@@ -41,7 +71,13 @@ const CUSTOM_AI_IDS = new Set([
   "ufo_alien", "sweat_hearts", "volcano_lava", "rain_storm",
   "fortnite_llama", "watercolor_art", "golden_hour", "rose_flower",
   "shrek_ogre", "superhero_cape", "spooky_ghost", "pirate_hat",
-  "jungle_leaf", "cute_zombie"
+  "jungle_leaf", "cute_zombie",
+  "ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_lop_truong", "ai_di_phu_ho", "ai_ve_que_nuoi_ca",
+  "ai_figure_1_7", "ai_action_figure_box", "ai_lego_figure", "ai_cartoon_3d", "ai_polaroid_string",
+  "ai_shipper_giao_hang", "ai_grab_driver", "ai_xanh_sm", "ai_bac_si",
+  "ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen", "ai_old_money",
+  "ai_makeup_idol", "ai_trang_diem_duyen", "ai_doi_kieu_toc", "ai_doi_mau_toc",
+  "ai_cosplay_wibu", "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop"
 ]);
 
 const AI_FILTER_PROMPTS = {
@@ -117,6 +153,62 @@ const AI_FILTER_PROMPTS = {
   frosty: "Wrap a cozy winter knit scarf around the neck with soft falling snowflakes and crisp frosty winter wonderland lighting.",
   locket: "Surround the person with a mystical golden starlight aura, floating warm sparkles, and magical twilight glow.",
   hom_nay_an_gi: "Float playful appetizing miniature icons of Vietnamese street food like pho bowls, banh mi, and iced milk tea in a halo around the background.",
+
+  // 27 New Vietnamese Meme, Trend, Shipper, Luxury & Beauty AI filters
+  ai_cong_chua_phong_tro:
+    "Keep the person's exact face, identity, and expression, dress them in an extravagant sparkling pastel pink fairytale princess gown with a crystal tiara while standing inside a cozy humble Vietnamese rented dorm room with tiled floor and electric fan.",
+  ai_hoang_tu_ktx:
+    "Keep the person's exact face and pose, dress them in an ornate royal white-and-gold European prince uniform jacket with ceremonial sash inside a lively Vietnamese university dorm room.",
+  ai_lop_truong:
+    "Keep the person's exact face and expression, style them in a crisp white Vietnamese high-school shirt with red class monitor armband and glasses holding a neat stack of notebooks in a sunlit classroom.",
+  ai_di_phu_ho:
+    "Keep the person's exact face and identity, dress them in realistic dusty construction worker clothes with a bright yellow safety hard hat, reflective vest, and a trowel at a sunny building site.",
+  ai_ve_que_nuoi_ca:
+    "Keep the person's exact face and smile, dress them in traditional rustic Vietnamese brown Ba Ba country attire wearing a conical leaf hat Non La beside a peaceful green countryside fish pond and banana trees.",
+  ai_figure_1_7:
+    "Keep the person's exact face and outfit likeness, transform them into a glossy collectible 1/7 scale PVC anime figure standing on a sleek round acrylic display base on an artist desk with warm studio rim lighting.",
+  ai_action_figure_box:
+    "Keep the person's exact likeness and outfit, render them as a collectible boxed plastic action figure inside a transparent blister retail packaging box with printed title card and tiny accessories.",
+  ai_lego_figure:
+    "Keep the person's hair, outfit colors, and vibe recognizable, transform the person and surroundings into glossy yellow LEGO minifigure style with blocky plastic LEGO bricks.",
+  ai_cartoon_3d:
+    "Keep the person's exact facial features, hair, and outfit recognizable, restyle them cleanly as a charming Pixar/Disney-style high-detail 3D animated movie character with expressive soft studio lighting.",
+  ai_polaroid_string:
+    "Frame the person's photo cleanly inside a charming physical instant Polaroid photograph hanging from natural twine string with a tiny wooden clothespin over warm fairy-light bokeh.",
+  ai_shipper_giao_hang:
+    "Keep the person's exact face, expression, and background, dress them in an authentic bright red-and-orange express delivery courier jacket with matching delivery helmet and parcel bag.",
+  ai_grab_driver:
+    "Keep the person's exact face, expression, and background, dress them in an authentic emerald green GrabBike rider jacket and matching green Grab motorcycle helmet with crisp natural folds.",
+  ai_xanh_sm:
+    "Keep the person's exact face, expression, and background, dress them in an authentic bright cyan-turquoise Xanh SM electric taxi/bike rider jacket with matching cyan helmet.",
+  ai_bac_si:
+    "Keep the person's exact face and expression, dress them in a crisp clean white doctor lab coat with a realistic medical stethoscope draped naturally around the neck in a bright modern clinic.",
+  ai_tong_tai:
+    "Keep the person's exact face and identity, dress them in a razor-sharp tailored charcoal black billionaire CEO three-piece suit and silk tie standing inside a sleek glass penthouse office overlooking the city skyline.",
+  ai_phu_ba:
+    "Keep the person's exact face and identity, dress them in glamorous wealthy heiress luxury pearl jewelry, designer silk blazer, and sunglasses in an upscale sunlit luxury boutique setting.",
+  ai_thieu_gia:
+    "Keep the person's exact face and identity, style them in a sharp luxury young heir cashmere coat and designer watch leaning casually near a sleek glossy sports car at golden hour.",
+  ai_du_thuyen:
+    "Keep the person's exact face and identity, dress them in crisp white linen summer resort wear sitting aboard a luxury white yacht deck overlooking sparkling turquoise ocean waves.",
+  ai_old_money:
+    "Keep the person's exact face and identity, style them in timeless old-money ivory cable-knit sweater draped over the shoulders and beige tailored polo shirt with warm film aesthetic.",
+  ai_makeup_idol:
+    "Keep the person's exact facial structure and identity, apply clean luminous K-pop idol glass-skin makeup with soft shimmer eyelids, peach gradient lips, and flattering softbox beauty light.",
+  ai_trang_diem_duyen:
+    "Keep the person's exact facial features and identity, apply trendy Douyin Chinese beauty makeup with wispy doll eyelashes, sparkly lower-lash shimmer, rosy blush, and glossy berry lips.",
+  ai_doi_kieu_toc:
+    "Keep the person's exact face, clothing, and background completely identical, restyle ONLY their hair into voluminous trendy layered salon hair with wispy curtain bangs and glossy natural texture.",
+  ai_doi_mau_toc:
+    "Keep the person's exact face, clothing, and background completely identical, dye ONLY their hair into a fashionable smoky ash-silver lavender balayage tone with natural roots and shine.",
+  ai_cosplay_wibu:
+    "Keep the person's exact face and pose, dress them in a highly detailed realistic Japanese anime academy cosplay uniform with vibrant stylized wig and dramatic studio backlight.",
+  ai_hau_gai:
+    "Keep the person's exact face and sweet expression, dress them in a cute classic black-and-white frilly Victorian cafe maid outfit with neat white lace headband inside a warm aesthetic cafe.",
+  ai_hoang_thuong:
+    "Keep the person's exact face and proud expression, dress them in an ornate imperial golden dragon embroidered ancient royal emperor robe and gilded crown inside a grand palace hall.",
+  ai_idol_kpop:
+    "Keep the person's exact face and charisma, dress them in a flashy sparkling K-pop concert stage outfit with wireless ear-mic under dramatic magenta-and-blue arena spotlights and lightsticks.",
 };
 
 const MEMORY_IMAGES = new Map();
@@ -729,6 +821,392 @@ function applyLutToRgb(srcRgb, w, h, lut) {
       srcRgb[i] = r < 0 ? 0 : r > 255 ? 255 : r | 0;
       srcRgb[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g | 0;
       srcRgb[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b | 0;
+    }
+  }
+}
+
+const FONT_5X7 = {
+  "0": [0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e],
+  "1": [0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e],
+  "2": [0x0e, 0x11, 0x01, 0x06, 0x08, 0x10, 0x1f],
+  "3": [0x1e, 0x01, 0x01, 0x0e, 0x01, 0x01, 0x1e],
+  "4": [0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02],
+  "5": [0x1f, 0x10, 0x1e, 0x01, 0x01, 0x11, 0x0e],
+  "6": [0x06, 0x08, 0x10, 0x1e, 0x11, 0x11, 0x0e],
+  "7": [0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08],
+  "8": [0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e],
+  "9": [0x0e, 0x11, 0x11, 0x0f, 0x01, 0x02, 0x0c],
+  A: [0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11],
+  B: [0x1e, 0x11, 0x11, 0x1e, 0x11, 0x11, 0x1e],
+  C: [0x0e, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0e],
+  D: [0x1e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1e],
+  E: [0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f],
+  F: [0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x10],
+  G: [0x0e, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0f],
+  H: [0x11, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11],
+  I: [0x0e, 0x04, 0x04, 0x04, 0x04, 0x04, 0x0e],
+  J: [0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0c],
+  K: [0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11],
+  L: [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1f],
+  M: [0x11, 0x1b, 0x15, 0x15, 0x11, 0x11, 0x11],
+  N: [0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11],
+  O: [0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e],
+  P: [0x1e, 0x11, 0x11, 0x1e, 0x10, 0x10, 0x10],
+  Q: [0x0e, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0d],
+  R: [0x1e, 0x11, 0x11, 0x1e, 0x14, 0x12, 0x11],
+  S: [0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e],
+  T: [0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
+  U: [0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e],
+  V: [0x11, 0x11, 0x11, 0x11, 0x11, 0x0a, 0x04],
+  W: [0x11, 0x11, 0x11, 0x15, 0x15, 0x1b, 0x11],
+  X: [0x11, 0x11, 0x0a, 0x04, 0x0a, 0x11, 0x11],
+  Y: [0x11, 0x11, 0x0a, 0x04, 0x04, 0x04, 0x04],
+  Z: [0x1f, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1f],
+  ":": [0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00],
+  "-": [0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00],
+  "/": [0x01, 0x01, 0x02, 0x04, 0x08, 0x10, 0x10],
+  ".": [0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x04],
+  " ": [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+};
+
+function fillRectRgb(rgb, w, h, x0, y0, x1, y1, color) {
+  const sx = Math.max(0, x0 | 0);
+  const sy = Math.max(0, y0 | 0);
+  const ex = Math.min(w, x1 | 0);
+  const ey = Math.min(h, y1 | 0);
+  for (let y = sy; y < ey; y++) {
+    const row = y * w * 3;
+    for (let x = sx; x < ex; x++) {
+      const i = row + x * 3;
+      rgb[i] = color[0];
+      rgb[i + 1] = color[1];
+      rgb[i + 2] = color[2];
+    }
+  }
+}
+
+function drawTextRgb(rgb, w, h, text, x, y, scale, fgColor, shadowColor = null) {
+  const s = String(text || "").toUpperCase();
+  let curX = x | 0;
+  const adv = 6 * scale;
+  for (let ci = 0; ci < s.length; ci++) {
+    const glyph = FONT_5X7[s[ci]] || FONT_5X7[" "];
+    for (let r = 0; r < 7; r++) {
+      const bits = glyph[r];
+      if (!bits) continue;
+      for (let c = 0; c < 5; c++) {
+        if ((bits >> (4 - c)) & 1) {
+          const px = curX + c * scale;
+          const py = y + r * scale;
+          if (shadowColor) {
+            fillRectRgb(rgb, w, h, px + Math.max(1, scale >> 1), py + Math.max(1, scale >> 1), px + scale + Math.max(1, scale >> 1), py + scale + Math.max(1, scale >> 1), shadowColor);
+          }
+          fillRectRgb(rgb, w, h, px, py, px + scale, py + scale, fgColor);
+        }
+      }
+    }
+    curX += adv;
+  }
+}
+
+function detectSpecialFxId(dataNode, rawBodyText) {
+  const candidates = [
+    dataNode?.filterId,
+    dataNode?.filter_id,
+    dataNode?.uid,
+    dataNode?.id,
+    dataNode?.filter?.id,
+    dataNode?.filter?.uid,
+    dataNode?.prompt,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && SPECIAL_FX_IDS.has(c.trim())) return c.trim();
+  }
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      for (const id of SPECIAL_FX_IDS) {
+        if (c.includes(id)) return id;
+      }
+    }
+  }
+  if (rawBodyText) {
+    for (const id of SPECIAL_FX_IDS) {
+      if (rawBodyText.includes(`"${id}"`) || rawBodyText.includes(id)) return id;
+    }
+  }
+  return null;
+}
+
+function detectWarpId(dataNode, rawBodyText) {
+  const candidates = [
+    dataNode?.filterId,
+    dataNode?.filter_id,
+    dataNode?.uid,
+    dataNode?.id,
+    dataNode?.filter?.id,
+    dataNode?.filter?.uid,
+    dataNode?.prompt,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && WARP_FILTERS[c.trim()]) return c.trim();
+  }
+  for (const c of candidates) {
+    if (typeof c === "string") {
+      for (const id of Object.keys(WARP_FILTERS)) {
+        if (c.includes(id)) return id;
+      }
+    }
+  }
+  if (rawBodyText) {
+    for (const id of Object.keys(WARP_FILTERS)) {
+      if (rawBodyText.includes(`"${id}"`) || rawBodyText.includes(id)) return id;
+    }
+  }
+  return null;
+}
+
+function applyWarpToRgb(srcRgb, w, h, warpId) {
+  const copy = new Uint8Array(srcRgb);
+  const invW = 1 / w;
+  const invH = 1 / h;
+
+  const radialWarp = (nx, ny, cx, cy, rad, strength) => {
+    const dx = nx - cx;
+    const dy = ny - cy;
+    const r = Math.hypot(dx, dy);
+    if (r >= rad || r < 1e-6) return [nx, ny];
+    const k = 1 - r / rad;
+    const factor = 1 - strength * k * k;
+    return [cx + dx * factor, cy + dy * factor];
+  };
+
+  for (let y = 0; y < h; y++) {
+    const ny = y * invH;
+    const rowOff = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const nx = x * invW;
+      let sx = nx;
+      let sy = ny;
+
+      if (warpId === "warp_big_head") {
+        [sx, sy] = radialWarp(nx, ny, 0.5, 0.36, 0.42, 0.55);
+      } else if (warpId === "warp_tiny_face") {
+        [sx, sy] = radialWarp(nx, ny, 0.5, 0.45, 0.36, -0.55);
+      } else if (warpId === "warp_alien_vline") {
+        [sx, sy] = radialWarp(nx, ny, 0.38, 0.38, 0.14, 0.55);
+        [sx, sy] = radialWarp(sx, sy, 0.62, 0.38, 0.14, 0.55);
+        const cdx = sx - 0.5;
+        const cdy = sy - 0.58;
+        const cr = Math.hypot(cdx, cdy);
+        if (cr < 0.28) {
+          const k = 1 - cr / 0.28;
+          sx += cdx * 0.48 * k * k;
+          sy -= cdy * 0.24 * k * k;
+        }
+      } else if (warpId === "warp_hamster") {
+        [sx, sy] = radialWarp(nx, ny, 0.34, 0.56, 0.22, 0.52);
+        [sx, sy] = radialWarp(sx, sy, 0.66, 0.56, 0.22, 0.52);
+      } else if (warpId === "warp_bug_eyes") {
+        [sx, sy] = radialWarp(nx, ny, 0.38, 0.38, 0.15, 0.60);
+        [sx, sy] = radialWarp(sx, sy, 0.62, 0.38, 0.15, 0.60);
+      } else if (warpId === "warp_wide_mouth") {
+        const dx = nx - 0.5;
+        const dy = ny - 0.62;
+        const r = Math.hypot(dx, dy);
+        if (r < 0.26) {
+          const k = 1 - r / 0.26;
+          sx = 0.5 + dx * (1 - 0.55 * k * k);
+          sy = 0.62 + dy * (1 + 0.18 * k * k);
+        }
+      } else if (warpId === "warp_chubby") {
+        const dx = nx - 0.5;
+        const dy = ny - 0.50;
+        const r = Math.hypot(dx, dy);
+        if (r < 0.44) {
+          const k = 1 - r / 0.44;
+          sx = 0.5 + dx * (1 - 0.48 * k * k);
+          sy = 0.50 + dy * (1 - 0.15 * k * k);
+        }
+      } else if (warpId === "warp_gigachad") {
+        [sx, sy] = radialWarp(nx, ny, 0.32, 0.64, 0.20, 0.50);
+        [sx, sy] = radialWarp(sx, sy, 0.68, 0.64, 0.20, 0.50);
+        [sx, sy] = radialWarp(sx, sy, 0.50, 0.70, 0.18, 0.35);
+      } else if (warpId === "warp_swirl") {
+        const dx = nx - 0.5;
+        const dy = ny - 0.46;
+        const r = Math.hypot(dx, dy);
+        if (r < 0.45) {
+          const k = 1 - r / 0.45;
+          const ang = 2.6 * k * k;
+          const ca = Math.cos(ang);
+          const sa = Math.sin(ang);
+          sx = 0.5 + (dx * ca - dy * sa);
+          sy = 0.46 + (dx * sa + dy * ca);
+        }
+      } else if (warpId === "warp_melt") {
+        sy = ny - 0.14 * (0.5 + 0.5 * Math.sin(nx * 14)) * Math.max(0, ny - 0.15);
+      }
+
+      const fx = Math.min(w - 1.001, Math.max(0, sx * (w - 1)));
+      const fy = Math.min(h - 1.001, Math.max(0, sy * (h - 1)));
+      const x0 = fx | 0;
+      const y0 = fy | 0;
+      const x1 = x0 + 1;
+      const y1 = y0 + 1;
+      const tx = fx - x0;
+      const ty = fy - y0;
+      const itx = 1 - tx;
+      const ity = 1 - ty;
+
+      const i00 = (y0 * w + x0) * 3;
+      const i10 = (y0 * w + x1) * 3;
+      const i01 = (y1 * w + x0) * 3;
+      const i11 = (y1 * w + x1) * 3;
+      const di = rowOff + x * 3;
+
+      for (let c = 0; c < 3; c++) {
+        const v =
+          (copy[i00 + c] * itx + copy[i10 + c] * tx) * ity +
+          (copy[i01 + c] * itx + copy[i11 + c] * tx) * ty;
+        srcRgb[di + c] = v < 0 ? 0 : v > 255 ? 255 : v | 0;
+      }
+    }
+  }
+}
+
+function applyCctvOverlay(rgb, w, h) {
+  let rng = 0x517cc1b7;
+  for (let y = 0; y < h; y++) {
+    const scan = y % 3 === 0 ? 0.78 : 1.0;
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const i = row + x * 3;
+      const lum = (0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2]) * scan;
+      rng = (rng ^ (rng << 13)) >>> 0;
+      rng = (rng ^ (rng >>> 17)) >>> 0;
+      rng = (rng ^ (rng << 5)) >>> 0;
+      const noise = ((rng & 0xff) / 127.5 - 1) * 14;
+      const r = Math.min(255, Math.max(0, lum * 0.45 + noise * 0.5));
+      const g = Math.min(255, Math.max(0, lum * 1.15 + noise));
+      const b = Math.min(255, Math.max(0, lum * 0.55 + noise * 0.5));
+      rgb[i] = r | 0;
+      rgb[i + 1] = g | 0;
+      rgb[i + 2] = b | 0;
+    }
+  }
+  // Corner viewfinder brackets
+  const brk = [180, 255, 200];
+  fillRectRgb(rgb, w, h, 14, 14, 46, 17, brk);
+  fillRectRgb(rgb, w, h, 14, 14, 17, 46, brk);
+  fillRectRgb(rgb, w, h, w - 46, 14, w - 14, 17, brk);
+  fillRectRgb(rgb, w, h, w - 17, 14, w - 14, 46, brk);
+  fillRectRgb(rgb, w, h, 14, h - 17, 46, h - 14, brk);
+  fillRectRgb(rgb, w, h, 14, h - 46, 17, h - 14, brk);
+  fillRectRgb(rgb, w, h, w - 46, h - 17, w - 14, h - 14, brk);
+  fillRectRgb(rgb, w, h, w - 17, h - 46, w - 14, h - 14, brk);
+  // Red REC dot
+  for (let y = 20; y <= 36; y++) {
+    for (let x = 20; x <= 36; x++) {
+      if ((x - 28) * (x - 28) + (y - 28) * (y - 28) <= 64) {
+        const i = (y * w + x) * 3;
+        rgb[i] = 245; rgb[i + 1] = 35; rgb[i + 2] = 35;
+      }
+    }
+  }
+  const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  const stamp =
+    vnNow.getUTCFullYear() + "-" + pad(vnNow.getUTCMonth() + 1) + "-" + pad(vnNow.getUTCDate()) +
+    " " + pad(vnNow.getUTCHours()) + ":" + pad(vnNow.getUTCMinutes()) + ":" + pad(vnNow.getUTCSeconds());
+  drawTextRgb(rgb, w, h, "REC CAM-01", 44, 21, 2, [220, 255, 225], [8, 25, 12]);
+  drawTextRgb(rgb, w, h, stamp, 24, h - 42, 2, [220, 255, 225], [8, 25, 12]);
+}
+
+function applyClockWeekdayOverlay(rgb, w, h) {
+  const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  const timeStr = pad(vnNow.getUTCHours()) + ":" + pad(vnNow.getUTCMinutes());
+  const dayNames = ["CHU NHAT", "THU HAI", "THU BA", "THU TU", "THU NAM", "THU SAU", "THU BAY"];
+  const dateStr = dayNames[vnNow.getUTCDay()] + " " + pad(vnNow.getUTCDate()) + "/" + pad(vnNow.getUTCMonth() + 1);
+  // 5 chars * 6 * 11 - 11 = ~319px wide -> centered near top
+  const tx = Math.max(16, ((w - (timeStr.length * 6 * 11 - 11)) >> 1));
+  drawTextRgb(rgb, w, h, timeStr, tx, 34, 11, [255, 255, 255], [15, 23, 42]);
+  const dx = Math.max(16, ((w - (dateStr.length * 6 * 3 - 3)) >> 1));
+  drawTextRgb(rgb, w, h, dateStr, dx, 122, 3, [254, 240, 138], [15, 23, 42]);
+}
+
+function applyTripleClone(rgb, w, h) {
+  const copy = new Uint8Array(rgb);
+  const shift = 54;
+  for (let y = 0; y < h; y++) {
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const lx = Math.max(0, x - shift);
+      const rx = Math.min(w - 1, x + shift);
+      const i = row + x * 3;
+      const li = row + lx * 3;
+      const ri = row + rx * 3;
+      const r = copy[i] * 0.58 + copy[li] * 0.16 + copy[ri] * 0.26;
+      const g = copy[i + 1] * 0.58 + copy[li + 1] * 0.24 + copy[ri + 1] * 0.14;
+      const b = copy[i + 2] * 0.58 + copy[li + 2] * 0.26 + copy[ri + 2] * 0.24;
+      rgb[i] = r > 255 ? 255 : r | 0;
+      rgb[i + 1] = g > 255 ? 255 : g | 0;
+      rgb[i + 2] = b > 255 ? 255 : b | 0;
+    }
+  }
+}
+
+function applyPortraitBokeh(rgb, w, h) {
+  // Fast separable 2-pass blur radius 7 (horizontal -> vertical)
+  const tmp = new Uint8Array(w * h * 3);
+  const blur = new Uint8Array(w * h * 3);
+  const rad = 7;
+  const win = rad * 2 + 1;
+  for (let y = 0; y < h; y++) {
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      let sr = 0, sg = 0, sb = 0;
+      for (let k = -rad; k <= rad; k++) {
+        const xx = x + k < 0 ? 0 : x + k >= w ? w - 1 : x + k;
+        const si = row + xx * 3;
+        sr += rgb[si]; sg += rgb[si + 1]; sb += rgb[si + 2];
+      }
+      const di = row + x * 3;
+      tmp[di] = (sr / win) | 0;
+      tmp[di + 1] = (sg / win) | 0;
+      tmp[di + 2] = (sb / win) | 0;
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let sr = 0, sg = 0, sb = 0;
+      for (let k = -rad; k <= rad; k++) {
+        const yy = y + k < 0 ? 0 : y + k >= h ? h - 1 : y + k;
+        const si = (yy * w + x) * 3;
+        sr += tmp[si]; sg += tmp[si + 1]; sb += tmp[si + 2];
+      }
+      const di = (y * w + x) * 3;
+      blur[di] = (sr / win) | 0;
+      blur[di + 1] = (sg / win) | 0;
+      blur[di + 2] = (sb / win) | 0;
+    }
+  }
+  // Smooth feathered vertical portrait ellipse matte
+  const invW = 1 / w;
+  const invH = 1 / h;
+  for (let y = 0; y < h; y++) {
+    const dy = (y * invH - 0.46) / 0.44;
+    const dy2 = dy * dy;
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const dx = (x * invW - 0.5) / 0.33;
+      const d = Math.sqrt(dx * dx + dy2);
+      const sharpRatio = d <= 0.68 ? 1 : d >= 1.12 ? 0 : 1 - (d - 0.68) / 0.44;
+      const i = row + x * 3;
+      const invRatio = 1 - sharpRatio;
+      rgb[i] = (rgb[i] * sharpRatio + blur[i] * invRatio) | 0;
+      rgb[i + 1] = (rgb[i + 1] * sharpRatio + blur[i + 1] * invRatio) | 0;
+      rgb[i + 2] = (rgb[i + 2] * sharpRatio + blur[i + 2] * invRatio) | 0;
     }
   }
 }
@@ -2664,6 +3142,8 @@ async function handleStudioRequest(request, env) {
         cf_ai_quota_cooldown_until: CF_AI_QUOTA_HIT_UNTIL ? new Date(CF_AI_QUOTA_HIT_UNTIL).toISOString() : null,
         ai_prompts_loaded: Object.keys(AI_FILTER_PROMPTS).length,
         luts_loaded: Object.keys(LUT_FILTERS).length,
+        warps_loaded: Object.keys(WARP_FILTERS).length,
+        special_fx_loaded: SPECIAL_FX_IDS.size,
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
         quote_bank_total: Object.values(VERIFIED_QUOTE_BANK).reduce((s, a) => s + a.length, 0),
         live_quote_cache_size: LIVE_QUOTE_CACHE.items.length,
@@ -3181,6 +3661,43 @@ async function handleStudioRequest(request, env) {
       return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
     }
 
+    // Priority 0.5: Special Instant 0-Neuron Worker FX (Clock+Weekday, Portrait Bokeh, CCTV Night Vision, Triple Clone)
+    const specialFxId = detectSpecialFxId(dataNode, rawBodyText);
+    if (specialFxId && SPECIAL_FX_IDS.has(specialFxId)) {
+      const t0 = Date.now();
+      const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
+      const tempId = crypto.randomUUID().slice(0, 12);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader);
+
+      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || SIZE;
+      const srcH = decodedUser?.h || SIZE;
+      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
+      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, SIZE, SIZE]);
+
+      if (specialFxId === "cctv_camera") applyCctvOverlay(canvasRgb, SIZE, SIZE);
+      else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, SIZE, SIZE);
+      else if (specialFxId === "triple_clone") applyTripleClone(canvasRgb, SIZE, SIZE);
+      else if (specialFxId === "portrait_bokeh") applyPortraitBokeh(canvasRgb, SIZE, SIZE);
+
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const outId = `tommm_fx_${tempId}.${encoded.ext}`;
+      await putImage(outId, encoded.bytes, encoded.mimeType);
+
+      LAST_DEBUG = {
+        mode: "special_fx",
+        filterId: specialFxId,
+        got_input: !!imgBytes,
+        decoded_user: !!decodedUser,
+        out_mime: encoded.mimeType,
+        out_bytes: encoded.bytes.length,
+        ms: Date.now() - t0,
+        ts: new Date().toISOString(),
+      };
+
+      return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+    }
+
     const filterId = detectFilterId(dataNode, rawBodyText);
 
     // Priority 1: Pixel-exact PNG Frames & 4-Cut Photobooth (100% original face)
@@ -3263,6 +3780,39 @@ async function handleStudioRequest(request, env) {
       LAST_DEBUG = {
         mode: "lut_filter",
         filterId: lutId,
+        got_input: !!imgBytes,
+        decoded_user: !!decodedUser,
+        out_mime: encoded.mimeType,
+        out_bytes: encoded.bytes.length,
+        ms: Date.now() - t0,
+        ts: new Date().toISOString(),
+      };
+
+      return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+    }
+
+    // Priority 1.6: Instant 0-Neuron Comedy Face Warp Filters (Méo mặt & Hài hước)
+    const warpId = detectWarpId(dataNode, rawBodyText);
+    if (warpId && WARP_FILTERS[warpId]) {
+      const t0 = Date.now();
+      const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
+      const tempId = crypto.randomUUID().slice(0, 12);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader);
+
+      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || SIZE;
+      const srcH = decodedUser?.h || SIZE;
+      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
+      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, SIZE, SIZE]);
+      applyWarpToRgb(canvasRgb, SIZE, SIZE, warpId);
+
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const outId = `tommm_warp_${tempId}.${encoded.ext}`;
+      await putImage(outId, encoded.bytes, encoded.mimeType);
+
+      LAST_DEBUG = {
+        mode: "warp_filter",
+        filterId: warpId,
         got_input: !!imgBytes,
         decoded_user: !!decodedUser,
         out_mime: encoded.mimeType,
