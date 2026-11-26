@@ -1234,20 +1234,64 @@ async function geminiEditImage(env, promptText, imgBytes, imgMime, key) {
 // Host ảnh của NVIDIA là ai.api.nvidia.com/v1/genai/{model} (khác endpoint chat integrate.*).
 // CHỈ chạy khi đặt env NVIDIA_IMAGE_MODEL (vd black-forest-labs/flux.2-klein-4b) — tắt mặc định
 // vì cấu trúc truyền ảnh img2img cần test với key thật trước khi tin dùng. Trả {bytes,mimeType} hoặc null.
+// Upload 1 ảnh lên NVCF asset store, trả assetId (uuid) hoặc null.
+// NVIDIA genai i2i BẮT BUỘC tham chiếu ảnh qua asset_id — không nhận base64/URL inline.
+async function nvcfUploadAsset(key, imgBytes, mime) {
+  const base = "https://api.nvcf.nvidia.com/v2/nvcf/assets";
+  try {
+    const a = await fetch(base, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ contentType: mime || "image/jpeg", description: "locket-input" }),
+    });
+    if (!a.ok) return null;
+    const aj = await a.json();
+    if (!aj.uploadUrl || !aj.assetId) return null;
+    const put = await fetch(aj.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": mime || "image/jpeg", "x-amz-meta-nvcf-asset-description": "locket-input" },
+      body: imgBytes,
+    });
+    if (!put.ok) return null;
+    return aj.assetId;
+  } catch (_) {
+    return null;
+  }
+}
+
+// NVIDIA NIM FLUX image (ai.api.nvidia.com/v1/genai/{model}). Verified qua test thật:
+// - t2i (không ảnh): body {prompt, steps, width, height} -> 200, {artifacts:[{base64}]}.
+// - i2i (có ảnh): PHẢI upload asset trước rồi image="data:<mime>;asset_id,<id>" + header NVCF-INPUT-ASSET-REFERENCES.
+// - flux.2-klein-4b: steps<=4, KHÔNG field "mode". flux-3-image-klein: cần mode "t2i"/"i2i".
+// Đặt NVIDIA_IMAGE_MODE="flux3" nếu model họ flux-3 (thêm mode). Mặc định schema flux.2 (steps<=4).
 async function nvidiaEditImage(env, promptText, imgBytes, imgMime, key) {
   const model = env && env.NVIDIA_IMAGE_MODEL;
   if (!model || !key) return null;
   const base = (env && env.NVIDIA_IMAGE_BASE_URL) || "https://ai.api.nvidia.com/v1/genai";
-  const b64 = imgBytes && imgBytes.length > 0 ? uint8ToBase64(imgBytes) : null;
-  // Thân request theo tài liệu cộng đồng (prompt + image base64 + kích thước). Có thể tinh chỉnh qua test.
-  const body = { prompt: String(promptText).slice(0, 1800), cfg_scale: 3.5, steps: 30, width: 768, height: 768 };
-  if (b64) { body.image = b64; body.mode = "image-to-image"; body.strength = 0.85; }
+  const isFlux3 = /flux3|flux-3/i.test((env && env.NVIDIA_IMAGE_MODE) || model);
+  const maxSteps = isFlux3 ? 30 : 4;
+  const out = parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${key}`, Accept: "application/json" };
+  const body = { prompt: String(promptText).slice(0, 1800), steps: maxSteps, width: out, height: out };
+
+  // img2img: upload asset trước
+  if (imgBytes && imgBytes.length > 0) {
+    const mime = imgMime || "image/jpeg";
+    const assetId = await nvcfUploadAsset(key, imgBytes, mime);
+    if (assetId) {
+      body.image = `data:${mime};asset_id,${assetId}`;
+      headers["NVCF-INPUT-ASSET-REFERENCES"] = assetId;
+      if (isFlux3) body.mode = "i2i";
+    } else {
+      // Không upload được asset -> không làm i2i được; bỏ (để nơi gọi suy giảm duyên dáng).
+      return null;
+    }
+  } else if (isFlux3) {
+    body.mode = "t2i";
+  }
+
   try {
-    const r = await fetch(`${base}/${model}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, Accept: "application/json" },
-      body: JSON.stringify(body),
-    });
+    const r = await fetch(`${base}/${model}`, { method: "POST", headers, body: JSON.stringify(body) });
     if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); return null; }
     const j = await r.json();
     const art = j?.artifacts?.[0];

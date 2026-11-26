@@ -24,8 +24,9 @@ NVIDIA_MODEL = "meta/llama-3.2-11b-vision-instruct"
 GROQ_MODEL = "openai/gpt-oss-120b"
 # ---- FALLBACK ẢNH (tách nền weekday_depth + AI 3D) ----
 # Cách nhân quota ảnh TỐT NHẤT: tạo thêm tài khoản Cloudflare (mỗi Gmail +10.000 neurons/ngày, cùng FLUX).
-# NVIDIA img2img: TẮT mặc định. Để bật, đặt NVIDIA_IMAGE_MODEL (vd "black-forest-labs/flux.2-klein-4b")
-# rồi TEST với key thật (cấu trúc truyền ảnh cần xác minh). Dùng chung NVIDIA_API_KEY ở trên.
+# NVIDIA img2img: TẮT (26/11/2026). Đã verify: endpoint asset upload NVCF (api.nvcf.nvidia.com/v2/nvcf/assets)
+# trả 410 Gone từ mọi nơi -> không gửi được ảnh đầu vào -> img2img không chạy. (t2i thì chạy nhưng không giữ mặt.)
+# Nếu sau này NVIDIA phục hồi asset API: bỏ comment dòng dưới (flux.2 steps<=4; flux-3 đặt NVIDIA_IMAGE_MODE="flux3").
 # NVIDIA_IMAGE_MODEL = "black-forest-labs/flux.2-klein-4b"
 
 [durable_objects]
