@@ -1052,9 +1052,42 @@ function markCfAiQuotaHit() {
   CF_AI_QUOTA_HIT_UNTIL = Date.now() + 20 * 60 * 1000;
 }
 
+// -------------------------------------------------------------------------
+// HỒ KEY XOAY VÒNG (multi-key rotation) — mỗi secret có thể chứa NHIỀU key
+// (phân tách bằng dấu phẩy / xuống dòng / khoảng trắng). Khi 1 key hết quota/429,
+// key đó bị "ngồi ghế dự bị" (cooldown) và worker tự nhảy sang key kế tiếp.
+// Nhờ bạn có nhiều Gmail -> nhiều key -> nhân quota lên nhiều lần, chia sẻ bạn bè thoải mái.
+// -------------------------------------------------------------------------
+const KEY_COOLDOWN = new Map(); // key -> timestamp hết cooldown
+const KEY_CURSOR = new Map();   // tên provider -> chỉ số round-robin
+
+function parseKeyList(raw) {
+  if (!raw) return [];
+  return String(raw).split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+}
+
+function benchKey(key, mins = 20) {
+  if (key) KEY_COOLDOWN.set(key, Date.now() + mins * 60 * 1000);
+}
+
+function keyAvailable(key) {
+  return (KEY_COOLDOWN.get(key) || 0) < Date.now();
+}
+
+// Trả danh sách key KHẢ DỤNG của provider, sắp theo round-robin để trải đều tải.
+// Nếu tất cả đang cooldown thì vẫn trả hết (thử lại còn hơn bỏ cuộc).
+function availableKeys(providerName, raw) {
+  const all = parseKeyList(raw);
+  if (all.length <= 1) return all;
+  const start = (KEY_CURSOR.get(providerName) || 0) % all.length;
+  KEY_CURSOR.set(providerName, start + 1);
+  const rotated = all.slice(start).concat(all.slice(0, start));
+  const fresh = rotated.filter(keyAvailable);
+  return fresh.length > 0 ? fresh : rotated;
+}
+
 // Gọi Gemini generateContent cho CAPTION (text, có kèm ảnh nếu có). Trả chuỗi text hoặc null.
-async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime) {
-  const key = env && env.GEMINI_API_KEY;
+async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
   if (!key) return { text: null, err: "no_gemini_key" };
   const model = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
@@ -1075,6 +1108,7 @@ async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
       body: JSON.stringify(payload),
     });
     if (!r.ok) {
+      if (r.status === 429 || r.status === 403) benchKey(key); // hết quota key này -> cho nghỉ
       return { text: null, err: `gemini_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
     }
     const j = await r.json();
@@ -1089,29 +1123,22 @@ async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
   }
 }
 
-// Gọi NVIDIA NIM (API tương thích OpenAI) cho CAPTION — tầng fallback miễn phí thứ 2.
-// NVIDIA NIM có nhiều model free credits, gồm vision (nhận ảnh base64 trong nội dung).
-// Key lưu qua: npx wrangler secret put NVIDIA_API_KEY
-async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime) {
-  const key = env && env.NVIDIA_API_KEY;
-  if (!key) return { text: null, err: "no_nvidia_key" };
-  // Model vision mặc định; đổi qua env NVIDIA_MODEL nếu muốn (vd meta/llama-3.1-8b-instruct cho text thuần).
-  const model = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
-  const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
-
-  // NIM vision nhận ảnh dạng <img src="data:..."> nhúng trong text (chuẩn của NVIDIA cho llama-vision),
-  // hoặc theo kiểu OpenAI image_url. Ưu tiên image_url, nếu model không hỗ trợ sẽ bỏ qua ảnh.
-  const userContent = [];
-  if (imgBytes && imgBytes.length > 0) {
-    userContent.push({ type: "image_url", image_url: { url: `data:${imgMime || "image/jpeg"};base64,${uint8ToBase64(imgBytes)}` } });
+// Gọi 1 endpoint CHAT tương thích OpenAI cho CAPTION (dùng chung cho NVIDIA NIM & Groq).
+// withImage=true thì gửi ảnh kiểu OpenAI image_url (model vision mới nhận); false thì text thuần.
+async function openAiChatCaption({ base, key, model, provider, systemPrompt, userText, imgBytes, imgMime, withImage }) {
+  if (!key) return { text: null, err: `no_${provider}_key` };
+  let userMsg = userText;
+  if (withImage && imgBytes && imgBytes.length > 0) {
+    userMsg = [
+      { type: "text", text: userText },
+      { type: "image_url", image_url: { url: `data:${imgMime || "image/jpeg"};base64,${uint8ToBase64(imgBytes)}` } },
+    ];
   }
-  userContent.push({ type: "text", text: userText });
-
   const payload = {
     model,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: imgBytes && imgBytes.length > 0 ? userContent : userText },
+      { role: "user", content: userMsg },
     ],
     max_tokens: 90,
     temperature: 0.8,
@@ -1122,53 +1149,121 @@ async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify(payload),
     });
-    if (!r.ok) return { text: null, err: `nvidia_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
+    if (!r.ok) {
+      if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); // hết quota/credit -> nghỉ
+      return { text: null, err: `${provider}_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
+    }
     const j = await r.json();
     let txt = String(j?.choices?.[0]?.message?.content || "").trim();
     txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
     if (txt && txt.length >= 3) return { text: txt.slice(0, 120), err: null };
-    return { text: null, err: "nvidia_empty" };
+    return { text: null, err: `${provider}_empty` };
   } catch (e) {
     return { text: null, err: String(e && e.message || e) };
   }
 }
 
-// Gọi Gemini image model để SỬA/TÁCH NỀN ảnh. Trả { bytes, mimeType } hoặc null.
-async function geminiEditImage(env, promptText, imgBytes, imgMime) {
-  const key = env && env.GEMINI_API_KEY;
+// NVIDIA NIM (nhiều model free credits, có vision). Model đổi qua env NVIDIA_MODEL.
+async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
+  return openAiChatCaption({
+    base: (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1",
+    key,
+    model: (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct",
+    provider: "nvidia",
+    systemPrompt, userText, imgBytes, imgMime,
+    withImage: true,
+  });
+}
+
+// Groq (rất nhanh, free tier rộng). Mặc định model text; nếu đặt GROQ_MODEL là model vision thì gửi kèm ảnh.
+async function groqGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
+  const model = (env && env.GROQ_MODEL) || "llama-3.3-70b-versatile";
+  return openAiChatCaption({
+    base: (env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1",
+    key,
+    model,
+    provider: "groq",
+    systemPrompt, userText, imgBytes, imgMime,
+    withImage: /vision|llava|scout|maverick/i.test(model), // chỉ gửi ảnh nếu model hỗ trợ
+  });
+}
+
+// ===== PROVIDER ẢNH DỰ PHÒNG (tách nền weekday_depth + AI 3D) khi Cloudflare FLUX hết quota =====
+
+// Gemini image (model Nano Banana) — LƯU Ý: thường là bản TRẢ PHÍ, free tier không chạy.
+// Giữ lại như một lựa chọn, chỉ dùng khi có key; nhận key tham số để xoay vòng.
+async function geminiEditImage(env, promptText, imgBytes, imgMime, key) {
   if (!key) return null;
   const model = (env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
-
   const parts = [{ text: promptText }];
   if (imgBytes && imgBytes.length > 0) {
     parts.push({ inline_data: { mime_type: imgMime || "image/jpeg", data: uint8ToBase64(imgBytes) } });
   }
-  const payload = {
-    contents: [{ role: "user", parts }],
-    generationConfig: { responseModalities: ["IMAGE"] },
-  };
   try {
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseModalities: ["IMAGE"] } }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); return null; }
     const j = await r.json();
-    const cand = j && j.candidates && j.candidates[0];
-    const outParts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
+    const outParts = j?.candidates?.[0]?.content?.parts || [];
     for (const p of outParts) {
       const inl = p.inline_data || p.inlineData;
-      if (inl && inl.data) {
-        const bytes = base64ToUint8Array(inl.data);
-        return { bytes, ...sniffImageFormat(bytes) };
-      }
+      if (inl && inl.data) { const bytes = base64ToUint8Array(inl.data); return { bytes, ...sniffImageFormat(bytes) }; }
     }
     return null;
   } catch (_) {
     return null;
   }
+}
+
+// NVIDIA NIM image EDITING (img2img, giữ mặt) qua endpoint hosted genai.
+// Host ảnh của NVIDIA là ai.api.nvidia.com/v1/genai/{model} (khác endpoint chat integrate.*).
+// CHỈ chạy khi đặt env NVIDIA_IMAGE_MODEL (vd black-forest-labs/flux.2-klein-4b) — tắt mặc định
+// vì cấu trúc truyền ảnh img2img cần test với key thật trước khi tin dùng. Trả {bytes,mimeType} hoặc null.
+async function nvidiaEditImage(env, promptText, imgBytes, imgMime, key) {
+  const model = env && env.NVIDIA_IMAGE_MODEL;
+  if (!model || !key) return null;
+  const base = (env && env.NVIDIA_IMAGE_BASE_URL) || "https://ai.api.nvidia.com/v1/genai";
+  const b64 = imgBytes && imgBytes.length > 0 ? uint8ToBase64(imgBytes) : null;
+  // Thân request theo tài liệu cộng đồng (prompt + image base64 + kích thước). Có thể tinh chỉnh qua test.
+  const body = { prompt: String(promptText).slice(0, 1800), cfg_scale: 3.5, steps: 30, width: 768, height: 768 };
+  if (b64) { body.image = b64; body.mode = "image-to-image"; body.strength = 0.85; }
+  try {
+    const r = await fetch(`${base}/${model}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); return null; }
+    const j = await r.json();
+    const art = j?.artifacts?.[0];
+    const data = (art && art.base64) || j?.image || j?.data?.[0]?.b64_json;
+    if (data) { const bytes = base64ToUint8Array(data); return { bytes, ...sniffImageFormat(bytes) }; }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Thử lần lượt các provider ảnh dự phòng (NVIDIA img2img -> Gemini image), mỗi provider xoay nhiều key.
+// Trả { bytes, mimeType, model } hoặc null. Dùng chung cho tách nền mask & AI 3D filter.
+async function fallbackEditImage(env, promptText, imgBytes, imgMime) {
+  // 1) NVIDIA NIM (chỉ khi đã bật NVIDIA_IMAGE_MODEL)
+  if (env && env.NVIDIA_IMAGE_MODEL) {
+    for (const k of availableKeys("nvidia_img", env.NVIDIA_API_KEY)) {
+      const out = await nvidiaEditImage(env, promptText, imgBytes, imgMime, k);
+      if (out && out.bytes) return { ...out, model: "nvidia:" + env.NVIDIA_IMAGE_MODEL };
+    }
+  }
+  // 2) Gemini image (nếu có key — thường trả phí)
+  for (const k of availableKeys("gemini_img", env && env.GEMINI_API_KEY)) {
+    const out = await geminiEditImage(env, promptText, imgBytes, imgMime, k);
+    if (out && out.bytes) return { ...out, model: "gemini:" + ((env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest") };
+  }
+  return null;
 }
 
 async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId) {
@@ -1203,19 +1298,24 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const prepBytes = prep && prep.bytes && prep.bytes.length > 0 ? prep.bytes : null;
   const prepMime = prep ? prep.mimeType : "image/jpeg";
 
-  // Chuỗi fallback miễn phí khi Cloudflare AI không khả dụng: NVIDIA NIM -> Gemini -> caption tĩnh.
+  // Chuỗi fallback caption miễn phí, mỗi provider XOAY NHIỀU KEY: NVIDIA -> Groq -> Gemini -> caption tĩnh.
   const tryFreeFallback = async (reasonTag) => {
-    // 1) NVIDIA NIM (nếu có key)
-    if (env && env.NVIDIA_API_KEY) {
-      const nv = await nvidiaGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime);
+    // 1) NVIDIA NIM (vision)
+    for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+      const nv = await nvidiaGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
       if (nv.text) return { text: nv.text, source: "nvidia:" + ((env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct"), aiErr: reasonTag || null };
     }
-    // 2) Google Gemini (nếu có key)
-    if (env && env.GEMINI_API_KEY) {
-      const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime);
+    // 2) Groq (rất nhanh, free rộng)
+    for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
+      const gq = await groqGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
+      if (gq.text) return { text: gq.text, source: "groq:" + ((env && env.GROQ_MODEL) || "llama-3.3-70b-versatile"), aiErr: reasonTag || null };
+    }
+    // 3) Google Gemini text
+    for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+      const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
       if (g.text) return { text: g.text, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: reasonTag || null };
     }
-    // 3) Caption tĩnh vui (luôn trả được chữ, không bao giờ để trống)
+    // 4) Caption tĩnh vui (luôn trả được chữ, không bao giờ để trống)
     return { text: fallbackText, source: "fallback_" + (reasonTag || "err"), aiErr: reasonTag || null };
   };
   const tryGemini = tryFreeFallback; // giữ tên cũ cho các lời gọi phía dưới
@@ -1301,11 +1401,22 @@ async function handleStudioRequest(request, env) {
         owner: "Tommm",
         ai_model: (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b",
         ai_binding_ready: !!(env && env.AI),
-        nvidia_fallback_ready: !!(env && env.NVIDIA_API_KEY),
+        // Caption fallback (text): đếm số key của mỗi provider (nhiều key = xoay vòng được).
+        caption_fallback_keys: {
+          nvidia: parseKeyList(env && env.NVIDIA_API_KEY).length,
+          groq: parseKeyList(env && env.GROQ_API_KEY).length,
+          gemini: parseKeyList(env && env.GEMINI_API_KEY).length,
+        },
+        // Image fallback (tách nền / AI 3D): NVIDIA img2img chỉ bật khi đặt NVIDIA_IMAGE_MODEL.
+        image_fallback: {
+          nvidia_image_model: (env && env.NVIDIA_IMAGE_MODEL) || null,
+          nvidia_keys: parseKeyList(env && env.NVIDIA_API_KEY).length,
+          gemini_image_keys: parseKeyList(env && env.GEMINI_API_KEY).length,
+        },
         nvidia_model: (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct",
-        gemini_fallback_ready: !!(env && env.GEMINI_API_KEY),
+        groq_model: (env && env.GROQ_MODEL) || "llama-3.3-70b-versatile",
         gemini_text_model: (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest",
-        gemini_image_model: (env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest",
+        keys_benched: KEY_COOLDOWN.size,
         cf_ai_quota_hit: cfAiQuotaActive(),
         cf_ai_quota_cooldown_until: CF_AI_QUOTA_HIT_UNTIL ? new Date(CF_AI_QUOTA_HIT_UNTIL).toISOString() : null,
         ai_prompts_loaded: Object.keys(AI_FILTER_PROMPTS).length,
@@ -1523,13 +1634,10 @@ async function handleStudioRequest(request, env) {
             }
           }
         }
-        // Fallback tách nền bằng Gemini image khi Cloudflare AI hết quota / không có binding.
-        if ((!maskOut || !maskOut.bytes) && env && env.GEMINI_API_KEY) {
-          const gMask = await geminiEditImage(env, segPrompt, preparedMaskInput.bytes, preparedMaskInput.mimeType);
-          if (gMask && gMask.bytes) {
-            maskOut = gMask;
-            segModelUsed = "gemini:" + ((env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest");
-          }
+        // Fallback tách nền bằng provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare hết quota.
+        if (!maskOut || !maskOut.bytes) {
+          const fb = await fallbackEditImage(env, segPrompt, preparedMaskInput.bytes, preparedMaskInput.mimeType);
+          if (fb && fb.bytes) { maskOut = fb; segModelUsed = fb.model; }
         }
         if (maskOut && maskOut.bytes) {
           const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, url.origin, `msk_${tempId}`, SIZE);
@@ -1747,8 +1855,8 @@ async function handleStudioRequest(request, env) {
     }
 
     // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 4B) cho Custom AI 3D Hot / Custom Prompt,
-    // kèm FALLBACK Google Gemini image khi Cloudflare hết quota 4006 (dịch vụ không gián đoạn).
-    if (aiReq && env && (env.AI || env.GEMINI_API_KEY)) {
+    // kèm FALLBACK provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare hết quota 4006.
+    if (aiReq && env && (env.AI || env.NVIDIA_IMAGE_MODEL || env.GEMINI_API_KEY)) {
       const t0 = Date.now();
       try {
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
@@ -1775,13 +1883,10 @@ async function handleStudioRequest(request, env) {
             // (markCfAiQuotaHit đã được gọi bên trong runCloudflareFluxEdit nếu là lỗi 4006)
           }
         }
-        // Fallback Gemini image khi Cloudflare không cho ảnh (hết quota / lỗi / không có binding).
-        if ((!aiOut || !aiOut.bytes) && env.GEMINI_API_KEY && preparedInput && preparedInput.bytes) {
-          const gOut = await geminiEditImage(env, aiReq.prompt, preparedInput.bytes, preparedInput.mimeType);
-          if (gOut && gOut.bytes) {
-            aiOut = gOut;
-            usedModel = "gemini:" + ((env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest");
-          }
+        // Fallback provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare không cho ảnh.
+        if ((!aiOut || !aiOut.bytes) && preparedInput && preparedInput.bytes) {
+          const fb = await fallbackEditImage(env, aiReq.prompt, preparedInput.bytes, preparedInput.mimeType);
+          if (fb && fb.bytes) { aiOut = fb; usedModel = fb.model; }
         }
 
         if (aiOut && aiOut.bytes) {

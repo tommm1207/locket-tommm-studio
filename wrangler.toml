@@ -15,9 +15,18 @@ GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-s
 # Nếu muốn ghim bản cụ thể (vd gemini-3.6-flash), chỉ cần đổi giá trị dưới đây rồi deploy lại.
 GEMINI_TEXT_MODEL = "gemini-flash-latest"
 GEMINI_IMAGE_MODEL = "gemini-flash-image-latest"
-# Fallback miễn phí thứ 2 cho CAPTION: NVIDIA NIM (API tương thích OpenAI, nhiều model free credits).
-# Key: npx wrangler secret put NVIDIA_API_KEY  (lấy ở build.nvidia.com). Model đổi tuỳ ý.
+# ---- FALLBACK CAPTION (TEXT) — mỗi secret có thể dán NHIỀU KEY, cách nhau bằng dấu phẩy ----
+# Worker tự xoay vòng key; key nào hết quota/429 sẽ nghỉ 20' rồi dùng lại. Nhiều Gmail = nhiều key.
+#   npx wrangler secret put NVIDIA_API_KEY   (vd: nvapi-aaa,nvapi-bbb,nvapi-ccc)
+#   npx wrangler secret put GROQ_API_KEY     (vd: gsk_aaa,gsk_bbb)
+#   npx wrangler secret put GEMINI_API_KEY   (vd: AIza_aaa,AIza_bbb)
 NVIDIA_MODEL = "meta/llama-3.2-11b-vision-instruct"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+# ---- FALLBACK ẢNH (tách nền weekday_depth + AI 3D) ----
+# Cách nhân quota ảnh TỐT NHẤT: tạo thêm tài khoản Cloudflare (mỗi Gmail +10.000 neurons/ngày, cùng FLUX).
+# NVIDIA img2img: TẮT mặc định. Để bật, đặt NVIDIA_IMAGE_MODEL (vd "black-forest-labs/flux.2-klein-4b")
+# rồi TEST với key thật (cấu trúc truyền ảnh cần xác minh). Dùng chung NVIDIA_API_KEY ở trên.
+# NVIDIA_IMAGE_MODEL = "black-forest-labs/flux.2-klein-4b"
 
 [durable_objects]
 bindings = [
