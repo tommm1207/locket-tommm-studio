@@ -500,7 +500,7 @@ const v2FilterSpecs = [
     // Meme Giải Trí (AI)
     ["ai_cong_chua_phong_tro", "Công Chúa Phòng Trọ", "#BE185D", "#F9A8D4", "crown.fill", "👸"],
     ["ai_hoang_tu_ktx", "Hoàng Tử KTX", "#1D4ED8", "#60A5FA", "crown.fill", "🤴"],
-    ["ai_lop_truong", "Lớp Trưởng", "#0F766E", "#2DD4BF", "book.fill", "📚"],
+    ["ai_lop_truong", "Lốp Trưởng", "#0F766E", "#2DD4BF", "circle.circle.fill", "🛞"],
     ["ai_di_phu_ho", "Đi Phụ Hồ", "#B45309", "#FBBF24", "hammer.fill", "🧱"],
     ["ai_ve_que_nuoi_ca", "Về Quê Nuôi Cá", "#15803D", "#4ADE80", "leaf.fill", "🐟"],
     // Trend Hot Mạng Xã Hội (AI)

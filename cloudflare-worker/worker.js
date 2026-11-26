@@ -160,7 +160,7 @@ const AI_FILTER_PROMPTS = {
   ai_hoang_tu_ktx:
     "Keep the person's exact face and pose, dress them in an ornate royal white-and-gold European prince uniform jacket with ceremonial sash inside a lively Vietnamese university dorm room.",
   ai_lop_truong:
-    "Keep the person's exact face and expression, style them in a crisp white Vietnamese high-school shirt with red class monitor armband and glasses holding a neat stack of notebooks in a sunlit classroom.",
+    "Keep the person's exact face, expression, clothing, pose, and background, and humorously place a large realistic heavy black rubber car tire slung around their neck and shoulders like a collar (funny 'lốp dự phòng' spare-tire meme) with natural shadows.",
   ai_di_phu_ho:
     "Keep the person's exact face and identity, dress them in realistic dusty construction worker clothes with a bright yellow safety hard hat, reflective vest, and a trowel at a sunny building site.",
   ai_ve_que_nuoi_ca:
