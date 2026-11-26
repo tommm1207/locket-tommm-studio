@@ -119,6 +119,7 @@ const MEMORY_IMAGES = new Map();
 const FRAME_CACHE = new Map();
 const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
+let LAST_CAPTION_DEBUG = null;
 
 const CRC_TABLE = new Uint32Array(256);
 for (let n = 0; n < 256; n++) {
@@ -814,9 +815,9 @@ async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId) {
 
 const REF_IMAGE_AI_IDS = new Set(["stk_mu_ngu_khoc", "stk_tai_tho"]);
 
-async function runCloudflareFluxEdit(env, promptText, inputImg, refImg) {
-  const aiModel = (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
-  const outSize = parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
+async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null) {
+  const aiModel = modelOverride || (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
+  const outSize = sizeOverride || parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
 
   const form = new FormData();
   form.append("prompt", promptText);
@@ -929,6 +930,126 @@ async function encodeCanvasToImage(canvasRgb, origin, tempId) {
   return { bytes: finalBytes, mimeType, ext };
 }
 
+function detectSpecialFilterId(dataNode, rawBodyText) {
+  const candidates = [
+    dataNode?.filterId,
+    dataNode?.filter_id,
+    dataNode?.uid,
+    dataNode?.id,
+    dataNode?.filter?.id,
+    dataNode?.filter?.uid,
+    dataNode?.prompt,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && c.trim() === "weekday_depth") return "weekday_depth";
+  }
+  if (rawBodyText && rawBodyText.includes('"weekday_depth"')) return "weekday_depth";
+  return null;
+}
+
+function getVietnamWeekdayIndex() {
+  return new Date(Date.now() + 7 * 3600 * 1000).getUTCDay();
+}
+
+function buildSmoothedForegroundMask(maskRgb) {
+  const total = SIZE * SIZE;
+  const lum = new Uint8Array(total);
+  for (let p = 0, i3 = 0; p < total; p++, i3 += 3) {
+    lum[p] = ((maskRgb[i3] * 77 + maskRgb[i3 + 1] * 150 + maskRgb[i3 + 2] * 29) >> 8) & 0xff;
+  }
+  const alpha = new Uint8Array(total);
+  let fgPixels = 0;
+  for (let y = 0; y < SIZE; y++) {
+    const y0 = y > 0 ? y - 1 : 0;
+    const y1 = y < SIZE - 1 ? y + 1 : SIZE - 1;
+    for (let x = 0; x < SIZE; x++) {
+      const x0 = x > 0 ? x - 1 : 0;
+      const x1 = x < SIZE - 1 ? x + 1 : SIZE - 1;
+      let sum = 0;
+      let cnt = 0;
+      for (let yy = y0; yy <= y1; yy++) {
+        const row = yy * SIZE;
+        for (let xx = x0; xx <= x1; xx++) {
+          sum += lum[row + xx];
+          cnt++;
+        }
+      }
+      const avg = sum / cnt;
+      let a = 0;
+      if (avg >= 170) a = 255;
+      else if (avg > 90) a = (((avg - 90) * 255) / 80) | 0;
+      alpha[y * SIZE + x] = a;
+      if (a >= 128) fgPixels++;
+    }
+  }
+  return { alpha, fgRatio: fgPixels / total };
+}
+
+function uint8ToBase64(bytes) {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId) {
+  const isQuote = String(captionType || "").toLowerCase().includes("quote");
+  const fallbackNews = [
+    "TIN NÓNG: PHÁT HIỆN SINH VẬT LƯỜI BIẾNG ĐANG ONLINE",
+    "TIN KHẨN: BẮT GẶP GƯƠNG MẶT ĐÁNG YÊU QUÁ MỨC QUY ĐỊNH",
+    "TRỰC TIẾP: TÌNH HÌNH RẤT ỔN NHƯNG HƠI BUỒN NGỦ",
+    "NÓNG 24H: XUẤT HIỆN NHÂN VẬT CHÍNH ĐANG CHILL HẾT NẤC",
+  ];
+  const fallbackQuotes = [
+    "Bình yên đôi khi chỉ là một tấm ảnh chụp vội.",
+    "Hôm nay trời đẹp, lòng cũng nhẹ tênh.",
+    "Sống chậm lại một nhịp để giữ trọn khoảnh khắc này.",
+    "Không cần hoàn hảo, chỉ cần là chính mình.",
+  ];
+  const fallbackList = isQuote ? fallbackQuotes : fallbackNews;
+  const fallbackText = fallbackList[Math.floor(Math.random() * fallbackList.length)];
+
+  if (!env || !env.AI) return { text: fallbackText, source: "fallback_no_ai" };
+
+  try {
+    const prep = await prepareAiInputImage(imgBytes, sourceUrl, origin, tempId);
+    const systemPrompt = isQuote
+      ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh Locket. Dựa vào bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm."
+      : "Bạn là biên tập viên bản tin LNN LIVE hài hước trên Locket. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). Không giải thích thêm.";
+
+    const userContent = [];
+    if (prep && prep.bytes && prep.bytes.length > 0) {
+      userContent.push({
+        type: "image_url",
+        image_url: { url: `data:${prep.mimeType};base64,${uint8ToBase64(prep.bytes)}` },
+      });
+    }
+    userContent.push({
+      type: "text",
+      text: isQuote
+        ? "Viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
+        : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.",
+    });
+
+    const resp = await env.AI.run("@cf/meta/llama-3.2-11b-vision-instruct", {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      max_tokens: 60,
+      temperature: 0.8,
+    });
+    let txt = String(resp?.response || resp?.result?.response || "").trim();
+    txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
+    if (txt && txt.length >= 4) {
+      return { text: txt.slice(0, 90), source: "llama_vision" };
+    }
+  } catch (_) {}
+  return { text: fallbackText, source: "fallback_err" };
+}
+
 async function handleStudioRequest(request, env) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
@@ -952,6 +1073,7 @@ async function handleStudioRequest(request, env) {
         cached_frames_in_ram: FRAME_CACHE.size,
         cached_images_in_ram: MEMORY_IMAGES.size,
         last_debug: LAST_DEBUG,
+        last_caption_debug: LAST_CAPTION_DEBUG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
     );
@@ -973,6 +1095,114 @@ async function handleStudioRequest(request, env) {
     return new Response("Image expired", { status: 404, headers: corsHeaders() });
   }
 
+  // 2.5 Handle Locket /generateCaption (LNN LIVE Tin nong & Trich dan)
+  if (request.method === "POST" && url.pathname.includes("generateCaption")) {
+    const rawBodyText = await request.text();
+    let bodyObj = {};
+    try {
+      bodyObj = JSON.parse(rawBodyText || "{}");
+    } catch (_) {}
+    const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
+    const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
+    const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
+    const fwdHeaders = new Headers();
+    for (const [k, v] of request.headers.entries()) {
+      const kl = k.toLowerCase();
+      if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
+      fwdHeaders.set(k, v);
+    }
+
+    const captionType = firstNonEmptyString([
+      dataNode?.caption_type,
+      dataNode?.captionType,
+      dataNode?.type,
+      dataNode?.overlay_type,
+      dataNode?.overlayType,
+      dataNode?.overlay_id,
+      dataNode?.overlayId,
+      dataNode?.style,
+    ]);
+
+    let upStatus = 0;
+    let upText = "";
+    try {
+      const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText });
+      upStatus = upRes.status;
+      upText = await upRes.text();
+      const upOk =
+        upRes.ok &&
+        upText.trim().startsWith("{") &&
+        !/requires_gold|permission-denied|unauthenticated|"error"\s*:/i.test(upText);
+      if (upOk) {
+        LAST_CAPTION_DEBUG = {
+          mode: "official_passthrough",
+          captionType,
+          reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+          upStatus,
+          upKeys: (() => {
+            try {
+              const j = JSON.parse(upText);
+              return Object.keys(j?.result?.data || j?.result || j || {});
+            } catch (_) {
+              return [];
+            }
+          })(),
+          ts: new Date().toISOString(),
+        };
+        return new Response(upText, {
+          status: upRes.status,
+          headers: corsHeaders({
+            "Content-Type": upRes.headers.get("Content-Type") || "application/json; charset=utf-8",
+          }),
+        });
+      }
+    } catch (e) {
+      upText = String(e?.message || e);
+    }
+
+    const tempId = crypto.randomUUID().slice(0, 12);
+    const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
+    const gen = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, url.origin, tempId);
+    const cleanText = gen.text;
+
+    LAST_CAPTION_DEBUG = {
+      mode: "ai_vision_caption",
+      source: gen.source,
+      captionType,
+      reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+      got_input: !!(imgBytes || sourceUrl),
+      upStatus,
+      upErrPreview: upText.slice(0, 220),
+      generated: cleanText,
+      ts: new Date().toISOString(),
+    };
+
+    const payload = {
+      result: {
+        caption: cleanText,
+        text: cleanText,
+        headline: cleanText,
+        title: cleanText,
+        data: {
+          caption: cleanText,
+          text: cleanText,
+          headline: cleanText,
+          title: cleanText,
+        },
+        status: 200,
+      },
+      caption: cleanText,
+      text: cleanText,
+      headline: cleanText,
+      status: 200,
+    };
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+    });
+  }
+
   // 3. Handle Locket generateFilteredImage / generateFilter / applyFilter
   if (
     request.method === "POST" &&
@@ -988,6 +1218,95 @@ async function handleStudioRequest(request, env) {
 
     const dataNode = bodyObj && typeof bodyObj.data === "object" ? bodyObj.data : bodyObj;
     const authHeader = request.headers.get("Authorization") || request.headers.get("authorization") || "";
+
+    // Priority 0: AI Subject-Mask + Crisp Vietnamese Weekday Depth Composite (weekday_depth)
+    const specialId = detectSpecialFilterId(dataNode, rawBodyText);
+    if (specialId === "weekday_depth") {
+      const t0 = Date.now();
+      const tempId = crypto.randomUUID().slice(0, 12);
+      const vnDay = getVietnamWeekdayIndex();
+      const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
+
+      const [decodedUser, weekdayRgba, preparedMaskInput] = await Promise.all([
+        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId),
+        getFrameRgba(`weekday_${vnDay}`),
+        prepareAiInputImage(imgBytes, sourceUrl, url.origin, `seg_${tempId}`),
+      ]);
+
+      const baseRgb = new Uint8Array(SIZE * SIZE * 3);
+      if (decodedUser?.rgb) {
+        drawCoverRgb(baseRgb, decodedUser.rgb, decodedUser.w, decodedUser.h, [0, 0, SIZE, SIZE]);
+      } else {
+        baseRgb.fill(28);
+      }
+
+      const canvasRgb = new Uint8Array(baseRgb);
+      alphaCompositeRgbaOverRgb(canvasRgb, weekdayRgba);
+
+      let maskApplied = false;
+      let fgRatio = 0;
+      let segModelUsed = null;
+      if (env && env.AI && preparedMaskInput && preparedMaskInput.bytes) {
+        const segPrompt =
+          "Create a pure black-and-white binary foreground segmentation matte of this exact image. Fill the entire main foreground subject (person, face, hair, hands, clothing, bag, food dish/bowl, pet, or prominent foreground object/tower) in solid pure white (#FFFFFF) and fill the entire background behind it in solid pure black (#000000). Keep exact pixel alignment with zero cropping or shifting. Pure white subject on pure black background only.";
+        let maskOut = null;
+        for (const candModel of ["@cf/black-forest-labs/flux-2-klein-9b", (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b"]) {
+          try {
+            maskOut = await runCloudflareFluxEdit(env, segPrompt, preparedMaskInput, null, candModel, 512);
+            segModelUsed = candModel;
+            break;
+          } catch (_) {}
+        }
+        if (maskOut && maskOut.bytes) {
+          const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, url.origin, `msk_${tempId}`);
+          if (decodedMask?.rgb && decodedMask.w === SIZE && decodedMask.h === SIZE) {
+            const { alpha, fgRatio: ratio } = buildSmoothedForegroundMask(decodedMask.rgb);
+            fgRatio = Number(ratio.toFixed(3));
+            if (ratio > 0.02 && ratio < 0.94) {
+              for (let p = 0, i3 = 0; p < SIZE * SIZE; p++, i3 += 3) {
+                const a = alpha[p];
+                if (a === 0) continue;
+                if (a === 255) {
+                  canvasRgb[i3] = baseRgb[i3];
+                  canvasRgb[i3 + 1] = baseRgb[i3 + 1];
+                  canvasRgb[i3 + 2] = baseRgb[i3 + 2];
+                } else {
+                  const invA = 255 - a;
+                  canvasRgb[i3] = (baseRgb[i3] * a + canvasRgb[i3] * invA + 128) >> 8;
+                  canvasRgb[i3 + 1] = (baseRgb[i3 + 1] * a + canvasRgb[i3 + 1] * invA + 128) >> 8;
+                  canvasRgb[i3 + 2] = (baseRgb[i3 + 2] * a + canvasRgb[i3 + 2] * invA + 128) >> 8;
+                }
+              }
+              maskApplied = true;
+            }
+          }
+        }
+      }
+
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const outId = `tommm_wd_${tempId}.${encoded.ext}`;
+      MEMORY_IMAGES.set(outId, {
+        bytes: encoded.bytes,
+        mimeType: encoded.mimeType,
+        ts: Date.now(),
+      });
+
+      LAST_DEBUG = {
+        mode: "weekday_depth",
+        vnDay,
+        segModelUsed,
+        maskApplied,
+        fgRatio,
+        got_input: !!imgBytes,
+        out_mime: encoded.mimeType,
+        out_bytes: encoded.bytes.length,
+        ms: Date.now() - t0,
+        ts: new Date().toISOString(),
+      };
+
+      return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+    }
+
     const filterId = detectFilterId(dataNode, rawBodyText);
 
     // Priority 1: Pixel-exact PNG Frames & 4-Cut Photobooth (100% original face)
