@@ -28,7 +28,17 @@ const LUT_FILTERS = {
 };
 
 const FACE_LOCK =
-  "Edit the input photo. Strictly preserve the exact same person, identical facial features, eyes, nose, mouth, skin tone, expression, pose, camera framing, and natural lighting. ";
+  "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
+
+const CUSTOM_AI_IDS = new Set([
+  "stk_tai_tho", "stk_mu_ngu_khoc", "stk_jollibee", "stk_nak_ve_than",
+  "stk_gojo_satoru", "stk_shopee_food", "fireworks", "harry_potter",
+  "minecraft", "fire_flame", "giant_spider", "ocean_underwater",
+  "ufo_alien", "sweat_hearts", "volcano_lava", "rain_storm",
+  "fortnite_llama", "watercolor_art", "golden_hour", "rose_flower",
+  "shrek_ogre", "superhero_cape", "spooky_ghost", "pirate_hat",
+  "jungle_leaf", "cute_zombie"
+]);
 
 const AI_FILTER_PROMPTS = {
   // 26 Custom AI 3D Hot & extra filters
@@ -777,14 +787,14 @@ async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId) {
     const rawKey = `ai_raw_${tempId}.jpg`;
     MEMORY_IMAGES.set(rawKey, { bytes: imgBytes, mimeType: sniffImageFormat(imgBytes).mimeType, ts: Date.now() });
     try {
-      resizedBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, "w=512&h=512&fit=cover&output=jpg&q=90", 500);
+      resizedBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, "w=768&h=768&fit=cover&output=jpg&q=92", 500);
     } finally {
       MEMORY_IMAGES.delete(rawKey);
     }
   }
 
   if (!resizedBytes && sourceUrl && sourceUrl.startsWith("http")) {
-    resizedBytes = await fetchBytesViaWsrv(sourceUrl, "w=512&h=512&fit=cover&output=jpg&q=90", 500);
+    resizedBytes = await fetchBytesViaWsrv(sourceUrl, "w=768&h=768&fit=cover&output=jpg&q=92", 500);
   }
 
   if (resizedBytes) {
@@ -1067,8 +1077,52 @@ async function handleStudioRequest(request, env) {
       return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
     }
 
-    // Priority 2: Cloudflare Workers AI (FLUX.2 Klein 4B) for AI 3D Hot, Native AI & Custom Prompts
+    // Priority 2: Official Locket AI filters -> pass through to Locket server FIRST (real official AI),
+    // and fall back to Cloudflare FLUX.2 only for custom AI filters or if Locket server rejects (403/gold/credits)
     const aiReq = detectAiRequest(dataNode, rawBodyText);
+    const isCustomAi = !!(
+      aiReq &&
+      (CUSTOM_AI_IDS.has(aiReq.filterId) || aiReq.source === "custom_prompt")
+    );
+    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
+    const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
+    const fwdHeaders = new Headers();
+    for (const [k, v] of request.headers.entries()) {
+      const kl = k.toLowerCase();
+      if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
+      fwdHeaders.set(k, v);
+    }
+
+    if (!isCustomAi) {
+      try {
+        const upRes = await fetch(upstreamUrl, {
+          method: "POST",
+          headers: fwdHeaders,
+          body: rawBodyText,
+        });
+        const upText = await upRes.text();
+        const looksBlocked =
+          !upRes.ok ||
+          /requires_gold|out_of_credits|permission-denied|unauthenticated|"error"\s*:/i.test(upText);
+        if (!looksBlocked && upText.includes("http")) {
+          LAST_DEBUG = {
+            mode: "official_passthrough",
+            filterId: aiReq?.filterId || filterId || "unknown",
+            origHost,
+            status: upRes.status,
+            ts: new Date().toISOString(),
+          };
+          return new Response(upText, {
+            status: upRes.status,
+            headers: corsHeaders({
+              "Content-Type": upRes.headers.get("Content-Type") || "application/json; charset=utf-8",
+            }),
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 4B) for Custom AI 3D Hot, Custom Prompts, or fallback
     if (aiReq && env && env.AI) {
       const t0 = Date.now();
       try {
@@ -1085,7 +1139,7 @@ async function handleStudioRequest(request, env) {
         });
 
         LAST_DEBUG = {
-          mode: "ai_flux",
+          mode: isCustomAi ? "ai_flux_custom" : "ai_flux_fallback",
           aiModel: aiOut.aiModel,
           filterId: aiReq.filterId,
           source: aiReq.source,
@@ -1110,25 +1164,7 @@ async function handleStudioRequest(request, env) {
       }
     }
 
-    // Priority 3: Pass-through unknown filters straight to Locket's servers
-    const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
-    if (!LAST_DEBUG || LAST_DEBUG.mode !== "ai_error") {
-      LAST_DEBUG = {
-        mode: "passthrough",
-        pathname: url.pathname,
-        origHost,
-        dataKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
-        preview: rawBodyText.slice(0, 300),
-        ts: new Date().toISOString(),
-      };
-    }
-    const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
-    const fwdHeaders = new Headers();
-    for (const [k, v] of request.headers.entries()) {
-      const kl = k.toLowerCase();
-      if (kl === "host" || kl === "content-length" || kl === "x-locket-orig-host" || kl.startsWith("cf-")) continue;
-      fwdHeaders.set(k, v);
-    }
+    // Priority 4: Raw pass-through fallback
     return fetch(upstreamUrl, {
       method: "POST",
       headers: fwdHeaders,
