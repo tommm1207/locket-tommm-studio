@@ -120,8 +120,8 @@ if (typeof $response === "undefined") {
         if (rawBody.indexOf("badge") === -1) {
             $done({});
         } else {
-            var isTurningOff = /"badge"\s*:\s*(null|false|"")/i.test(rawBody);
-            var isTurningOn = !isTurningOff && (rawBody.indexOf("locket_gold") !== -1 || /"badge"\s*:\s*(true|"gold")/i.test(rawBody));
+            var isTurningOff = /"(badge|show_badge|badge_enabled|badge_visible)"\s*:\s*(null|false|"")/i.test(rawBody);
+            var isTurningOn = !isTurningOff;
             writeStore(isTurningOn ? "ON" : "OFF", "tommm_my_badge_state");
             var badgeVal = isTurningOn ? "locket_gold" : null;
             var tierVal = isTurningOn ? "gold" : null;
