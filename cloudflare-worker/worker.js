@@ -31,7 +31,7 @@ const LUT_FILTERS = {
 };
 
 const FACE_LOCK =
-  "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
+  "CRITICAL: This is a photo editing task, NOT image generation. Preserve the EXACT original photo pixel-for-pixel — the person's real face, facial features, face angle, head tilt, exact camera viewpoint, framing, zoom, body position, and lighting must stay 100% identical and unchanged. Do NOT redraw, beautify, rotate, reframe, or regenerate the face or the camera angle. Keep it the same real person from the same photo. ONLY overlay/add the following requested change on top of the unchanged photo: ";
 
 const CUSTOM_AI_IDS = new Set([
   "stk_tai_tho", "stk_mu_ngu_khoc", "stk_jollibee", "stk_nak_ve_than",
@@ -124,7 +124,8 @@ const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
 let LAST_ANY_REQUEST = null;
-let LAST_DECODE_ERR = null; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
+let LAST_DECODE_ERR = null;
+let LAST_CAPTION_RAW = null; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
 let REQUEST_LOG = []; // vài request gần nhất
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
@@ -891,11 +892,11 @@ async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId, authHead
 
 const REF_IMAGE_AI_IDS = new Set(["stk_mu_ngu_khoc", "stk_tai_tho"]);
 
-async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null, steps = null) {
+async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null, opts = null) {
   const aiModel = modelOverride || (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
   const outSize = sizeOverride || parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
 
-  const form = buildFluxForm(promptText, outSize, inputImg, refImg, steps);
+  const form = buildFluxForm(promptText, outSize, inputImg, refImg, opts);
   const formResp = new Response(form);
   let aiResp;
   try {
@@ -930,9 +931,12 @@ async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOve
 }
 
 // Xây FormData cho FLUX (prompt + size + steps + input image + ref image). Dùng chung binding & REST.
-function buildFluxForm(promptText, outSize, inputImg, refImg, steps = null) {
+function buildFluxForm(promptText, outSize, inputImg, refImg, opts = null) {
   const form = new FormData();
-  if (steps) form.append("steps", String(steps));
+  if (opts && opts.steps) form.append("steps", String(opts.steps));
+  // strength thấp = GIỮ ảnh gốc (mặt + góc) nhiều hơn, chỉ thêm trang phục/hiệu ứng. Cao = vẽ lại nhiều.
+  if (opts && opts.strength != null) form.append("strength", String(opts.strength));
+  if (opts && opts.guidance != null) form.append("guidance", String(opts.guidance));
   form.append("prompt", promptText);
   form.append("width", String(outSize));
   form.append("height", String(outSize));
@@ -949,8 +953,8 @@ function buildFluxForm(promptText, outSize, inputImg, refImg, steps = null) {
 
 // Gọi FLUX qua REST API trên 1 tài khoản Cloudflare KHÁC (acct:token), đã verify chạy multipart.
 // Trả { bytes, mimeType, aiModel, outSize } hoặc ném lỗi (để pool thử account kế tiếp).
-async function cfRestFluxRun(acct, token, aiModel, promptText, inputImg, refImg, outSize, steps = null) {
-  const form = buildFluxForm(promptText, outSize, inputImg, refImg, steps);
+async function cfRestFluxRun(acct, token, aiModel, promptText, inputImg, refImg, outSize, opts = null) {
+  const form = buildFluxForm(promptText, outSize, inputImg, refImg, opts);
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${acct}/ai/run/${aiModel}`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
@@ -993,7 +997,7 @@ function parseCfAccounts(raw) {
 // Chạy FLUX với CHIẾN LƯỢC POOL: binding account chính trước; nếu 4006/lỗi -> xoay vòng các
 // tài khoản Cloudflare phụ qua REST (mỗi account +10k neurons/ngày, cùng model, cùng chất lượng).
 // Trả { bytes, mimeType, aiModel, outSize, via } hoặc ném lỗi nếu TẤT CẢ đều fail.
-async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null, steps = null) {
+async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = null, sizeOverride = null, opts = null) {
   const aiModel = modelOverride || (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
   const outSize = sizeOverride || parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
   let lastErr = null;
@@ -1001,7 +1005,7 @@ async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = 
   // 1) Account chính qua binding (nếu còn quota)
   if (env && env.AI && !cfAiQuotaActive()) {
     try {
-      const out = await runCloudflareFluxEdit(env, promptText, inputImg, refImg, aiModel, outSize, steps);
+      const out = await runCloudflareFluxEdit(env, promptText, inputImg, refImg, aiModel, outSize, opts);
       return { ...out, via: "binding" };
     } catch (e) {
       lastErr = e;
@@ -1020,7 +1024,7 @@ async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = 
     const tryList = fresh.length > 0 ? fresh : ordered;
     for (const a of tryList) {
       try {
-        const out = await cfRestFluxRun(a.acct, a.token, aiModel, promptText, inputImg, refImg, outSize, steps);
+        const out = await cfRestFluxRun(a.acct, a.token, aiModel, promptText, inputImg, refImg, outSize, opts);
         return { ...out, via: "cf_rest:" + a.acct.slice(0, 8) };
       } catch (e) {
         lastErr = e;
@@ -1658,6 +1662,7 @@ async function handleStudioRequest(request, env) {
         last_fallback_debug: LAST_FALLBACK_DEBUG,
         last_any_request: LAST_ANY_REQUEST,
         last_decode_err: LAST_DECODE_ERR,
+        last_caption_raw: LAST_CAPTION_RAW,
         request_log: REQUEST_LOG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
@@ -1750,6 +1755,16 @@ async function handleStudioRequest(request, env) {
     } catch (e) {
       upText = String(e?.message || e);
     }
+
+    // DEBUG: ghi nguyên văn response_format + prompt mà Locket 2.74.0 gửi (để dựng đúng cấu trúc trả về).
+    LAST_CAPTION_RAW = {
+      prompt: typeof dataNode?.prompt === "string" ? dataNode.prompt.slice(0, 600) : null,
+      response_format: dataNode?.response_format ? JSON.stringify(dataNode.response_format).slice(0, 800) : null,
+      model: dataNode?.model || null,
+      allKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+      upErr: upText.slice(0, 300),
+      ts: new Date().toISOString(),
+    };
 
     const tempId = crypto.randomUUID().slice(0, 12);
     const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
@@ -2096,10 +2111,14 @@ async function handleStudioRequest(request, env) {
         // FLUX với POOL: binding account chính -> xoay vòng tài khoản Cloudflare phụ (REST) khi 4006.
         if (env.AI || env.CF_AI_ACCOUNTS) {
           try {
-            // Filter AI 3D/nhân vật/hiệu ứng: dùng model MẠNH hơn (flux-2-dev) + nhiều steps để giống mẫu hơn.
+            // Filter AI 3D/nhân vật: model mạnh (flux-2-dev) + strength THẤP để GIỮ mặt + góc chụp gốc
+            // (chỉ thêm trang phục/tóc/hiệu ứng, không vẽ lại mặt -> hết lệch mặt lệch góc).
             const ai3dModel = (env && env.AI_3D_MODEL) || "@cf/black-forest-labs/flux-2-dev";
-            const ai3dSteps = parseInt((env && env.AI_3D_STEPS) || "20", 10) || 20;
-            aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg, ai3dModel, null, ai3dSteps);
+            const ai3dOpts = {
+              steps: parseInt((env && env.AI_3D_STEPS) || "16", 10) || 16,
+              strength: parseFloat((env && env.AI_3D_STRENGTH) || "0.55"),
+            };
+            aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
             usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
           } catch (err) {
             cfErr = String(err?.message || err);
