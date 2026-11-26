@@ -126,7 +126,8 @@ let LAST_CAPTION_DEBUG = null;
 let LAST_ANY_REQUEST = null;
 let LAST_DECODE_ERR = null;
 let LAST_CAPTION_RAW = null;
-let LAST_RC_LOG = null; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
+let LAST_RC_LOG = null;
+const URL_LOG = []; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
 let REQUEST_LOG = []; // vài request gần nhất
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
@@ -1570,8 +1571,11 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
   for (const p of providers) {
     try {
       const raw = await p();
-      const obj = tryParse(raw);
+      let obj = tryParse(raw);
       if (obj && typeof obj === "object") {
+        // Làm SẠCH theo schema: bỏ field thừa (schema có additionalProperties:false -> app reject nếu dư),
+        // ép enum, đúng số phần tử mảng. Thiếu field thì điền từ caption fallback.
+        obj = sanitizeToSchema(obj, schema);
         source = "ai";
         return { data: obj, source, err: null };
       }
@@ -1585,6 +1589,50 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
 }
 
 // Dựng object JSON hợp lệ theo schema khi AI không trả JSON. Điền caption vào các field string.
+// Làm sạch object cho KHỚP CHÍNH XÁC schema (OpenAI structured output strict, additionalProperties:false).
+// Bỏ field thừa, ép enum, cắt/đệm mảng đúng minItems/maxItems, điền field thiếu.
+function sanitizeToSchema(obj, schema) {
+  if (!schema || typeof schema !== "object") return obj;
+  const type = schema.type;
+  const props = schema.properties;
+  if (type === "object" && props) {
+    const out = {};
+    for (const key of Object.keys(props)) {
+      const ps = props[key];
+      let v = obj ? obj[key] : undefined;
+      if (v === undefined) {
+        // field thiếu: thử lấy từ obj key tương tự, else để trình gọi điền fallback
+        if (ps.type === "array") v = [];
+        else if (ps.enum) v = ps.enum[0];
+        else v = typeof obj === "string" ? obj : "";
+      }
+      out[key] = sanitizeToSchema(v, ps);
+    }
+    return out; // CHỈ giữ field trong schema -> không có additionalProperties
+  }
+  if (type === "array" && schema.items) {
+    let arr = Array.isArray(obj) ? obj : [];
+    const min = Number(schema.minItems) || 0;
+    const max = Number(schema.maxItems) || (arr.length || min) || 5;
+    arr = arr.map((it) => sanitizeToSchema(it, schema.items));
+    // đệm cho đủ min
+    while (arr.length < min && arr.length < (max || min)) arr.push(sanitizeToSchema({}, schema.items));
+    if (max && arr.length > max) arr = arr.slice(0, max);
+    return arr;
+  }
+  if (schema.enum && Array.isArray(schema.enum)) {
+    if (schema.enum.includes(obj)) return obj;
+    // tìm enum gần nhất hoặc lấy phần tử đầu
+    const lower = String(obj || "").toLowerCase();
+    const match = schema.enum.find((e) => String(e).toLowerCase() === lower);
+    return match || schema.enum[0];
+  }
+  if (type === "string") return typeof obj === "string" ? obj : (obj == null ? "" : String(obj));
+  if (type === "number" || type === "integer") return typeof obj === "number" ? obj : Number(obj) || 0;
+  if (type === "boolean") return !!obj;
+  return obj;
+}
+
 function buildFallbackStructured(schema, text, isQuote) {
   const quotesVi = [
     { quote: text || "Mỗi khoảnh khắc là một câu chuyện chưa kể.", category: "famous_modern_figures", attribution: "Khuyết danh" },
@@ -1763,6 +1811,16 @@ async function handleStudioRequest(request, env) {
     return new Response("ok", { headers: corsHeaders() });
   }
 
+  // DEBUG TẠM /urllog: nhận MỌI URL app Locket gọi (tìm endpoint eligibility LNN để chặn DNS). Xoá sau.
+  if (request.method === "POST" && url.pathname === "/urllog") {
+    try {
+      const e = await request.json();
+      const entry = (e.m || "?") + " " + (e.u || "");
+      if (!URL_LOG.includes(entry)) { URL_LOG.unshift(entry); if (URL_LOG.length > 40) URL_LOG.pop(); }
+    } catch (_) {}
+    return new Response("ok", { headers: corsHeaders() });
+  }
+
   // DEBUG: ghi mọi request (trừ chính /status và /ai-filters ảnh) để biết iPhone gọi gì.
   if (url.pathname !== "/status" && url.pathname !== "/" && !url.pathname.startsWith("/ai-filters/")) {
     const entry = {
@@ -1819,6 +1877,7 @@ async function handleStudioRequest(request, env) {
         last_decode_err: LAST_DECODE_ERR,
         last_caption_raw: LAST_CAPTION_RAW,
         last_rc_log: LAST_RC_LOG,
+        url_log: URL_LOG,
         request_log: REQUEST_LOG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
@@ -1877,7 +1936,9 @@ async function handleStudioRequest(request, env) {
     let upStatus = 0;
     let upText = "";
     try {
-      const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText });
+      // Forward lên server gốc với timeout NGẮN (2s) — nếu account có quyền thì passthrough thật;
+      // nếu chậm/401 (thường gặp) thì bỏ qua ngay, generate bằng AI để app không bị timeout -> "thử lại".
+      const upRes = await fetch(upstreamUrl, { method: "POST", headers: fwdHeaders, body: rawBodyText, signal: AbortSignal.timeout(2000) });
       upStatus = upRes.status;
       upText = await upRes.text();
       let parsedUp = null;
@@ -1912,12 +1973,13 @@ async function handleStudioRequest(request, env) {
       upText = String(e?.message || e);
     }
 
-    // DEBUG: ghi nguyên văn response_format + prompt mà Locket 2.74.0 gửi (để dựng đúng cấu trúc trả về).
+    // DEBUG: ghi NGUYÊN VĂN request body + headers Locket gửi (tìm flag stream/method app cần).
+    const hdrDump = {};
+    for (const [hk, hv] of request.headers.entries()) { if (!/authorization|cookie/i.test(hk)) hdrDump[hk] = hv.slice(0, 60); }
     LAST_CAPTION_RAW = {
-      prompt: typeof dataNode?.prompt === "string" ? dataNode.prompt.slice(0, 600) : null,
-      response_format: dataNode?.response_format ? JSON.stringify(dataNode.response_format).slice(0, 800) : null,
-      model: dataNode?.model || null,
-      allKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
+      bodyFull: rawBodyText.replace(/"image_base64"\s*:\s*"[^"]*"/, '"image_base64":"<...>"').slice(0, 1500),
+      headers: hdrDump,
+      accept: request.headers.get("accept") || null,
       upErr: upText.slice(0, 300),
       ts: new Date().toISOString(),
     };
@@ -1953,24 +2015,24 @@ async function handleStudioRequest(request, env) {
     const sd = structured.data;
     const sdJson = JSON.stringify(sd);
     const nowSec = Math.floor(Date.now() / 1000);
-    // Trả CHUẨN OpenAI Chat Completions ĐẦY ĐỦ (model gpt-5.4) — content là JSON string khớp schema.
-    // Kèm luôn các field cũ (result/data/top-level) để mọi phiên bản Locket đều đọc được.
+    // Format Locket gốc: lỗi là {"result":{"errors":[...],"status":401}}. THÀNH CÔNG = {"result":{...data,
+    // "status":200}} KHÔNG có errors. Đặt data schema TRỰC TIẾP trong result (giống server), không lồng thừa.
+    // Kèm choices/top-level cho mọi bản. content choices = JSON string sanitize khớp schema.
+    // result SẠCH: chỉ data schema + status (giống server Locket thành công, không field thừa).
+    const resultObj = Object.assign({}, sd, { status: 200 });
     const payload = Object.assign({}, sd, {
+      result: resultObj,
+      data: sd,
+      status: 200,
+      success: true,
+      // OpenAI (một số bản đọc choices[].message.content)
       id: "chatcmpl-" + tempId,
       object: "chat.completion",
       created: nowSec,
       model: (dataNode && dataNode.model) || "gpt-5.4",
-      choices: [{
-        index: 0,
-        message: { role: "assistant", content: sdJson, refusal: null },
-        logprobs: null,
-        finish_reason: "stop",
-      }],
+      choices: [{ index: 0, message: { role: "assistant", content: sdJson, refusal: null }, logprobs: null, finish_reason: "stop" }],
       usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-      result: Object.assign({}, sd, { data: sd, status: 200 }),
-      data: sd,
-      status: 200,
-      success: true,
+      output_text: sdJson,
     });
     return new Response(JSON.stringify(payload), {
       status: 200,
