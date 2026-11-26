@@ -31,7 +31,7 @@ const LUT_FILTERS = {
 };
 
 const FACE_LOCK =
-  "CRITICAL: This is a photo editing task, NOT image generation. Preserve the EXACT original photo pixel-for-pixel — the person's real face, facial features, face angle, head tilt, exact camera viewpoint, framing, zoom, body position, and lighting must stay 100% identical and unchanged. Do NOT redraw, beautify, rotate, reframe, or regenerate the face or the camera angle. Keep it the same real person from the same photo. ONLY overlay/add the following requested change on top of the unchanged photo: ";
+  "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
 
 const CUSTOM_AI_IDS = new Set([
   "stk_tai_tho", "stk_mu_ngu_khoc", "stk_jollibee", "stk_nak_ve_than",
@@ -2111,13 +2111,14 @@ async function handleStudioRequest(request, env) {
         // FLUX với POOL: binding account chính -> xoay vòng tài khoản Cloudflare phụ (REST) khi 4006.
         if (env.AI || env.CF_AI_ACCOUNTS) {
           try {
-            // Filter AI 3D/nhân vật: model mạnh (flux-2-dev) + strength THẤP để GIỮ mặt + góc chụp gốc
-            // (chỉ thêm trang phục/tóc/hiệu ứng, không vẽ lại mặt -> hết lệch mặt lệch góc).
-            const ai3dModel = (env && env.AI_3D_MODEL) || "@cf/black-forest-labs/flux-2-dev";
-            const ai3dOpts = {
-              steps: parseInt((env && env.AI_3D_STEPS) || "16", 10) || 16,
-              strength: parseFloat((env && env.AI_3D_STRENGTH) || "0.55"),
-            };
+            // Filter AI 3D: dùng ĐÚNG cấu hình "trưa nay" đã chạy tốt (giữ mặt+góc, chỉ thêm 3D):
+            // flux-2-klein-4b mặc định, KHÔNG ép strength/steps (để model tự quyết -> bám ảnh gốc).
+            // Chỉ đổi qua env nếu muốn thử model khác.
+            const ai3dModel = (env && env.AI_3D_MODEL) || null; // null -> dùng AI_MODEL (4B)
+            const ai3dOpts = (env && (env.AI_3D_STEPS || env.AI_3D_STRENGTH))
+              ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
+                  strength: env.AI_3D_STRENGTH ? parseFloat(env.AI_3D_STRENGTH) : undefined }
+              : null;
             aiOut = await runFluxPooled(env, aiReq.prompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
             usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
           } catch (err) {
