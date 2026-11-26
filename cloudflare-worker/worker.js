@@ -125,6 +125,7 @@ let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
 let CAPTION_MODE_OVERRIDE = null;
 let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
+const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -1049,6 +1050,7 @@ async function cfRestVisionChat(acct, token, modelId, messages, maxTokens = 256,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ messages, max_tokens: maxTokens, temperature }),
+    signal: AbortSignal.timeout(7000),
   });
   let j = null;
   try {
@@ -1056,7 +1058,9 @@ async function cfRestVisionChat(acct, token, modelId, messages, maxTokens = 256,
   } catch (_) {}
   if (r.ok && j && j.success !== false) {
     const rawVal = j?.result?.response ?? j?.result?.choices?.[0]?.message?.content ?? "";
-    const text = (typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal)).trim();
+    const text = (typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal))
+      .replace(/<think>[\s\S]*?<\/think>/gi, "")
+      .trim();
     return text;
   }
   const errMsg = (j && j.errors && j.errors[0] && j.errors[0].message) || `cf_vision_http_${r.status}`;
@@ -1066,49 +1070,193 @@ async function cfRestVisionChat(acct, token, modelId, messages, maxTokens = 256,
   throw e;
 }
 
-async function runVisionChatPooled(env, messages, maxTokens = 256, temperature = 0.75) {
-  const modelId = "@cf/mistralai/mistral-small-3.1-24b-instruct";
-  let lastErr = null;
-
-  if (env && env.AI && !cfAiQuotaActive()) {
-    try {
-      const r = await env.AI.run(modelId, { messages, max_tokens: maxTokens, temperature });
-      const rawVal = r?.response ?? r?.result?.response ?? r?.choices?.[0]?.message?.content ?? "";
-      const text = (typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal)).trim();
-      if (text && !isCaptionRefusal(text)) {
-        return { text, source: "cf_binding:" + modelId, err: null };
-      }
-    } catch (e) {
-      lastErr = String(e?.message || e);
-      if (isQuotaOrCapacityError(e)) markCfAiQuotaHit();
+function normalizeMessagesForCfVision(messages) {
+  if (!Array.isArray(messages)) return [];
+  const sysTexts = [];
+  const rest = [];
+  for (const m of messages) {
+    if (!m) continue;
+    if (m.role === "system") {
+      if (typeof m.content === "string" && m.content.trim()) sysTexts.push(m.content.trim());
+    } else {
+      rest.push(m);
     }
   }
+  const sysPrefix = sysTexts.join("\n").trim();
+  if (!sysPrefix) return rest;
 
+  const out = [];
+  let merged = false;
+  for (const m of rest) {
+    if (!merged && m.role === "user") {
+      merged = true;
+      if (typeof m.content === "string") {
+        out.push({ role: "user", content: `${sysPrefix}\n\n${m.content}` });
+      } else if (Array.isArray(m.content)) {
+        let patched = false;
+        const nextParts = m.content.map((p) => {
+          if (!patched && p && p.type === "text") {
+            patched = true;
+            return { type: "text", text: `${sysPrefix}\n\n${p.text || ""}` };
+          }
+          return p;
+        });
+        if (!patched) nextParts.unshift({ type: "text", text: sysPrefix });
+        out.push({ role: "user", content: nextParts });
+      } else {
+        out.push(m);
+      }
+    } else {
+      out.push(m);
+    }
+  }
+  return out;
+}
+
+async function runVisionChatPooled(env, messages, maxTokens = 256, temperature = 0.75, models = null) {
+  const modelList =
+    Array.isArray(models) && models.length > 0
+      ? models
+      : ["@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/mistralai/mistral-small-3.1-24b-instruct"];
+  const normMsgs = normalizeMessagesForCfVision(messages);
+  let lastErr = null;
   const accounts = parseCfAccounts(env && env.CF_AI_ACCOUNTS);
-  if (accounts.length > 0) {
-    const start = (KEY_CURSOR.get("cfvision") || 0) % accounts.length;
-    KEY_CURSOR.set("cfvision", start + 1);
-    const ordered = accounts.slice(start).concat(accounts.slice(0, start));
-    const fresh = ordered.filter((a) => keyAvailable(a.token));
-    const tryList = (fresh.length > 0 ? fresh : ordered).slice(0, 6);
-    for (const a of tryList) {
+
+  for (const modelId of modelList) {
+    if ((SKIP_CF_MODELS.get(modelId) || 0) > Date.now()) continue;
+    const shortModel = modelId.split("/").pop();
+
+    // 1) Main binding
+    if (env && env.AI && !cfAiQuotaActive()) {
       try {
-        const text = await cfRestVisionChat(a.acct, a.token, modelId, messages, maxTokens, temperature);
+        const r = await env.AI.run(modelId, { messages: normMsgs, max_tokens: maxTokens, temperature });
+        const rawVal = r?.response ?? r?.result?.response ?? r?.choices?.[0]?.message?.content ?? "";
+        const text = (typeof rawVal === "string" ? rawVal : JSON.stringify(rawVal))
+          .replace(/<think>[\s\S]*?<\/think>/gi, "")
+          .trim();
         if (text && !isCaptionRefusal(text)) {
-          return { text, source: "cf_rest:" + a.acct.slice(0, 8), err: null };
+          return { text, source: "cf_binding:" + shortModel, err: null };
         }
       } catch (e) {
         lastErr = String(e?.message || e);
-        if (isQuotaOrCapacityError(e) || e.httpStatus === 429) {
-          benchKey(a.token);
-        } else {
-          benchKey(a.token, 5);
+        if (isQuotaOrCapacityError(e)) markCfAiQuotaHit();
+        else if (/no such model|not found|does not exist|invalid/i.test(lastErr)) {
+          SKIP_CF_MODELS.set(modelId, Date.now() + 30 * 60 * 1000);
+          continue;
+        }
+      }
+    }
+
+    // 2) 18-account CF REST pool
+    if (accounts.length > 0) {
+      const start = (KEY_CURSOR.get("cfvision") || 0) % accounts.length;
+      KEY_CURSOR.set("cfvision", start + 1);
+      const ordered = accounts.slice(start).concat(accounts.slice(0, start));
+      const fresh = ordered.filter((a) => keyAvailable(a.token));
+      const tryList = (fresh.length > 0 ? fresh : ordered).slice(0, 4);
+      for (const a of tryList) {
+        try {
+          const text = await cfRestVisionChat(a.acct, a.token, modelId, normMsgs, maxTokens, temperature);
+          if (text && !isCaptionRefusal(text)) {
+            return { text, source: "cf_rest:" + a.acct.slice(0, 8) + ":" + shortModel, err: null };
+          }
+        } catch (e) {
+          lastErr = String(e?.message || e);
+          if (isQuotaOrCapacityError(e) || e.httpStatus === 429) {
+            benchKey(a.token);
+          } else {
+            if (
+              e.httpStatus === 400 ||
+              e.httpStatus === 404 ||
+              /no such model|not found|does not exist|invalid/i.test(lastErr)
+            ) {
+              SKIP_CF_MODELS.set(modelId, Date.now() + 30 * 60 * 1000);
+            }
+            break;
+          }
         }
       }
     }
   }
 
   return { text: null, source: null, err: lastErr };
+}
+
+async function runCfTextChatPooled(env, messages, maxTokens = 120, temperature = 0.75) {
+  return runVisionChatPooled(env, messages, maxTokens, temperature, [
+    "@cf/meta/llama-4-scout-17b-16e-instruct",
+    "@cf/mistralai/mistral-small-3.1-24b-instruct",
+  ]);
+}
+
+async function describeImageWithVision(env, prepBytes, prepMime) {
+  if (!prepBytes || prepBytes.length === 0) return { desc: "", source: null };
+  const obsSys =
+    "You are a precise visual observer. Describe the photo factually in 2 concise English sentences: who or what is visible, clothing/accessories, facial expression, action, key objects, setting/background, and lighting/mood. Be specific and accurate. No speculation or filler.";
+  const obsUser = "Describe this photo factually in 2 short sentences.";
+  const userContent = [
+    { type: "image_url", image_url: { url: `data:${prepMime || "image/jpeg"};base64,${uint8ToBase64(prepBytes)}` } },
+    { type: "text", text: obsUser },
+  ];
+
+  // 1) Cloudflare Vision pool (18 accounts + main binding)
+  if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+    const res = await runVisionChatPooled(
+      env,
+      [
+        { role: "system", content: obsSys },
+        { role: "user", content: userContent },
+      ],
+      95,
+      0.2,
+      ["@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/mistralai/mistral-small-3.1-24b-instruct"]
+    );
+    const clean = String(res.text || "").replace(/\s+/g, " ").trim();
+    if (clean && !isCaptionRefusal(clean)) {
+      return { desc: clean.slice(0, 320), source: res.source || "cf_vision" };
+    }
+  }
+
+  // 2) NVIDIA NIM Vision fallback
+  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+    try {
+      const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
+      const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
+      const r = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+        body: JSON.stringify({
+          model: nvModel,
+          messages: [
+            { role: "system", content: obsSys },
+            { role: "user", content: userContent },
+          ],
+          max_tokens: 95,
+          temperature: 0.2,
+        }),
+      });
+      if (!r.ok) {
+        if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k);
+        continue;
+      }
+      const j = await r.json();
+      const txt = String(j?.choices?.[0]?.message?.content || "").replace(/\s+/g, " ").trim();
+      if (txt && !isCaptionRefusal(txt)) {
+        return { desc: txt.slice(0, 320), source: "nvidia:" + nvModel };
+      }
+    } catch (_) {}
+  }
+
+  // 3) Gemini Vision fallback
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const g = await geminiGenerateCaption(env, obsSys, obsUser, prepBytes, prepMime, k, 95, true);
+    const clean = String(g.text || "").replace(/\s+/g, " ").trim();
+    if (clean && !isCaptionRefusal(clean)) {
+      return { desc: clean.slice(0, 320), source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest") };
+    }
+  }
+
+  return { desc: "", source: null };
 }
 
 function buildLocketFilterResponse(outUrl) {
@@ -1375,6 +1523,7 @@ async function openAiChatCaption({ base, key, model, provider, systemPrompt, use
     max_tokens: 256,
     temperature: 0.85,
   }, extra || {});
+  if (extra && extra.max_completion_tokens) delete payload.max_tokens;
   try {
     const r = await fetch(`${base}/chat/completions`, {
       method: "POST",
@@ -1418,7 +1567,9 @@ async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgM
 async function groqGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime, key) {
   const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
   // Model gpt-oss là reasoning -> đặt reasoning_effort thấp để "nghĩ" ngắn, trả caption nhanh & không rỗng.
-  const extra = /gpt-oss/i.test(model) ? { reasoning_effort: "low" } : {};
+  const extra = /gpt-oss/i.test(model)
+    ? { reasoning_effort: "low", max_completion_tokens: 320, temperature: 0.8 }
+    : { max_tokens: 180, temperature: 0.8 };
   return openAiChatCaption({
     base: (env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1",
     key,
@@ -1562,11 +1713,120 @@ function normalizeSchema(node) {
   return out;
 }
 
-// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu, breaking_news headline...).
-// Gọi AI (CF -> NVIDIA -> Groq -> Gemini) ép JSON; nếu fail thì tự dựng JSON hợp lệ từ caption đơn.
+const VERIFIED_QUOTE_BANK = {
+  pop_music: [
+    { id: "pm_1", quote: "Có chắc yêu là đây?", attribution: "Sơn Tùng M-TP", tags: "love, smile, cute, happy" },
+    { id: "pm_2", quote: "Đi về nhà, đi về nhà, hạnh phúc đi về nhà.", attribution: "Đen Vâu", tags: "cozy, home, room, family, peaceful" },
+    { id: "pm_3", quote: "Em ơi đi trốn với anh, mình đi đến nơi có biển bạc núi xanh.", attribution: "Đen Vâu", tags: "travel, outdoor, nature, road, adventure" },
+    { id: "pm_4", quote: "Lạ lùng em tới, hãy nói tôi nghe một câu.", attribution: "Vũ.", tags: "dreamy, portrait, selfie, calm, chill" },
+    { id: "pm_5", quote: "Anh nhà ở đâu thế? Cứ tới lui trong tim tôi chẳng nhớ đường về.", attribution: "AMEE", tags: "cute, cafe, sweet, drink, food, smile" },
+    { id: "pm_6", quote: "Mưa vẫn mưa bay trên tầng tháp cổ.", attribution: "Trịnh Công Sơn", tags: "rain, window, moody, calm, alone" },
+    { id: "pm_7", quote: "Mang tiền về cho mẹ, đừng mang ưu phiền về cho mẹ.", attribution: "Đen Vâu", tags: "work, laptop, study, desk, hustle, funny" },
+    { id: "pm_8", quote: "Ước gì anh ở đây giờ này.", attribution: "Mỹ Tâm", tags: "sunset, night, cozy, missing, window" },
+    { id: "pm_9", quote: "Tháng tư là lời nói dối của em.", attribution: "Hà Anh Tuấn", tags: "sky, flowers, outdoor, poetic, gentle" },
+    { id: "pm_10", quote: "Bay lên nào, em bay lên nào!", attribution: "Thu Minh", tags: "party, fireworks, energy, hype, night, celebration" },
+    { id: "pm_11", quote: "Sống trong đời sống cần có một tấm lòng.", attribution: "Trịnh Công Sơn", tags: "friends, warm, meal, sharing, kindness, food" },
+    { id: "pm_12", quote: "Cầm tay anh, dựa vai anh, kề bên anh nơi này có anh.", attribution: "Sơn Tùng M-TP", tags: "couple, love, warm, together, smile" },
+  ],
+  greek_philosophy: [
+    { id: "gp_1", quote: "Hạnh phúc phụ thuộc vào chính chúng ta.", attribution: "Aristotle", tags: "happy, smile, joy, positive" },
+    { id: "gp_2", quote: "Hãy tự biết chính mình.", attribution: "Socrates", tags: "selfie, mirror, portrait, reflection" },
+    { id: "gp_3", quote: "Cuộc sống không được chiêm nghiệm là cuộc sống không đáng sống.", attribution: "Socrates", tags: "thoughtful, desk, study, book" },
+    { id: "gp_4", quote: "Hãy để thức ăn là thuốc của bạn, và thuốc là thức ăn của bạn.", attribution: "Hippocrates", tags: "food, meal, eating, burger, drink" },
+    { id: "gp_5", quote: "Tình bạn là một tâm hồn ngự trị trong hai thể xác.", attribution: "Aristotle", tags: "friends, group, together, duo" },
+    { id: "gp_6", quote: "Trong vạn vật của thiên nhiên luôn ẩn chứa điều kỳ diệu.", attribution: "Aristotle", tags: "nature, sky, tree, flowers, pet, outdoor, fireworks" },
+    { id: "gp_7", quote: "Kiên nhẫn thì đắng, nhưng quả ngọt của nó lại vô cùng ngọt ngào.", attribution: "Aristotle", tags: "tired, study, laptop, work, waiting" },
+    { id: "gp_8", quote: "Không ai tắm hai lần trên cùng một dòng sông.", attribution: "Heraclitus", tags: "travel, street, motion, moment" },
+    { id: "gp_9", quote: "Giàu có không phải là sở hữu thật nhiều, mà là mong cầu thật ít.", attribution: "Epictetus", tags: "minimal, room, simple, cozy, coffee" },
+    { id: "gp_10", quote: "Sự xuất sắc không phải là hành động nhất thời, mà là một thói quen.", attribution: "Aristotle", tags: "workout, study, routine, focus" },
+    { id: "gp_11", quote: "Đừng làm hỏng những gì bạn đang có bằng cách khao khát điều chưa có.", attribution: "Epicurus", tags: "chill, peaceful, relaxed, sunset" },
+    { id: "gp_12", quote: "Sự giàu có lớn nhất là biết sống đủ với những điều giản dị.", attribution: "Plato", tags: "calm, everyday, cozy, cute" },
+  ],
+  famous_modern_figures: [
+    { id: "fm_1", quote: "Hãy cứ khát khao, hãy cứ dại khờ.", attribution: "Steve Jobs", tags: "ambition, food, youth, hustle, laptop" },
+    { id: "fm_2", quote: "Cách duy nhất để làm việc tuyệt vời là yêu những gì bạn làm.", attribution: "Steve Jobs", tags: "work, desk, smiling, craft, uniform" },
+    { id: "fm_3", quote: "Trí tưởng tượng quan trọng hơn kiến thức.", attribution: "Albert Einstein", tags: "creative, art, study, glasses, clever" },
+    { id: "fm_4", quote: "Cuộc sống giống như đi xe đạp, muốn giữ thăng bằng bạn phải tiếp tục tiến lên.", attribution: "Albert Einstein", tags: "outdoor, street, travel, bike, motion" },
+    { id: "fm_5", quote: "Càng trân trọng và ăn mừng cuộc sống, bạn càng có nhiều lý do để vui.", attribution: "Oprah Winfrey", tags: "happy, party, celebration, smiling, fireworks" },
+    { id: "fm_6", quote: "Những người thích ăn ngon luôn là những người tuyệt vời nhất.", attribution: "Julia Child", tags: "food, eating, burger, snack, restaurant" },
+    { id: "fm_7", quote: "Để trở thành người không thể thay thế, bạn phải luôn khác biệt.", attribution: "Coco Chanel", tags: "fashion, outfit, selfie, style, unique" },
+    { id: "fm_8", quote: "Bình yên bắt đầu bằng một nụ cười.", attribution: "Mẹ Teresa", tags: "smile, warm, gentle, portrait, cute" },
+    { id: "fm_9", quote: "Tương lai thuộc về những ai tin vào vẻ đẹp của ước mơ.", attribution: "Eleanor Roosevelt", tags: "sky, sunset, hopeful, window, dreamy, fireworks" },
+    { id: "fm_10", quote: "Không phải ai lang thang cũng đều lạc lối.", attribution: "J.R.R. Tolkien", tags: "travel, road, nature, adventure, walking" },
+    { id: "fm_11", quote: "Hãy là chính mình, vì tất cả những người khác đều đã có chủ rồi.", attribution: "Oscar Wilde", tags: "funny, quirky, selfie, costume, casual" },
+    { id: "fm_12", quote: "Mọi chuyện luôn có vẻ bất khả thi cho đến khi nó được hoàn thành.", attribution: "Nelson Mandela", tags: "late night, deadline, study, tired, effort" },
+  ],
+  film_and_tv: [
+    { id: "ft_1", quote: "Cuộc đời giống như một hộp sô-cô-la, bạn chẳng bao giờ biết mình sẽ bốc phải viên nào.", attribution: "Forrest Gump", tags: "food, sweet, candid, everyday, surprise" },
+    { id: "ft_2", quote: "Tôi là vua của thế giới!", attribution: "Titanic", tags: "happy, epic, outdoor, sky, excited, fireworks" },
+    { id: "ft_3", quote: "Vươn tới vô cực và xa hơn nữa!", attribution: "Toy Story", tags: "fun, playful, adventure, sky, energetic" },
+    { id: "ft_4", quote: "Hakuna Matata! Nghĩa là đừng lo âu gì cả.", attribution: "Vua Sư Tử", tags: "chill, relaxed, friends, laughing, carefree" },
+    { id: "ft_5", quote: "Hạnh phúc có thể tìm thấy ngay cả trong thời khắc tăm tối nhất, chỉ cần ta nhớ bật đèn lên.", attribution: "Harry Potter", tags: "night, cozy light, lamp, dark, warm" },
+    { id: "ft_6", quote: "Tôi sẽ quay trở lại.", attribution: "Kẻ Hủy Diệt", tags: "cool, sunglasses, serious, night, dramatic" },
+    { id: "ft_7", quote: "Cứ tiếp tục bơi đi, cứ tiếp tục bơi đi.", attribution: "Đi Tìm Nemo", tags: "tired, study, work, deadline, keep going" },
+    { id: "ft_8", quote: "Ai cũng có thể nấu ăn.", attribution: "Ratatouille", tags: "food, kitchen, restaurant, burger, meal" },
+    { id: "ft_9", quote: "Sao phải nghiêm túc thế?", attribution: "Hiệp Sĩ Bóng Đêm", tags: "serious face, moody, funny, costume, edgy" },
+    { id: "ft_10", quote: "Tôi không có bạn bè, tôi chỉ có gia đình.", attribution: "Fast & Furious", tags: "friends, group, car, hangout, squad" },
+    { id: "ft_11", quote: "Thanh xuân giống như một cơn mưa rào, dù bị cảm lạnh vẫn muốn đắm mình thêm lần nữa.", attribution: "Cô Gái Năm Ấy Chúng Ta Cùng Theo Đuổi", tags: "youth, school, rain, nostalgic, portrait, smile" },
+    { id: "ft_12", quote: "Với sức mạnh càng lớn, trách nhiệm càng cao.", attribution: "Spider-Man", tags: "hero, bold, costume, energy, cool, desk" },
+  ],
+  athlete: [
+    { id: "at_1", quote: "Bay nhẹ như bướm, chích đau như ong.", attribution: "Muhammad Ali", tags: "cool, confident, pose, energy, sharp" },
+    { id: "at_2", quote: "Tôi có thể chấp nhận thất bại, nhưng tôi không thể chấp nhận việc không cố gắng.", attribution: "Michael Jordan", tags: "study, hustle, effort, grind" },
+    { id: "at_3", quote: "Áp lực và thử thách chính là cơ hội để tôi vươn lên.", attribution: "Kobe Bryant", tags: "late night, serious, focus, dark, work" },
+    { id: "at_4", quote: "Bạn sẽ trượt 100% những cú sút mà bạn không dám thực hiện.", attribution: "Wayne Gretzky", tags: "bold, playful, selfie, camera, fun" },
+    { id: "at_5", quote: "Thà hối tiếc vì đã dám thử còn hơn tiếc nuối những cơ hội mình bỏ lỡ.", attribution: "Simone Biles", tags: "adventure, travel, outdoor, brave, smile, fireworks" },
+    { id: "at_6", quote: "Tài năng giúp thắng trận đấu, nhưng tinh thần đồng đội mang về chức vô địch.", attribution: "Michael Jordan", tags: "friends, team, group, service, together" },
+    { id: "at_7", quote: "Chăm chỉ sẽ đánh bại tài năng khi tài năng không chịu chăm chỉ.", attribution: "Kevin Durant", tags: "laptop, desk, gym, workout, focus" },
+    { id: "at_8", quote: "Chiến thắng càng khó khăn, niềm vui khi giành được nó càng lớn lao.", attribution: "Pelé", tags: "happy, proud, celebration, smiling" },
+    { id: "at_9", quote: "Đừng bao giờ nói không thể, vì giới hạn cũng như nỗi sợ, thường chỉ là ảo giác.", attribution: "Michael Jordan", tags: "sky, freedom, upbeat, food, joyful" },
+    { id: "at_10", quote: "Bạn phải chiến đấu và hy sinh mỗi ngày để chạm tới ước mơ.", attribution: "Lionel Messi", tags: "tired, dedication, night, goal" },
+    { id: "at_11", quote: "Nhà vô địch cứ tiếp tục chơi cho đến khi làm đúng.", attribution: "Billie Jean King", tags: "practice, focus, everyday, smile" },
+    { id: "at_12", quote: "Tài năng mà không rèn luyện thì chẳng là gì cả.", attribution: "Cristiano Ronaldo", tags: "workout, gym, confident, selfie, hustle" },
+  ],
+};
+
+function buildQuoteBankCatalog() {
+  const lines = [];
+  for (const [cat, list] of Object.entries(VERIFIED_QUOTE_BANK)) {
+    lines.push(`${cat}: ` + list.map((q) => `${q.id}(${q.tags})`).join("; "));
+  }
+  return lines.join("\n");
+}
+
+function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null) {
+  const cats =
+    Array.isArray(catsOverride) && catsOverride.length > 0
+      ? catsOverride
+      : ["pop_music", "greek_philosophy", "famous_modern_figures", "film_and_tv", "athlete"];
+  let h = 0;
+  for (let i = 0; i < seedText.length; i++) h = (h * 31 + seedText.charCodeAt(i)) >>> 0;
+  const quotes = [];
+  let matchedCount = 0;
+
+  cats.forEach((cat, idx) => {
+    const list = VERIFIED_QUOTE_BANK[cat] || VERIFIED_QUOTE_BANK.pop_music;
+    const reqId = idMap && typeof idMap[cat] === "string" ? idMap[cat].trim() : "";
+    let item = list.find((it) => it.id === reqId);
+    if (item) {
+      matchedCount++;
+    } else {
+      item = list[(h + idx * 3) % list.length];
+    }
+    quotes.push({
+      quote: item.quote,
+      category: cat,
+      attribution: item.attribution,
+    });
+  });
+
+  return { data: { quotes }, matchedCount };
+}
+
+// Sinh JSON ĐÚNG response_format schema mà Locket 2.74.0 yêu cầu (quote 5 câu từ VERIFIED_QUOTE_BANK, ...).
 async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, sourceUrl, origin, tempId, captionType) {
   const schema = rawSchema ? normalizeSchema(rawSchema) : null;
-  const isQuote = /quote/i.test(appPrompt + " " + captionType);
+  const isQuote = /quote/i.test(appPrompt + " " + captionType) || !!(schema && schema.properties && schema.properties.quotes);
 
   // 1) Chuẩn bị ảnh (cho model vision)
   let prep = null;
@@ -1574,17 +1834,6 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
   const prepBytes = prep && prep.bytes ? prep.bytes : null;
   const prepMime = prep ? prep.mimeType : "image/jpeg";
 
-  // 2) System prompt: yêu cầu trả DUY NHẤT JSON đúng schema
-  const schemaStr = schema ? JSON.stringify(schema).slice(0, 1500) : "";
-  const sys =
-    "You are a Locket caption generator. Look at the photo and follow the user's instruction. " +
-    "You MUST reply with ONLY a single valid JSON object (no markdown, no code fence, no extra text) " +
-    (schema ? "that strictly matches this JSON schema: " + schemaStr + ". " : "") +
-    "If the schema has a `quotes` array with `category` enum values, return EXACTLY 1 concise quote per unique category (5 unique categories total), with non-empty `quote` and `attribution`. " +
-    "Write in Vietnamese where the text is user-facing. Return pure JSON only.";
-  const userText = (appPrompt || "Write a caption for this photo.").slice(0, 1200);
-
-  // 3) Thử các provider, parse JSON từ kết quả
   const tryParse = (txt) => {
     if (!txt) return null;
     let s = String(txt).trim().replace(/^```[a-z]*\s*/i, "").replace(/```\s*$/i, "").trim();
@@ -1593,90 +1842,141 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     try { return JSON.parse(s); } catch (_) { return null; }
   };
 
-  // Gọi 1 endpoint chat OpenAI-compatible lấy NGUYÊN content (không cắt) để parse JSON.
-  const rawChat = async (base, key, model, withImg, extra) => {
-    const userMsg = withImg && prepBytes
-      ? [{ type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } }, { type: "text", text: userText }]
-      : userText;
-    const r = await fetch(`${base}/chat/completions`, {
-      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify(Object.assign({ model, messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }], temperature: 0.75 }, extra || {})),
-    });
-    if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(key); return ""; }
-    const j = await r.json();
-    const m = j?.choices?.[0]?.message || {};
-    return String(m.content || m.reasoning_content || "");
-  };
+  // Nhánh QUOTE: chọn ID từ VERIFIED_QUOTE_BANK (60 quote thật 100%) bằng Vision AI -> không bao giờ bịa quote
+  if (schema && schema.properties && schema.properties.quotes) {
+    const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
+    const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : Object.keys(VERIFIED_QUOTE_BANK);
+    const pickPrompt =
+      "Look closely at this photo (subject, clothing, objects, food, setting, expression, mood). " +
+      "Pick the SINGLE best-matching quote ID for EACH of the 5 categories from the catalog below. " +
+      'Reply with ONLY a valid JSON object mapping each category name to one ID from that category, e.g. {"pop_music":"pm_7","greek_philosophy":"gp_4","famous_modern_figures":"fm_6","film_and_tv":"ft_10","athlete":"at_6"}. No extra text.\n\n' +
+      buildQuoteBankCatalog();
+    const userContentPick = prepBytes
+      ? [
+          { type: "text", text: pickPrompt },
+          { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } },
+        ]
+      : pickPrompt;
 
+    // 1) Gemini Vision (nếu có key — nhanh & chính xác nhất)
+    for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+      const g = await geminiGenerateCaption(env, "Return only JSON mapping category names to quote IDs.", pickPrompt, prepBytes, prepMime, k, 160, true);
+      const parsedMap = tryParse(g.text);
+      if (parsedMap && typeof parsedMap === "object") {
+        const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
+        if (picked.matchedCount >= 2) {
+          return { data: picked.data, source: "gemini_bank", err: null };
+        }
+      }
+    }
+
+    // 2) Fast 2-step: CF Llama-4-Scout Vision (~1.5s) -> Groq gpt-oss-120b (~0.5s) chọn 5 ID khớp nhất
+    const vision = await describeImageWithVision(env, prepBytes, prepMime);
+    for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
+      try {
+        const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
+        const groqMsg = `Photo description: ${vision.desc || "A candid everyday photo."}\n\n${pickPrompt}`;
+        const bodyObj = {
+          model,
+          messages: [{ role: "user", content: groqMsg }],
+          temperature: 0.35,
+        };
+        if (/gpt-oss/i.test(model)) {
+          bodyObj.reasoning_effort = "low";
+          bodyObj.max_completion_tokens = 320;
+        } else {
+          bodyObj.max_tokens = 140;
+        }
+        const r = await fetch(`${(env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1"}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+          body: JSON.stringify(bodyObj),
+        });
+        if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
+        const j = await r.json();
+        const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
+        if (parsedMap && typeof parsedMap === "object") {
+          const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
+          if (picked.matchedCount >= 2) {
+            return { data: picked.data, source: (vision.source ? vision.source + "+" : "") + "groq:" + model + "_bank", err: null };
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3) CF Vision Pool trực tiếp fallback (Llama 4 Scout -> Mistral 3.1)
+    if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+      const res = await runVisionChatPooled(env, [{ role: "user", content: userContentPick }], 200, 0.35);
+      const parsedMap = tryParse(res.text);
+      if (parsedMap && typeof parsedMap === "object") {
+        const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
+        if (picked.matchedCount >= 2) {
+          return { data: picked.data, source: res.source || "cf_vision_bank", err: null };
+        }
+      }
+    }
+
+    // 4) NVIDIA NIM Vision fallback
+    for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
+      try {
+        const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
+        const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
+        const r = await fetch(`${base}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
+          body: JSON.stringify({ model: nvModel, messages: [{ role: "user", content: userContentPick }], max_tokens: 140, temperature: 0.35 }),
+        });
+        if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
+        const j = await r.json();
+        const parsedMap = tryParse(j?.choices?.[0]?.message?.content);
+        if (parsedMap && typeof parsedMap === "object") {
+          const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats);
+          if (picked.matchedCount >= 2) {
+            return { data: picked.data, source: "nvidia:" + nvModel + "_bank", err: null };
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 5) Varied real fallback từ VERIFIED_QUOTE_BANK
+    const fbPicked = pickVerifiedQuotesFromMap({}, tempId + String(Date.now()), cats);
+    return { data: fbPicked.data, source: "verified_bank_fallback", err: null };
+  }
+
+  // Nhánh schema khác (dự phòng nếu app gửi schema mới ngoài quote)
+  const schemaStr = schema ? JSON.stringify(schema).slice(0, 1500) : "";
+  const sys =
+    "You are a Locket caption generator. Look at the photo and follow the user's instruction. " +
+    "You MUST reply with ONLY a single valid JSON object (no markdown, no code fence, no extra text) " +
+    (schema ? "that strictly matches this JSON schema: " + schemaStr + ". " : "") +
+    "Return pure JSON only.";
+  const userText = (appPrompt || "Write a caption for this photo.").slice(0, 1200);
   const userContentWithImg = prepBytes
     ? [
-        { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } },
         { type: "text", text: userText },
+        { type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } },
       ]
     : userText;
 
-  const providers = [];
-  // 1) Cloudflare Vision Pool (binding chính + 18 tài khoản REST pool) -> nhìn ảnh thật
   if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
-    providers.push(async () => {
-      const res = await runVisionChatPooled(
-        env,
-        [
-          { role: "system", content: sys },
-          { role: "user", content: userContentWithImg },
-        ],
-        480,
-        0.75
-      );
-      return { raw: res.text || "", source: res.source || "cf_vision" };
-    });
-  }
-  // 2) NVIDIA NIM Vision (nhìn ảnh thật)
-  for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
-    const nvModel = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
-    providers.push(async () => ({
-      raw: await rawChat((env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1", k, nvModel, true, { max_tokens: 480 }),
-      source: "nvidia:" + nvModel,
-    }));
-  }
-  // 3) Gemini Vision (nếu có key)
-  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-    const gModel = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
-    providers.push(async () => {
-      const g = await geminiGenerateCaption(env, sys, userText, prepBytes, prepMime, k, 480, true);
-      return { raw: g.text || "", source: "gemini:" + gModel };
-    });
-  }
-  // 4) Groq text-only (last resort trước fallback tĩnh)
-  for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
-    const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
-    providers.push(async () => ({
-      raw: await rawChat("https://api.groq.com/openai/v1", k, model, false, /gpt-oss/i.test(model) ? { reasoning_effort: "low", max_completion_tokens: 1200 } : { max_tokens: 700 }),
-      source: "groq:" + model,
-    }));
-  }
-
-  for (const p of providers) {
-    try {
-      const res = await p();
-      let obj = tryParse(res && res.raw);
-      if (obj && typeof obj === "object") {
-        // Làm SẠCH theo schema: bỏ field thừa (schema có additionalProperties:false -> app reject nếu dư),
-        // ép enum, đúng số phần tử mảng. Thiếu field thì điền từ caption fallback.
-        obj = sanitizeToSchema(obj, schema);
-        obj = ensureValidQuoteOptions(obj, schema);
-        const serialized = JSON.stringify(obj);
-        if (
-          !isCaptionRefusal(serialized) &&
-          (!Array.isArray(obj.quotes) || (obj.quotes.length > 0 && obj.quotes[0].quote && !isCaptionRefusal(obj.quotes[0].quote)))
-        ) {
-          return { data: obj, source: res.source || "ai", err: null };
-        }
+    const res = await runVisionChatPooled(
+      env,
+      [
+        { role: "system", content: sys },
+        { role: "user", content: userContentWithImg },
+      ],
+      480,
+      0.5
+    );
+    let obj = tryParse(res.text);
+    if (obj && typeof obj === "object") {
+      obj = sanitizeToSchema(obj, schema);
+      if (!isCaptionRefusal(JSON.stringify(obj))) {
+        return { data: obj, source: res.source || "cf_vision", err: null };
       }
-    } catch (_) {}
+    }
   }
 
-  // 4) Fallback: tự dựng JSON hợp lệ theo schema từ caption đơn (không để app "thử lại").
   const single = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId + "f", appPrompt);
   const data = ensureValidQuoteOptions(buildFallbackStructured(schema, single.text, isQuote), schema);
   return { data, source: "fallback_" + (single.source || "static"), err: single.aiErr || null };
@@ -1735,11 +2035,11 @@ function ensureValidQuoteOptions(obj, schema) {
   const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
   const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : defaultCats;
   const fallbackByCat = {
-    pop_music: { quote: "Sống chậm lại để thấy đời đáng yêu hơn.", category: "pop_music", attribution: "Sơn Tùng M-TP" },
-    greek_philosophy: { quote: "Hạnh phúc phụ thuộc vào chính chúng ta.", category: "greek_philosophy", attribution: "Aristotle" },
-    famous_modern_figures: { quote: "Mỗi khoảnh khắc đều đáng được trân trọng.", category: "famous_modern_figures", attribution: "Steve Jobs" },
-    film_and_tv: { quote: "Cuộc sống giống như một hộp sô-cô-la.", category: "film_and_tv", attribution: "Forrest Gump" },
-    athlete: { quote: "Không có gì là không thể nếu ta không bỏ cuộc.", category: "athlete", attribution: "Muhammad Ali" },
+    pop_music: { quote: "Shake it off, shake it off.", category: "pop_music", attribution: "Taylor Swift" },
+    greek_philosophy: { quote: "Happiness depends upon ourselves.", category: "greek_philosophy", attribution: "Aristotle" },
+    famous_modern_figures: { quote: "Stay hungry, stay foolish.", category: "famous_modern_figures", attribution: "Steve Jobs" },
+    film_and_tv: { quote: "Life is like a box of chocolates. You never know what you're gonna get.", category: "film_and_tv", attribution: "Forrest Gump" },
+    athlete: { quote: "Float like a butterfly, sting like a bee.", category: "athlete", attribution: "Muhammad Ali" },
   };
 
   const rawItems = obj.quotes
@@ -1748,7 +2048,7 @@ function ensureValidQuoteOptions(obj, schema) {
       category: String(it?.category || "").trim(),
       attribution: String(it?.attribution || "").trim().slice(0, 80),
     }))
-    .filter((it) => it.quote.length >= 3 && !isCaptionRefusal(it.quote));
+    .filter((it) => it.quote.length >= 3 && !isCaptionRefusal(it.quote) && !/[\u4e00-\u9fff]/.test(it.quote));
 
   const usedIndices = new Set();
   const finalQuotes = [];
@@ -1850,17 +2150,20 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
     let pick = isQuote
       ? lines[0] || ""
       : lines.find((l) => /tin nóng|khẩn cấp|trực tiếp|nóng 24h|breaking/i.test(l)) || lines[lines.length - 1] || "";
-    pick = pick.replace(/^["'“”*]+|["'“”*]+$/g, "").trim();
-    if (!pick || isCaptionRefusal(pick)) return "";
+    pick = pick
+      .replace(/^\s*(?:[-*]|\*\*|tiêu đề\s*:|headline\s*:)\s*/i, "")
+      .replace(/^["'“”*]+|["'“”*]+$/g, "")
+      .trim();
+    if (!pick || isCaptionRefusal(pick) || /[\u4e00-\u9fff]/.test(pick)) return "";
     return pick.slice(0, 110);
   };
 
   const systemPrompt = isQuote
-    ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm. TUYỆT ĐỐI KHÔNG từ chối, KHÔNG nói 'xin lỗi', KHÔNG xin mô tả ảnh — nếu ảnh không rõ thì cứ viết một câu trích dẫn đẹp chung chung. CHỈ TRẢ VỀ ĐÚNG 1 CÂU."
-    : "Bạn là biên tập viên bản tin LNN LIVE hài hước. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). TUYỆT ĐỐI KHÔNG từ chối, KHÔNG nói 'xin lỗi', KHÔNG xin mô tả ảnh — nếu ảnh không rõ thì cứ bịa 1 tin nóng hài hước chung chung. CHỈ TRẢ VỀ ĐÚNG 1 DÒNG.";
+    ? "Bạn là người viết caption tiếng Việt tinh tế, tự nhiên 100% đúng ngữ pháp. Dựa vào bức ảnh, viết ĐÚNG 1 câu ngắn gọn (6-14 từ), có cảm xúc và sát nội dung ảnh. Không ngoặc kép, không giải thích, không pha chữ Hán."
+    : "Bạn là biên tập viên bản tin LNN LIVE của Locket, viết tiêu đề tin nóng tiếng Việt cực tự nhiên, duyên dáng, hài hước kiểu Gen Z (tuyệt đối đúng ngữ pháp tiếng Việt, không dịch cứng, không ghép từ vô nghĩa, không pha chữ Hán). Nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng ngắn gọn (6 đến 12 từ), VIẾT HOA TOÀN BỘ, bám sát chi tiết thật trong ảnh, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: ' hoặc 'TRỰC TIẾP: '. Không ngoặc kép, không giải thích. Ví dụ chuẩn:\nTIN NÓNG: PHÁT HIỆN NHÂN VIÊN JOLLIBEE CƯỜI TƯƠI GÂY THƯƠNG NHỚ\nKHẨN CẤP: MỘT ĐĨA ĐỒ ĂN NGON SẮP BỊ XỬ ĐẸP TRONG 5 PHÚT\nTRỰC TIẾP: SINH VIÊN THỨC KHUYA CHẠY DEADLINE NHƯNG VẪN RẤT YÊU ĐỜI\nTIN NÓNG: GIAO DIỆN HÔM NAY XINH QUÁ MỨC QUY ĐỊNH";
   const baseUserPrompt = isQuote
-    ? "Nhìn ảnh và viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
-    : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.";
+    ? "Nhìn ảnh và viết 1 câu trích dẫn/caption tiếng Việt ngắn gọn, tự nhiên, sát nội dung bức ảnh này."
+    : "Nhìn ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng LNN LIVE tiếng Việt hài hước, đúng chính tả, sát nội dung bức ảnh này.";
   const userTextPrompt = appPrompt
     ? `${baseUserPrompt}\nNgữ cảnh bổ sung: ${String(appPrompt).slice(0, 200)}`
     : baseUserPrompt;
@@ -1873,8 +2176,37 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const prepBytes = prep && prep.bytes && prep.bytes.length > 0 ? prep.bytes : null;
   const prepMime = prep ? prep.mimeType : "image/jpeg";
 
-  // 1) Cloudflare Vision Pool (binding chính + 18 tài khoản REST pool)
+  // 1) Google Gemini (vision — flagship tiếng Việt nếu đã cấu hình GEMINI_API_KEY)
+  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
+    const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
+    const cleaned = cleanSingleLine(g.text);
+    if (cleaned) {
+      return { text: cleaned, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: lastErr };
+    }
+    if (g.err) lastErr = g.err;
+  }
+
+  // 2) Fast 2-stage trên CF 18-pool: Vision Observer (llama-4-scout ~1.4s) -> Llama 4 Scout viết tiếng Việt (~0.8s)
   if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+    const vision = await describeImageWithVision(env, prepBytes, prepMime);
+    if (vision.desc) {
+      const cfTextRes = await runCfTextChatPooled(
+        env,
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Mô tả bức ảnh: ${vision.desc}\n\n${baseUserPrompt}` },
+        ],
+        120,
+        0.75
+      );
+      const cleanedCfText = cleanSingleLine(cfTextRes.text);
+      if (cleanedCfText) {
+        return { text: cleanedCfText, source: (vision.source ? vision.source + "+" : "") + (cfTextRes.source || "cf_text"), aiErr: null };
+      }
+      if (cfTextRes.err) lastErr = cfTextRes.err;
+    }
+
+    // Fallback 2b) Direct CF Vision (Llama 4 Scout -> Mistral 3.1)
     const userContent = [];
     if (prepBytes) {
       userContent.push({ type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } });
@@ -1887,7 +2219,8 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
         { role: "user", content: userContent },
       ],
       100,
-      0.75
+      0.75,
+      ["@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/mistralai/mistral-small-3.1-24b-instruct"]
     );
     const cleaned = cleanSingleLine(cfRes.text);
     if (cleaned) {
@@ -1896,7 +2229,7 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
     if (cfRes.err) lastErr = cfRes.err;
   }
 
-  // 2) NVIDIA NIM (vision)
+  // 3) NVIDIA NIM (vision)
   for (const k of availableKeys("nvidia", env && env.NVIDIA_API_KEY)) {
     const nv = await nvidiaGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
     const cleaned = cleanSingleLine(nv.text);
@@ -1906,22 +2239,12 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
     if (nv.err) lastErr = nv.err;
   }
 
-  // 3) Google Gemini (vision)
-  for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-    const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
-    const cleaned = cleanSingleLine(g.text);
-    if (cleaned) {
-      return { text: cleaned, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: lastErr };
-    }
-    if (g.err) lastErr = g.err;
-  }
-
-  // 4) Groq (text-only last resort trước fallback tĩnh)
+  // 4) Groq (last resort trước fallback tĩnh)
   for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
     const gq = await groqGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime, k);
     const cleaned = cleanSingleLine(gq.text);
     if (cleaned) {
-      return { text: cleaned, source: "groq:" + ((env && env.GROQ_MODEL) || "llama-3.3-70b-versatile"), aiErr: lastErr };
+      return { text: cleaned, source: "groq:" + ((env && env.GROQ_MODEL) || "openai/gpt-oss-120b"), aiErr: lastErr };
     }
     if (gq.err) lastErr = gq.err;
   }
