@@ -350,8 +350,18 @@ delete baseRcEntries["invite_link_preview_variant"];
 delete baseRcEntries["friend_limit_geo_override"];
 
 baseRcEntries["camera"] = JSON.stringify({ "gold_max_duration": 30, "max_duration": 30, "ultra_wide": true, "volume_button": true, "flash_button": true, "telephoto": true, "srgb": true, "lanczos": true, "quality_mbps": 1.2 });
-baseRcEntries["camera_roll"] = JSON.stringify({ "gold_max_duration": 30, "video_max_duration": 30, "max_duration": 30, "trim_max_duration": 30, "camera_roll_max_duration": 30, "quality_mbps": 1.2, "flash_button": true });
+// camera_config: biến thể snake + camelCase mà binary Locket 2.74.0 đọc (đối chiếu RC gốc vps)
+baseRcEntries["camera_config"] = JSON.stringify({ "gold_max_duration": 30, "goldMaxDuration": 30, "max_duration": 30, "maxDuration": 30, "ultra_wide": true, "ultraWide": true, "volume_button": true, "volumeButton": true, "flash_button": true, "telephoto": true, "lanczos": true, "quality_mbps": 1.2, "qualityMbps": 1.2 });
+// camera_roll: đủ cả snake + camelCase + các khoá bật video thư viện (giúp up video 10s KHÔNG báo "Thử lại")
+baseRcEntries["camera_roll"] = JSON.stringify({ "gold_max_duration": 30, "goldMaxDuration": 30, "video_max_duration": 30, "videoMaxDuration": 30, "max_duration": 30, "maxDuration": 30, "trim_max_duration": 30, "camera_roll_max_duration": 30, "cameraRollMaxDuration": 30, "quality_mbps": 1.2, "qualityMbps": 1.2, "flash_button": true });
 baseRcEntries["longer_camera_roll_videos_enabled"] = "true";
+baseRcEntries["camera_roll_preview_enabled"] = "true";
+baseRcEntries["camera_roll_video_enabled"] = "true";
+baseRcEntries["camera_roll_video_upload_enabled"] = "true";
+baseRcEntries["internal_camera_roll_video_upload_enabled"] = "true";
+baseRcEntries["camera_roll_video_max_duration"] = "30";
+baseRcEntries["camera_roll_max_duration"] = "30";
+baseRcEntries["camera_roll_duration"] = "30";
 baseRcEntries["camera_quality_mbps"] = "1.2";
 baseRcEntries["camera_roll_quality_mbps"] = "1.2";
 baseRcEntries["video_quality_mbps"] = "1.2";
@@ -498,25 +508,26 @@ const fallbackFilterCfg = {
     remote_filters: []
 };
 
-// Không ghi đè cứng overlay_items & camera_filter_config để giữ nguyên 100% Caption ngày lễ mới nhất & Filter chính chủ của Locket!
+// Không ghi đè cứng overlay_items, camera_filter_config & feature_gates để giữ nguyên 100%
+// Caption ngày lễ mới nhất, Filter chính chủ, VÀ TOÀN BỘ feature_gates native của Locket 2.74.0.
+// (feature_gates được MERGE động trong runtime script phía dưới — KHÔNG ghi đè bằng snapshot cũ,
+//  nếu không sẽ nuốt mất các gate mới như camera_roll_video / photo_library_video / Dazz Cam.)
 delete baseRcEntries["overlay_items"];
 delete baseRcEntries["camera_filter_config"];
-try {
-    const fg = JSON.parse(baseRcEntries["feature_gates"] || "{}");
-    fg.camera_filter_sheet = "enabled";
-    fg.camera_filters = "enabled";
-    fg.ai_filters = "enabled";
-    fg.camera_filter_button = "enabled";
-    fg.custom_filters = "enabled";
-    fg.camera_viewfinder_controls = "enabled";
-    fg.camera_modes = "enabled";
-    fg.digicam = "enabled";
-    fg.camera_roll = "enabled";
-    fg.video = "enabled";
-    fg.longer_video = "enabled";
-    baseRcEntries["feature_gates"] = JSON.stringify(fg);
-} catch (_) {}
-baseRcEntries["feature_gates_override"] = JSON.stringify({ "camera_viewfinder_controls": "enabled" });
+delete baseRcEntries["feature_gates"];
+delete baseRcEntries["feature_gates_override"];
+// Danh sách gate Gold cần ÉP BẬT, merge lên trên feature_gates LIVE của server (không xoá gate nào).
+// Chỉ gồm các gate THẬT mà binary Locket 2.74.0 đọc (đã đối chiếu RC gốc) — bỏ các tên bịa.
+const TOMMM_FORCE_GATES = [
+    "camera_roll", "camera_roll_video", "camera_roll_video_30s", "camera_roll_video_upload",
+    "photo_library_video", "can_upload_30s_video", "can_record_30s_video",
+    "video", "video_30s", "video_60s", "longer_video", "longer_video_30s", "extended_video_30s",
+    "camera_filter_sheet", "camera_filters", "camera_filter", "filter", "filters",
+    "photo_filters", "ai_filters", "ar_filters", "face_filters",
+    "camera_filter_button", "custom_filters", "create_filter",
+    "holiday_effects", "holiday_filters", "camera_theme",
+    "long_captions", "remove_ads", "profile_badge", "unlimited_friends"
+];
 baseRcEntries["overlay_dynamic_captions"] = JSON.stringify([
     "standard", "poll", "color_palette", "review", "quote", "breaking_news",
     "music", "location", "weather", "time", "streak", "star_sign",
@@ -554,6 +565,19 @@ try {
     liveStreak.minimum_display_count = 0;
     obj.entries["streak_config"] = JSON.stringify(liveStreak);
 } catch (_) {}
+
+// 2b. MERGE feature_gates: GIỮ NGUYÊN toàn bộ gate native mà server Locket 2.74.0 trả về
+// (camera_roll_video, photo_library_video, Dazz Cam, v.v.), chỉ ÉP BẬT thêm các gate Gold cần.
+// Đây là điểm mấu chốt giữ nút [📷] Dazz Cam & cho up video 10s từ thư viện (giống khi chặn DNS).
+var TOMMM_FORCE_GATES = ${JSON.stringify(TOMMM_FORCE_GATES)};
+var liveGates = {};
+try { liveGates = JSON.parse(obj.entries["feature_gates"] || "{}"); } catch (_) { liveGates = {}; }
+if (!liveGates || typeof liveGates !== "object") liveGates = {};
+for (var fgi = 0; fgi < TOMMM_FORCE_GATES.length; fgi++) {
+    liveGates[TOMMM_FORCE_GATES[fgi]] = "enabled";
+}
+obj.entries["feature_gates"] = JSON.stringify(liveGates);
+
 var TOMMM_ENTRIES = ${JSON.stringify(baseRcEntries)};
 Object.assign(obj.entries, TOMMM_ENTRIES);
 
@@ -834,12 +858,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=28, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=28, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=28, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=28, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=28, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=28, requires-body=true, max-size=131072, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=29, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=29, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=29, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=29, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=29, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=29, requires-body=true, max-size=131072, timeout=60
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -906,12 +930,12 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/initplayback.+&oad 'data-type=text data="" status-code=200'
 
 [Script]
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=28, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=28, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=28, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=28, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=28, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=28, requires-body=true, max-size=131072, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=29, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=29, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=29, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(generateFilteredImage|generateFilter|applyFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=29, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=29, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(changeProfileInfo|fetchUser), script-path=${ghRawBase}/js_tommm_badge.js?v=29, requires-body=true, max-size=131072, timeout=60
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com

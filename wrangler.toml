@@ -9,6 +9,15 @@ binding = "AI"
 AI_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
 AI_OUTPUT_SIZE = "768"
 GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets"
+# Fallback Google Gemini khi Cloudflare Workers AI hết quota 4006 (10.000 neurons/ngày).
+# API key KHÔNG để ở đây — lưu bằng: npx wrangler secret put GEMINI_API_KEY  (an toàn, không commit).
+# Dùng alias "-latest" để Google tự trỏ về bản Flash free mới nhất (khỏi phải sửa tên model khi Google đổi).
+# Nếu muốn ghim bản cụ thể (vd gemini-3.6-flash), chỉ cần đổi giá trị dưới đây rồi deploy lại.
+GEMINI_TEXT_MODEL = "gemini-flash-latest"
+GEMINI_IMAGE_MODEL = "gemini-flash-image-latest"
+# Fallback miễn phí thứ 2 cho CAPTION: NVIDIA NIM (API tương thích OpenAI, nhiều model free credits).
+# Key: npx wrangler secret put NVIDIA_API_KEY  (lấy ở build.nvidia.com). Model đổi tuỳ ý.
+NVIDIA_MODEL = "meta/llama-3.2-11b-vision-instruct"
 
 [durable_objects]
 bindings = [

@@ -1,4 +1,8 @@
-name = "locket-tommm-ai"
+# LƯU Ý: File deploy CHÍNH là ../wrangler.toml ở thư mục gốc dự án.
+# Luôn deploy bằng: (ở D:\Locket_Gold_Tommm)  npx wrangler deploy
+# File này chỉ để phòng khi lỡ chạy `wrangler deploy` TỪ TRONG thư mục cloudflare-worker,
+# nên nó được giữ KHỚP 100% với file gốc (cùng tên worker, cùng binding) để không tạo worker lạc "locket-tommm-ai".
+name = "locket-tommm-studio"
 main = "worker.js"
 compatibility_date = "2026-01-01"
 
@@ -6,5 +10,18 @@ compatibility_date = "2026-01-01"
 binding = "AI"
 
 [vars]
-GEMINI_MODEL = "gemini-3.1-flash-lite-image"
+AI_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
+AI_OUTPUT_SIZE = "768"
 GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets"
+GEMINI_TEXT_MODEL = "gemini-flash-latest"
+GEMINI_IMAGE_MODEL = "gemini-flash-image-latest"
+NVIDIA_MODEL = "meta/llama-3.2-11b-vision-instruct"
+
+[durable_objects]
+bindings = [
+  { name = "STUDIO", class_name = "StudioRoom" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StudioRoom"]

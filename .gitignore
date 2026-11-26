@@ -3,3 +3,20 @@ Locket_Tommm_Private.conf
 output/
 *.pyc
 __pycache__/
+
+# File riêng tư / nháp — TUYỆT ĐỐI không commit (chứa thiết bị, key, cert MITM, hoặc chỉ là script debug)
+push_to_iphone.py
+iphone_current_conf.txt
+check_sizes.js
+compare_dv_tommm.js
+diagnose_rc.js
+
+# Thư mục tạm của wrangler
+.wrangler/
+cloudflare-worker/.wrangler/
+
+# Không bao giờ commit bất kỳ file key/secret nào
+*.key
+*.pem
+.dev.vars
+.env

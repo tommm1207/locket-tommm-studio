@@ -121,6 +121,10 @@ const FRAME_CACHE = new Map();
 const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
+// Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
+// Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
+let CF_AI_QUOTA_HIT_UNTIL = 0;
+let LAST_FALLBACK_DEBUG = null;
 
 const CRC_TABLE = new Uint32Array(256);
 for (let n = 0; n < 256; n++) {
@@ -835,12 +839,19 @@ async function runCloudflareFluxEdit(env, promptText, inputImg, refImg, modelOve
   }
 
   const formResp = new Response(form);
-  const aiResp = await env.AI.run(aiModel, {
-    multipart: {
-      body: formResp.body,
-      contentType: formResp.headers.get("content-type"),
-    },
-  });
+  let aiResp;
+  try {
+    aiResp = await env.AI.run(aiModel, {
+      multipart: {
+        body: formResp.body,
+        contentType: formResp.headers.get("content-type"),
+      },
+    });
+  } catch (runErr) {
+    // Hết quota 4006 -> đánh dấu để các request sau fallback thẳng sang Gemini.
+    if (isQuotaOrCapacityError(runErr)) markCfAiQuotaHit();
+    throw runErr;
+  }
 
   let bytes = null;
   if (typeof aiResp?.image === "string") {
@@ -1010,6 +1021,156 @@ function uint8ToBase64(bytes) {
   return btoa(bin);
 }
 
+// =========================================================================
+// FALLBACK MIỄN PHÍ KHI CLOUDFLARE WORKERS AI HẾT QUOTA (lỗi 4006 - 10.000 neurons/ngày)
+// - Dùng Google Gemini API (GEMINI_API_KEY lưu qua `wrangler secret`, KHÔNG hardcode vào git)
+// - Caption: gemini-*-flash (text + vision). Tách nền/sửa ảnh: model image (vd gemini-*-flash-image)
+// =========================================================================
+
+// Nhận diện lỗi hết quota / giới hạn của Cloudflare Workers AI để chủ động fallback.
+function isQuotaOrCapacityError(err) {
+  const msg = String((err && (err.message || err.toString())) || err || "").toLowerCase();
+  return (
+    msg.includes("4006") ||
+    msg.includes("daily free allocation") ||
+    msg.includes("used up") ||
+    msg.includes("out of neurons") ||
+    msg.includes("capacity temporarily exceeded") ||
+    msg.includes("3040") || // account-level rate limit
+    (msg.includes("quota") && msg.includes("exceed")) ||
+    msg.includes("too many requests") ||
+    msg.includes("429")
+  );
+}
+
+function cfAiQuotaActive() {
+  return Date.now() < CF_AI_QUOTA_HIT_UNTIL;
+}
+
+function markCfAiQuotaHit() {
+  // Nghỉ 20 phút rồi thử lại Cloudflare AI (quota reset ~07:00 nhưng vẫn thử định kỳ phòng khi tạm thời).
+  CF_AI_QUOTA_HIT_UNTIL = Date.now() + 20 * 60 * 1000;
+}
+
+// Gọi Gemini generateContent cho CAPTION (text, có kèm ảnh nếu có). Trả chuỗi text hoặc null.
+async function geminiGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime) {
+  const key = env && env.GEMINI_API_KEY;
+  if (!key) return { text: null, err: "no_gemini_key" };
+  const model = (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+
+  const parts = [{ text: userText }];
+  if (imgBytes && imgBytes.length > 0) {
+    parts.push({ inline_data: { mime_type: imgMime || "image/jpeg", data: uint8ToBase64(imgBytes) } });
+  }
+  const payload = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: "user", parts }],
+    generationConfig: { temperature: 0.8, maxOutputTokens: 120 },
+  };
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) {
+      return { text: null, err: `gemini_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
+    }
+    const j = await r.json();
+    const cand = j && j.candidates && j.candidates[0];
+    const txtParts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
+    let txt = txtParts.map((p) => (typeof p.text === "string" ? p.text : "")).join(" ").trim();
+    txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
+    if (txt && txt.length >= 3) return { text: txt.slice(0, 120), err: null };
+    return { text: null, err: "gemini_empty" };
+  } catch (e) {
+    return { text: null, err: String(e && e.message || e) };
+  }
+}
+
+// Gọi NVIDIA NIM (API tương thích OpenAI) cho CAPTION — tầng fallback miễn phí thứ 2.
+// NVIDIA NIM có nhiều model free credits, gồm vision (nhận ảnh base64 trong nội dung).
+// Key lưu qua: npx wrangler secret put NVIDIA_API_KEY
+async function nvidiaGenerateCaption(env, systemPrompt, userText, imgBytes, imgMime) {
+  const key = env && env.NVIDIA_API_KEY;
+  if (!key) return { text: null, err: "no_nvidia_key" };
+  // Model vision mặc định; đổi qua env NVIDIA_MODEL nếu muốn (vd meta/llama-3.1-8b-instruct cho text thuần).
+  const model = (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct";
+  const base = (env && env.NVIDIA_BASE_URL) || "https://integrate.api.nvidia.com/v1";
+
+  // NIM vision nhận ảnh dạng <img src="data:..."> nhúng trong text (chuẩn của NVIDIA cho llama-vision),
+  // hoặc theo kiểu OpenAI image_url. Ưu tiên image_url, nếu model không hỗ trợ sẽ bỏ qua ảnh.
+  const userContent = [];
+  if (imgBytes && imgBytes.length > 0) {
+    userContent.push({ type: "image_url", image_url: { url: `data:${imgMime || "image/jpeg"};base64,${uint8ToBase64(imgBytes)}` } });
+  }
+  userContent.push({ type: "text", text: userText });
+
+  const payload = {
+    model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: imgBytes && imgBytes.length > 0 ? userContent : userText },
+    ],
+    max_tokens: 90,
+    temperature: 0.8,
+  };
+  try {
+    const r = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) return { text: null, err: `nvidia_http_${r.status}: ${(await r.text()).slice(0, 160)}` };
+    const j = await r.json();
+    let txt = String(j?.choices?.[0]?.message?.content || "").trim();
+    txt = txt.replace(/^["'“”]+|["'“”]+$/g, "").split(/\r?\n/)[0].trim();
+    if (txt && txt.length >= 3) return { text: txt.slice(0, 120), err: null };
+    return { text: null, err: "nvidia_empty" };
+  } catch (e) {
+    return { text: null, err: String(e && e.message || e) };
+  }
+}
+
+// Gọi Gemini image model để SỬA/TÁCH NỀN ảnh. Trả { bytes, mimeType } hoặc null.
+async function geminiEditImage(env, promptText, imgBytes, imgMime) {
+  const key = env && env.GEMINI_API_KEY;
+  if (!key) return null;
+  const model = (env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+
+  const parts = [{ text: promptText }];
+  if (imgBytes && imgBytes.length > 0) {
+    parts.push({ inline_data: { mime_type: imgMime || "image/jpeg", data: uint8ToBase64(imgBytes) } });
+  }
+  const payload = {
+    contents: [{ role: "user", parts }],
+    generationConfig: { responseModalities: ["IMAGE"] },
+  };
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const cand = j && j.candidates && j.candidates[0];
+    const outParts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
+    for (const p of outParts) {
+      const inl = p.inline_data || p.inlineData;
+      if (inl && inl.data) {
+        const bytes = base64ToUint8Array(inl.data);
+        return { bytes, ...sniffImageFormat(bytes) };
+      }
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, origin, tempId) {
   const isQuote = String(captionType || "").toLowerCase().includes("quote");
   const fallbackNews = [
@@ -1027,28 +1188,49 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   const fallbackList = isQuote ? fallbackQuotes : fallbackNews;
   const fallbackText = fallbackList[Math.floor(Math.random() * fallbackList.length)];
 
-  if (!env || !env.AI) return { text: fallbackText, source: "fallback_no_ai", aiErr: null };
+  const systemPrompt = isQuote
+    ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh Locket. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm."
+    : "Bạn là biên tập viên bản tin LNN LIVE hài hước trên Locket. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). Không giải thích thêm.";
+  const userTextPrompt = isQuote
+    ? "Nhìn ảnh và viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
+    : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.";
 
   let lastErr = null;
+  let prep = null;
   try {
-    const prep = await prepareAiInputImage(imgBytes, sourceUrl, origin, tempId);
-    const systemPrompt = isQuote
-      ? "Bạn là người viết caption tiếng Việt tinh tế cho ảnh Locket. Dựa vào nội dung bức ảnh, hãy viết ĐÚNG 1 câu trích dẫn ngắn gọn (6-14 chữ), sâu lắng hoặc dễ thương bằng tiếng Việt, KHÔNG dùng ngoặc kép, KHÔNG giải thích thêm."
-      : "Bạn là biên tập viên bản tin LNN LIVE hài hước trên Locket. Hãy nhìn kỹ bức ảnh và viết ĐÚNG 1 dòng tiêu đề tin nóng tiếng Việt thật hài hước, bắt trend Gen Z (tối đa 11 chữ, VIẾT HOA TOÀN BỘ, bắt đầu bằng 'TIN NÓNG: ' hoặc 'KHẨN CẤP: '). Không giải thích thêm.";
+    prep = await prepareAiInputImage(imgBytes, sourceUrl, origin, tempId);
+  } catch (_) {}
+  const prepBytes = prep && prep.bytes && prep.bytes.length > 0 ? prep.bytes : null;
+  const prepMime = prep ? prep.mimeType : "image/jpeg";
 
-    const userContent = [];
-    if (prep && prep.bytes && prep.bytes.length > 0) {
-      userContent.push({
-        type: "image_url",
-        image_url: { url: `data:${prep.mimeType};base64,${uint8ToBase64(prep.bytes)}` },
-      });
+  // Chuỗi fallback miễn phí khi Cloudflare AI không khả dụng: NVIDIA NIM -> Gemini -> caption tĩnh.
+  const tryFreeFallback = async (reasonTag) => {
+    // 1) NVIDIA NIM (nếu có key)
+    if (env && env.NVIDIA_API_KEY) {
+      const nv = await nvidiaGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime);
+      if (nv.text) return { text: nv.text, source: "nvidia:" + ((env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct"), aiErr: reasonTag || null };
     }
-    userContent.push({
-      type: "text",
-      text: isQuote
-        ? "Nhìn ảnh và viết 1 câu trích dẫn tiếng Việt ngắn phù hợp với ảnh này."
-        : "Nhìn ảnh và viết 1 dòng tin nóng LNN LIVE hài hước bằng tiếng Việt.",
-    });
+    // 2) Google Gemini (nếu có key)
+    if (env && env.GEMINI_API_KEY) {
+      const g = await geminiGenerateCaption(env, systemPrompt, userTextPrompt, prepBytes, prepMime);
+      if (g.text) return { text: g.text, source: "gemini:" + ((env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest"), aiErr: reasonTag || null };
+    }
+    // 3) Caption tĩnh vui (luôn trả được chữ, không bao giờ để trống)
+    return { text: fallbackText, source: "fallback_" + (reasonTag || "err"), aiErr: reasonTag || null };
+  };
+  const tryGemini = tryFreeFallback; // giữ tên cũ cho các lời gọi phía dưới
+
+  // Nếu Cloudflare AI vừa chạm quota (4006) hoặc không có binding -> đi thẳng Gemini.
+  if (!env || !env.AI || cfAiQuotaActive()) {
+    return await tryGemini(!env || !env.AI ? "no_cf_ai" : "cf_quota_cooldown");
+  }
+
+  try {
+    const userContent = [];
+    if (prepBytes) {
+      userContent.push({ type: "image_url", image_url: { url: `data:${prepMime};base64,${uint8ToBase64(prepBytes)}` } });
+    }
+    userContent.push({ type: "text", text: userTextPrompt });
 
     const payload = {
       messages: [
@@ -1070,6 +1252,11 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
       } catch (mErr) {
         const msg = String(mErr?.message || mErr);
         lastErr = msg;
+        // Hết quota Cloudflare -> ghi nhận & fallback Gemini ngay, không thử model CF khác nữa.
+        if (isQuotaOrCapacityError(mErr)) {
+          markCfAiQuotaHit();
+          return await tryGemini("cf_quota_4006");
+        }
         if (modelId.includes("llama-3.2") && /agree|license|5016/i.test(msg)) {
           try {
             await env.AI.run(modelId, { prompt: "agree" });
@@ -1081,14 +1268,20 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
             }
           } catch (rErr) {
             lastErr = String(rErr?.message || rErr);
+            if (isQuotaOrCapacityError(rErr)) {
+              markCfAiQuotaHit();
+              return await tryGemini("cf_quota_4006");
+            }
           }
         }
       }
     }
   } catch (outerErr) {
     lastErr = String(outerErr?.message || outerErr);
+    if (isQuotaOrCapacityError(outerErr)) markCfAiQuotaHit();
   }
-  return { text: fallbackText, source: "fallback_err", aiErr: lastErr };
+  // Cloudflare AI trả rỗng/lỗi khác -> thử Gemini trước khi dùng fallback tĩnh.
+  return await tryGemini(lastErr ? "cf_err" : "cf_empty");
 }
 
 async function handleStudioRequest(request, env) {
@@ -1108,6 +1301,13 @@ async function handleStudioRequest(request, env) {
         owner: "Tommm",
         ai_model: (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b",
         ai_binding_ready: !!(env && env.AI),
+        nvidia_fallback_ready: !!(env && env.NVIDIA_API_KEY),
+        nvidia_model: (env && env.NVIDIA_MODEL) || "meta/llama-3.2-11b-vision-instruct",
+        gemini_fallback_ready: !!(env && env.GEMINI_API_KEY),
+        gemini_text_model: (env && env.GEMINI_TEXT_MODEL) || "gemini-flash-latest",
+        gemini_image_model: (env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest",
+        cf_ai_quota_hit: cfAiQuotaActive(),
+        cf_ai_quota_cooldown_until: CF_AI_QUOTA_HIT_UNTIL ? new Date(CF_AI_QUOTA_HIT_UNTIL).toISOString() : null,
         ai_prompts_loaded: Object.keys(AI_FILTER_PROMPTS).length,
         luts_loaded: Object.keys(LUT_FILTERS).length,
         frames_loaded: Object.keys(FRAMES_MANIFEST).length,
@@ -1115,6 +1315,7 @@ async function handleStudioRequest(request, env) {
         cached_images_in_ram: MEMORY_IMAGES.size,
         last_debug: LAST_DEBUG,
         last_caption_debug: LAST_CAPTION_DEBUG,
+        last_fallback_debug: LAST_FALLBACK_DEBUG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
     );
@@ -1211,6 +1412,9 @@ async function handleStudioRequest(request, env) {
     const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
     const gen = await generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, url.origin, tempId);
     const cleanText = gen.text;
+    if (gen.source && (gen.source.startsWith("gemini") || gen.source.startsWith("fallback"))) {
+      LAST_FALLBACK_DEBUG = { kind: "caption", source: gen.source, reason: gen.aiErr || null, ts: new Date().toISOString() };
+    }
 
     const rfSchema = dataNode?.response_format?.json_schema?.schema?.properties || dataNode?.response_format?.properties || null;
     const rfKeys = rfSchema && typeof rfSchema === "object" ? Object.keys(rfSchema) : [];
@@ -1303,17 +1507,29 @@ async function handleStudioRequest(request, env) {
       let maskApplied = false;
       let fgRatio = 0;
       let segModelUsed = null;
-      if (env && env.AI && preparedMaskInput && preparedMaskInput.bytes) {
+      if (preparedMaskInput && preparedMaskInput.bytes) {
         const segPrompt =
           "Create a pure black-and-white binary foreground segmentation matte of this exact image. Fill the entire main foreground subject (person, face, hair, hands, clothing, bag, food dish/bowl, pet, or prominent foreground object/tower) in solid pure white (#FFFFFF) and fill the entire background behind it in solid pure black (#000000). Keep exact pixel alignment with zero cropping or shifting. Pure white subject on pure black background only.";
         let maskOut = null;
-        // Prefer fast 4B model first to save daily free neurons (~3x cheaper than 9B)
-        for (const candModel of [(env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b", "@cf/black-forest-labs/flux-2-klein-9b"]) {
-          try {
-            maskOut = await runCloudflareFluxEdit(env, segPrompt, preparedMaskInput, null, candModel, SIZE);
-            segModelUsed = candModel;
-            break;
-          } catch (_) {}
+        // Cloudflare Workers AI trước (ưu tiên 4B để tiết kiệm neurons), bỏ qua nếu đang cooldown quota 4006.
+        if (env && env.AI && !cfAiQuotaActive()) {
+          for (const candModel of [(env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b", "@cf/black-forest-labs/flux-2-klein-9b"]) {
+            try {
+              maskOut = await runCloudflareFluxEdit(env, segPrompt, preparedMaskInput, null, candModel, SIZE);
+              segModelUsed = candModel;
+              break;
+            } catch (segErr) {
+              if (isQuotaOrCapacityError(segErr)) break; // hết quota -> sang Gemini luôn
+            }
+          }
+        }
+        // Fallback tách nền bằng Gemini image khi Cloudflare AI hết quota / không có binding.
+        if ((!maskOut || !maskOut.bytes) && env && env.GEMINI_API_KEY) {
+          const gMask = await geminiEditImage(env, segPrompt, preparedMaskInput.bytes, preparedMaskInput.mimeType);
+          if (gMask && gMask.bytes) {
+            maskOut = gMask;
+            segModelUsed = "gemini:" + ((env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest");
+          }
         }
         if (maskOut && maskOut.bytes) {
           const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, url.origin, `msk_${tempId}`, SIZE);
@@ -1530,8 +1746,9 @@ async function handleStudioRequest(request, env) {
       } catch (_) {}
     }
 
-    // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 4B) for Custom AI 3D Hot, Custom Prompts, or fallback
-    if (aiReq && env && env.AI) {
+    // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 4B) cho Custom AI 3D Hot / Custom Prompt,
+    // kèm FALLBACK Google Gemini image khi Cloudflare hết quota 4006 (dịch vụ không gián đoạn).
+    if (aiReq && env && (env.AI || env.GEMINI_API_KEY)) {
       const t0 = Date.now();
       try {
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
@@ -1544,30 +1761,56 @@ async function handleStudioRequest(request, env) {
                 .catch(() => null)
             : Promise.resolve(null),
         ]);
-        const aiOut = await runCloudflareFluxEdit(env, aiReq.prompt, preparedInput, refImg);
 
-        const outId = `tommm_ai_${tempId}.${aiOut.ext}`;
-        MEMORY_IMAGES.set(outId, {
-          bytes: aiOut.bytes,
-          mimeType: aiOut.mimeType,
-          ts: Date.now(),
-        });
+        let aiOut = null;
+        let usedModel = null;
+        let cfErr = null;
+        // Thử Cloudflare FLUX trước (nếu không đang cooldown quota).
+        if (env.AI && !cfAiQuotaActive()) {
+          try {
+            aiOut = await runCloudflareFluxEdit(env, aiReq.prompt, preparedInput, refImg);
+            usedModel = aiOut.aiModel;
+          } catch (err) {
+            cfErr = String(err?.message || err);
+            // (markCfAiQuotaHit đã được gọi bên trong runCloudflareFluxEdit nếu là lỗi 4006)
+          }
+        }
+        // Fallback Gemini image khi Cloudflare không cho ảnh (hết quota / lỗi / không có binding).
+        if ((!aiOut || !aiOut.bytes) && env.GEMINI_API_KEY && preparedInput && preparedInput.bytes) {
+          const gOut = await geminiEditImage(env, aiReq.prompt, preparedInput.bytes, preparedInput.mimeType);
+          if (gOut && gOut.bytes) {
+            aiOut = gOut;
+            usedModel = "gemini:" + ((env && env.GEMINI_IMAGE_MODEL) || "gemini-flash-image-latest");
+          }
+        }
 
+        if (aiOut && aiOut.bytes) {
+          const outId = `tommm_ai_${tempId}.${aiOut.ext}`;
+          MEMORY_IMAGES.set(outId, { bytes: aiOut.bytes, mimeType: aiOut.mimeType, ts: Date.now() });
+          LAST_DEBUG = {
+            mode: usedModel && usedModel.startsWith("gemini") ? "ai_gemini_fallback" : (isCustomAi ? "ai_flux_custom" : "ai_flux_fallback"),
+            aiModel: usedModel,
+            cfErr,
+            filterId: aiReq.filterId,
+            source: aiReq.source,
+            got_input: !!imgBytes,
+            input_bytes: preparedInput?.bytes?.length || 0,
+            out_mime: aiOut.mimeType,
+            out_bytes: aiOut.bytes.length,
+            ms: Date.now() - t0,
+            error: null,
+            ts: new Date().toISOString(),
+          };
+          return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+        }
         LAST_DEBUG = {
-          mode: isCustomAi ? "ai_flux_custom" : "ai_flux_fallback",
-          aiModel: aiOut.aiModel,
+          mode: "ai_error",
           filterId: aiReq.filterId,
-          source: aiReq.source,
-          got_input: !!imgBytes,
-          input_bytes: preparedInput?.bytes?.length || 0,
-          out_mime: aiOut.mimeType,
-          out_bytes: aiOut.bytes.length,
+          cfErr,
+          error: cfErr || "no_image_from_cf_or_gemini",
           ms: Date.now() - t0,
-          error: null,
           ts: new Date().toISOString(),
         };
-
-        return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
       } catch (err) {
         LAST_DEBUG = {
           mode: "ai_error",
