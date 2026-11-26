@@ -42,12 +42,18 @@ const CUSTOM_AI_IDS = new Set([
 
 const AI_FILTER_PROMPTS = {
   // 26 Custom AI 3D Hot & extra filters
-  stk_tai_tho: "Place a cute fluffy white plush bunny ears headband with soft pink inner ears realistically on top of the person's head.",
-  stk_mu_ngu_khoc: "Put a cozy cream knit sleeping cap on the person's head, add soft rosy cheeks and two tiny cute translucent teardrop tears beneath the eyes.",
-  stk_jollibee: "Change only the person's shirt and headwear into a crisp red-and-yellow Jollibee crew uniform shirt and matching red Jollibee cap.",
-  stk_nak_ve_than: "Give the person sleek silver-white center-parted hair with shoulder-length locks and dress them in a realistic futuristic blue-and-silver Nakroth Dimensional Guardian cosplay armor jacket.",
-  stk_gojo_satoru: "Give the person spiky silver-white hair, place a sleek black fabric blindfold over their eyes, and dress them in a black high-collar Jujutsu uniform jacket.",
-  stk_shopee_food: "Dress the person in an authentic bright orange ShopeeFood delivery jacket and matching orange delivery helmet or cap with realistic fabric textures.",
+  stk_tai_tho:
+    "Keep the person's exact face, expression, pose, and background from the photo, and realistically place a cute fluffy white and soft pink plush bunny ears headband sitting naturally on top of their head with matching soft lighting and natural shadows. If there are multiple people, put a matching bunny ears headband on each person cleanly.",
+  stk_mu_ngu_khoc:
+    "Apply the exact cartoon face filter from the second reference image to the person's face in the first photo: 1) A cream-colored pixel-art sleeping hat with thick black outlines and a light cyan pom-pom on the left side. 2) Large thin round black wire-frame glasses over both eyes. 3) Two glossy cyan-blue anime crying streams from the inner corners of both eyes. 4) A tiny black spiral doodle on the nose and two small curved whisker lines on each cheek. Precisely align all elements with the person's facial features while keeping their identity, hairstyle, clothing, pose, and background.",
+  stk_jollibee:
+    "Edit the first photograph while keeping the exact same person, face, hairstyle, pose, hands, and background unchanged. Change ONLY the person's clothing into a realistic Jollibee employee uniform genuinely worn on their body: bright red short-sleeved polo shirt with yellow shoulder panels, blue-and-yellow striped collar, Jollibee mascot logo on the left chest, small name tag on the right chest, and dark navy waist apron. Natural fabric folds and shadows; no cartoon or sticker outline.",
+  stk_nak_ve_than:
+    "Edit the photograph into a photorealistic real-life cosplay of Nakroth Dimensional Guardian while keeping the person's exact face, expression, body proportions, pose, framing, and background unchanged. ONLY change: 1) Voluminous spiky silver-white hair with a center part and two long shoulder-length side locks. 2) A tailored black cropped blazer with white piping, royal-blue and gold armor accents, and leather gloves. Real hair strands and real fabric; not anime or CGI.",
+  stk_gojo_satoru:
+    "Edit the photograph while strictly preserving the exact half-body framing, crop, face shape, pose, and background. ONLY replace the hairstyle and outfit with a realistic Satoru Gojo cosplay: spiky silver-white hair, a sleek black fabric blindfold covering both eyes, and a black high-collar Jujutsu uniform jacket with natural fabric folds.",
+  stk_shopee_food:
+    "Edit the photograph while keeping the exact same person, face, expression, pose, and background unchanged. Dress the person in an authentic bright orange ShopeeFood delivery rider jacket with white logo on the left chest, front zipper, natural fabric folds, and an orange ShopeeFood motorcycle helmet with white branding. Ultra-photorealistic photo, not pasted or cartoon.",
   fireworks: "Fill the night sky background behind the person with vibrant colorful fireworks bursting with warm glowing sparks and bokeh.",
   harry_potter: "Dress the person in a classic black Hogwarts wizard robe with a red-and-gold striped Gryffindor scarf and thin round metal glasses.",
   minecraft: "Restyle the background and clothing into blocky 3D Minecraft voxel geometry and pixelated textures while keeping the person's face recognizable.",
@@ -806,7 +812,9 @@ async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId) {
   return null;
 }
 
-async function runCloudflareFluxEdit(env, promptText, inputImg) {
+const REF_IMAGE_AI_IDS = new Set(["stk_mu_ngu_khoc", "stk_tai_tho"]);
+
+async function runCloudflareFluxEdit(env, promptText, inputImg, refImg) {
   const aiModel = (env && env.AI_MODEL) || "@cf/black-forest-labs/flux-2-klein-4b";
   const outSize = parseInt((env && env.AI_OUTPUT_SIZE) || "768", 10) || 768;
 
@@ -817,6 +825,10 @@ async function runCloudflareFluxEdit(env, promptText, inputImg) {
   if (inputImg && inputImg.bytes && inputImg.bytes.length > 0) {
     const ext = inputImg.mimeType === "image/png" ? "input.png" : "input.jpg";
     form.append("input_image_0", new Blob([inputImg.bytes], { type: inputImg.mimeType }), ext);
+  }
+  if (refImg && refImg.bytes && refImg.bytes.length > 0) {
+    const rExt = refImg.mimeType === "image/png" ? "ref.png" : "ref.jpg";
+    form.append("input_image_1", new Blob([refImg.bytes], { type: refImg.mimeType }), rExt);
   }
 
   const formResp = new Response(form);
@@ -1128,8 +1140,15 @@ async function handleStudioRequest(request, env) {
       try {
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
         const tempId = crypto.randomUUID().slice(0, 12);
-        const preparedInput = await prepareAiInputImage(imgBytes, sourceUrl, url.origin, tempId);
-        const aiOut = await runCloudflareFluxEdit(env, aiReq.prompt, preparedInput);
+        const [preparedInput, refImg] = await Promise.all([
+          prepareAiInputImage(imgBytes, sourceUrl, url.origin, tempId),
+          REF_IMAGE_AI_IDS.has(aiReq.filterId)
+            ? fetch(`https://tommm1207.github.io/locket-tommm-studio/assets/ai/${encodeURIComponent(aiReq.filterId)}.png`)
+                .then(async r => (r.ok ? { bytes: new Uint8Array(await r.arrayBuffer()), mimeType: "image/png" } : null))
+                .catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        const aiOut = await runCloudflareFluxEdit(env, aiReq.prompt, preparedInput, refImg);
 
         const outId = `tommm_ai_${tempId}.${aiOut.ext}`;
         MEMORY_IMAGES.set(outId, {
