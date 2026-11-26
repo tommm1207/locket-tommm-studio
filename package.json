@@ -1,0 +1,24 @@
+{
+  "name": "locket_gold_tommm",
+  "version": "1.0.0",
+  "description": "Hệ thống kích hoạt và tùy biến **Locket Gold VIP** độc lập 100% thuộc quyền sở hữu của **Tommm** (`tommm1207`). - **Thư mục dự án trên máy tính:** `D:\\Locket_Gold_Tommm` - **Máy chủ Cloud 24/7 (GitHub & jsDelivr CDN):** `https://github.com/tommm1207/locket-tommm-studio` - **Bảo mật tuyệt đối:** Không qua bất kỳ máy chủ VPS trung gian nào của bên thứ 3, không lộ ảnh chụp hay Token đăng nhập, chặn toàn bộ hệ thống theo dõi ngầm (`Sentry`, `Crashlytics`, `Amplitude`, `AppsFlyer`).",
+  "main": "build_cloud_edition.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tommm1207/locket-tommm-studio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/tommm1207/locket-tommm-studio/issues"
+  },
+  "homepage": "https://github.com/tommm1207/locket-tommm-studio#readme",
+  "dependencies": {
+    "jpeg-js": "^0.4.4"
+  }
+}

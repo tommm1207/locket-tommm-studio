@@ -6,6 +6,8 @@
 // - Cac filter khong nhan dien duoc se pass-through ve server Locket
 // =========================================================================
 
+import jpeg from "jpeg-js";
+
 const SIZE = 512;
 const WD_SIZE = 768;
 const GITHUB_FRAMES_BIN_BASE =
@@ -121,6 +123,9 @@ const FRAME_CACHE = new Map();
 const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
+let LAST_ANY_REQUEST = null;
+let LAST_DECODE_ERR = null; // ghi MỌI request tới worker (debug: xem iPhone có gọi không)
+let REQUEST_LOG = []; // vài request gần nhất
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -148,6 +153,38 @@ function corsHeaders(extra = {}) {
     },
     extra
   );
+}
+
+// Lưu ảnh tạm vào CẢ RAM lẫn Cache API. Cache API chia sẻ cross-isolate trong colo -> wsrv.nl
+// callback và app tải ảnh KHÔNG bị kẹt vào Durable Object đang bận (nguyên nhân ảnh đen trước đây).
+// Cache API key PHẢI là URL http(s) hợp lệ cùng kiểu origin thật, nếu không put/match âm thầm fail.
+const CACHE_IMG_PREFIX = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/__imgcache__/";
+async function putImage(id, bytes, mimeType) {
+  MEMORY_IMAGES.set(id, { bytes, mimeType, ts: Date.now() });
+  try {
+    await caches.default.put(
+      new Request(CACHE_IMG_PREFIX + encodeURIComponent(id)),
+      new Response(bytes, { headers: { "Content-Type": mimeType, "Cache-Control": "public, max-age=300" } })
+    );
+  } catch (_) {}
+}
+async function getImage(id) {
+  const ram = MEMORY_IMAGES.get(id);
+  if (ram) return ram;
+  try {
+    const hit = await caches.default.match(new Request(CACHE_IMG_PREFIX + encodeURIComponent(id)));
+    if (hit) {
+      const bytes = new Uint8Array(await hit.arrayBuffer());
+      return { bytes, mimeType: hit.headers.get("Content-Type") || "image/jpeg", ts: Date.now() };
+    }
+  } catch (_) {}
+  return null;
+}
+async function delImage(id) {
+  MEMORY_IMAGES.delete(id);
+  try {
+    await caches.default.delete(new Request(CACHE_IMG_PREFIX + encodeURIComponent(id)));
+  } catch (_) {}
 }
 
 function cleanupMemory() {
@@ -768,51 +805,84 @@ async function fetchBytesViaWsrv(targetUrl, query, minBytes = 200) {
   return null;
 }
 
-async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId, targetSize = SIZE) {
-  let pngBytes = null;
-  const qStr = `w=${targetSize}&h=${targetSize}&fit=cover&output=png&af=false`;
-
-  // Prefer fetching via temp MEMORY_IMAGES URL first (per plan), falling back cleanly
-  if (imgBytes && imgBytes.length > 0) {
-    const rawKey = `raw_${tempId}.jpg`;
-    MEMORY_IMAGES.set(rawKey, { bytes: imgBytes, mimeType: "image/jpeg", ts: Date.now() });
+// Decode ảnh (JPEG qua jpeg-js, PNG qua decodePngToRgb) -> { w, h, rgb } ở KÍCH THƯỚC GỐC.
+// Thay thế weserv.nl (đã chặn Cloudflare Worker). Không gọi service ngoài -> chạy ổn định 24/7.
+async function decodeImageBytesToRgb(bytes) {
+  if (!bytes || bytes.length < 4) return null;
+  // PNG
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    try { return await decodePngToRgb(bytes); } catch (_) { return null; }
+  }
+  // JPEG
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) {
     try {
-      pngBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, qStr, 200);
-    } finally {
-      MEMORY_IMAGES.delete(rawKey);
-    }
+      const raw = jpeg.decode(bytes, { useTArray: true, maxMemoryUsageInMB: 512 });
+      if (!raw || !raw.data) return null;
+      const { width: w, height: h, data } = raw;
+      const rgb = new Uint8Array(w * h * 3);
+      for (let p = 0, i4 = 0, i3 = 0; p < w * h; p++, i4 += 4, i3 += 3) {
+        rgb[i3] = data[i4]; rgb[i3 + 1] = data[i4 + 1]; rgb[i3 + 2] = data[i4 + 2];
+      }
+      return { w, h, rgb };
+    } catch (_) { return null; }
   }
+  // WEBP hoặc khác: thử cf.image chuyển sang jpeg rồi decode (cf.image nhận được qua Response wrap).
+  return null;
+}
 
-  // Secondary fallback: if sourceUrl is directly accessible to wsrv.nl
-  if (!pngBytes && sourceUrl && sourceUrl.startsWith("http")) {
-    pngBytes = await fetchBytesViaWsrv(sourceUrl, qStr, 200);
+// Lấy RGB ở kích thước GỐC từ bytes hoặc URL (fetch về rồi decode). Không dùng weserv.
+async function getSourceRgb(imgBytes, sourceUrl, authHeader) {
+  if (imgBytes && imgBytes.length > 0) {
+    const d = await decodeImageBytesToRgb(imgBytes);
+    if (d) return d;
   }
-
-  if (pngBytes) {
-    return decodePngToRgb(pngBytes);
+  if (sourceUrl && sourceUrl.startsWith("http")) {
+    try {
+      const hdrs = { "User-Agent": "Locket/1.0" };
+      if (authHeader) hdrs["Authorization"] = authHeader;
+      const r = await fetch(sourceUrl, { headers: hdrs });
+      if (r.ok) {
+        const b = new Uint8Array(await r.arrayBuffer());
+        const d = await decodeImageBytesToRgb(b);
+        if (d) return d;
+      }
+    } catch (_) {}
   }
   return null;
 }
 
-async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId) {
-  let resizedBytes = null;
-  if (imgBytes && imgBytes.length > 0) {
-    const rawKey = `ai_raw_${tempId}.jpg`;
-    MEMORY_IMAGES.set(rawKey, { bytes: imgBytes, mimeType: sniffImageFormat(imgBytes).mimeType, ts: Date.now() });
+// Decode ảnh đầu vào -> { w, h, rgb } ở KÍCH THƯỚC GỐC (drawCoverRgb sẽ scale khi composite).
+// Dùng jpeg-js/decodePngToRgb trong worker (KHÔNG weserv.nl, đã bị chặn Cloudflare).
+async function decodeInputToRgb512(imgBytes, sourceUrl, origin, tempId, targetSize = SIZE, authHeader = "") {
+  const d = await getSourceRgb(imgBytes, sourceUrl, authHeader);
+  if (!d) {
+    LAST_DECODE_ERR = "decode_fail (src=" + (sourceUrl ? "y" : "n") + " img=" + (imgBytes ? imgBytes.length : 0) + ")";
+  }
+  return d;
+}
+
+// Chuẩn bị ảnh cho AI (FLUX/segmentation): JPEG đã nén ~768px. Encode từ RGB bằng cf.image hoặc jpeg-js.
+async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId, authHeader = "") {
+  // Nếu đã là JPEG hợp lệ (<1.5MB) thì dùng thẳng — FLUX nhận trực tiếp.
+  if (imgBytes && imgBytes.length > 0 && imgBytes[0] === 0xff && imgBytes[1] === 0xd8 && imgBytes.length < 1500000) {
+    return { bytes: imgBytes, mimeType: "image/jpeg" };
+  }
+  // Decode -> RGB rồi encode JPEG 768 bằng jpeg-js (chắc chắn, không service ngoài).
+  const d = await getSourceRgb(imgBytes, sourceUrl, authHeader);
+  if (d && d.rgb) {
+    // scale về 768x768 cover bằng drawCoverRgb
+    const out = new Uint8Array(768 * 768 * 3);
+    drawCoverRgb(out, d.rgb, d.w, d.h, [0, 0, 768, 768], 768);
     try {
-      resizedBytes = await fetchBytesViaWsrv(`${origin}/ai-filters/${rawKey}`, "w=768&h=768&fit=cover&output=jpg&q=92", 500);
-    } finally {
-      MEMORY_IMAGES.delete(rawKey);
-    }
+      const rgba = new Uint8Array(768 * 768 * 4);
+      for (let p = 0, i3 = 0, i4 = 0; p < 768 * 768; p++, i3 += 3, i4 += 4) {
+        rgba[i4] = out[i3]; rgba[i4 + 1] = out[i3 + 1]; rgba[i4 + 2] = out[i3 + 2]; rgba[i4 + 3] = 255;
+      }
+      const enc = jpeg.encode({ data: rgba, width: 768, height: 768 }, 90);
+      return { bytes: new Uint8Array(enc.data), mimeType: "image/jpeg" };
+    } catch (_) {}
   }
-
-  if (!resizedBytes && sourceUrl && sourceUrl.startsWith("http")) {
-    resizedBytes = await fetchBytesViaWsrv(sourceUrl, "w=768&h=768&fit=cover&output=jpg&q=92", 500);
-  }
-
-  if (resizedBytes) {
-    return { bytes: resizedBytes, mimeType: "image/jpeg" };
-  }
+  // Fallback: ảnh gốc nếu có
   if (imgBytes && imgBytes.length > 0) {
     return { bytes: imgBytes, mimeType: sniffImageFormat(imgBytes).mimeType };
   }
@@ -1019,28 +1089,18 @@ function buildLocketFilterResponse(outUrl) {
 }
 
 async function encodeCanvasToImage(canvasRgb, origin, tempId, canvasSize = SIZE) {
-  const bmpBytes = encodeBmpRgb24(canvasSize, canvasSize, canvasRgb);
-  const bmpKey = `bmp_${tempId}.bmp`;
-  MEMORY_IMAGES.set(bmpKey, { bytes: bmpBytes, mimeType: "image/bmp", ts: Date.now() });
-  const bmpUrl = `${origin}/ai-filters/${bmpKey}`;
-
+  // Encode RGB -> JPEG bằng jpeg-js (không weserv, không BMP round-trip). Nhỏ & nhanh.
   let finalBytes = null;
   let mimeType = "image/jpeg";
   let ext = "jpg";
-
   try {
-    const jRes = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(bmpUrl)}&output=jpg&q=94`);
-    if (jRes.ok) {
-      const ab = await jRes.arrayBuffer();
-      const candidate = new Uint8Array(ab);
-      if (candidate.length > 1000 && candidate[0] === 0xff && candidate[1] === 0xd8) {
-        finalBytes = candidate;
-      }
+    const rgba = new Uint8Array(canvasSize * canvasSize * 4);
+    for (let p = 0, i3 = 0, i4 = 0; p < canvasSize * canvasSize; p++, i3 += 3, i4 += 4) {
+      rgba[i4] = canvasRgb[i3]; rgba[i4 + 1] = canvasRgb[i3 + 1]; rgba[i4 + 2] = canvasRgb[i3 + 2]; rgba[i4 + 3] = 255;
     }
-  } catch (_) {
-  } finally {
-    MEMORY_IMAGES.delete(bmpKey);
-  }
+    const enc = jpeg.encode({ data: rgba, width: canvasSize, height: canvasSize }, 92);
+    if (enc && enc.data && enc.data.length > 1000) finalBytes = new Uint8Array(enc.data);
+  } catch (_) {}
 
   if (!finalBytes) {
     finalBytes = encodeFastPngRgb(canvasSize, canvasSize, canvasRgb);
@@ -1555,6 +1615,21 @@ async function handleStudioRequest(request, env) {
   cleanupMemory();
   const url = new URL(request.url);
 
+  // DEBUG: ghi mọi request (trừ chính /status và /ai-filters ảnh) để biết iPhone gọi gì.
+  if (url.pathname !== "/status" && url.pathname !== "/" && !url.pathname.startsWith("/ai-filters/")) {
+    const entry = {
+      method: request.method,
+      path: url.pathname,
+      origHost: request.headers.get("X-Locket-Orig-Host") || null,
+      hasAuth: !!(request.headers.get("Authorization") || request.headers.get("authorization")),
+      ua: (request.headers.get("User-Agent") || "").slice(0, 40),
+      ts: new Date().toISOString(),
+    };
+    LAST_ANY_REQUEST = entry;
+    REQUEST_LOG.unshift(entry);
+    if (REQUEST_LOG.length > 10) REQUEST_LOG.pop();
+  }
+
   // 1. Status endpoint
   if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/status")) {
     return new Response(
@@ -1592,15 +1667,18 @@ async function handleStudioRequest(request, env) {
         last_debug: LAST_DEBUG,
         last_caption_debug: LAST_CAPTION_DEBUG,
         last_fallback_debug: LAST_FALLBACK_DEBUG,
+        last_any_request: LAST_ANY_REQUEST,
+        last_decode_err: LAST_DECODE_ERR,
+        request_log: REQUEST_LOG,
       }),
       { headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
     );
   }
 
-  // 2. Serve temporary / generated images from RAM
+  // 2. Serve temporary / generated images (RAM -> Cache API). Cũng phục vụ ở top-level (ngoài DO).
   if (request.method === "GET" && url.pathname.startsWith("/ai-filters/")) {
     const id = url.pathname.slice("/ai-filters/".length);
-    const item = MEMORY_IMAGES.get(id);
+    const item = await getImage(id);
     if (item) {
       return new Response(item.bytes, {
         status: 200,
@@ -1765,9 +1843,9 @@ async function handleStudioRequest(request, env) {
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
 
       const [decodedUser, weekdayRgba, preparedMaskInput] = await Promise.all([
-        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, WD_SIZE),
+        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, WD_SIZE, authHeader),
         getFrameRgba(`${binPrefix}_${vnDay}`),
-        prepareAiInputImage(imgBytes, sourceUrl, url.origin, `seg_${tempId}`),
+        prepareAiInputImage(imgBytes, sourceUrl, url.origin, `seg_${tempId}`, authHeader),
       ]);
 
       const baseRgb = new Uint8Array(WD_SIZE * WD_SIZE * 3);
@@ -1845,11 +1923,7 @@ async function handleStudioRequest(request, env) {
 
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, WD_SIZE);
       const outId = `tommm_wd_${tempId}.${encoded.ext}`;
-      MEMORY_IMAGES.set(outId, {
-        bytes: encoded.bytes,
-        mimeType: encoded.mimeType,
-        ts: Date.now(),
-      });
+      await putImage(outId, encoded.bytes, encoded.mimeType);
 
       LAST_DEBUG = {
         mode: specialId,
@@ -1859,6 +1933,11 @@ async function handleStudioRequest(request, env) {
         maskApplied,
         fgRatio,
         got_input: !!imgBytes,
+        input_bytes: imgBytes ? imgBytes.length : 0,
+        src_url: sourceUrl ? sourceUrl.slice(0, 80) : null,
+        decoded_user: !!(decodedUser && decodedUser.rgb),
+        decoded_wh: decodedUser ? `${decodedUser.w}x${decodedUser.h}` : null,
+        prepared_mask: !!(preparedMaskInput && preparedMaskInput.bytes),
         out_mime: encoded.mimeType,
         out_bytes: encoded.bytes.length,
         ms: Date.now() - t0,
@@ -1876,7 +1955,7 @@ async function handleStudioRequest(request, env) {
       const tempId = crypto.randomUUID().slice(0, 12);
 
       const [decodedUser, frameRgba] = await Promise.all([
-        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId),
+        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader),
         getFrameRgba(filterId),
       ]);
 
@@ -1912,11 +1991,7 @@ async function handleStudioRequest(request, env) {
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
 
       const outId = `tommm_${tempId}.${encoded.ext}`;
-      MEMORY_IMAGES.set(outId, {
-        bytes: encoded.bytes,
-        mimeType: encoded.mimeType,
-        ts: Date.now(),
-      });
+      await putImage(outId, encoded.bytes, encoded.mimeType);
 
       LAST_DEBUG = {
         mode: "png_frame",
@@ -1938,7 +2013,7 @@ async function handleStudioRequest(request, env) {
       const t0 = Date.now();
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
-      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader);
 
       const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
       const srcW = decodedUser?.w || SIZE;
@@ -1949,11 +2024,7 @@ async function handleStudioRequest(request, env) {
 
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
       const outId = `tommm_lut_${tempId}.${encoded.ext}`;
-      MEMORY_IMAGES.set(outId, {
-        bytes: encoded.bytes,
-        mimeType: encoded.mimeType,
-        ts: Date.now(),
-      });
+      await putImage(outId, encoded.bytes, encoded.mimeType);
 
       LAST_DEBUG = {
         mode: "lut_filter",
@@ -2022,7 +2093,7 @@ async function handleStudioRequest(request, env) {
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
         const tempId = crypto.randomUUID().slice(0, 12);
         const [preparedInput, refImg] = await Promise.all([
-          prepareAiInputImage(imgBytes, sourceUrl, url.origin, tempId),
+          prepareAiInputImage(imgBytes, sourceUrl, url.origin, tempId, authHeader),
           REF_IMAGE_AI_IDS.has(aiReq.filterId)
             ? fetch(`https://tommm1207.github.io/locket-tommm-studio/assets/ai/${encodeURIComponent(aiReq.filterId)}.png`)
                 .then(async r => (r.ok ? { bytes: new Uint8Array(await r.arrayBuffer()), mimeType: "image/png" } : null))
@@ -2050,7 +2121,7 @@ async function handleStudioRequest(request, env) {
 
         if (aiOut && aiOut.bytes) {
           const outId = `tommm_ai_${tempId}.${aiOut.ext}`;
-          MEMORY_IMAGES.set(outId, { bytes: aiOut.bytes, mimeType: aiOut.mimeType, ts: Date.now() });
+          await putImage(outId, aiOut.bytes, aiOut.mimeType);
           LAST_DEBUG = {
             mode: usedModel && usedModel.startsWith("gemini") ? "ai_gemini_fallback" : (isCustomAi ? "ai_flux_custom" : "ai_flux_fallback"),
             aiModel: usedModel,
@@ -2112,6 +2183,11 @@ export class StudioRoom {
 
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    // Ảnh TẠM cho wsrv callback (raw_/ai_raw_/bmp_) phục vụ ở TOP-LEVEL từ Cache API, KHÔNG vào DO.
+    // Lý do: khi filter đang chạy TRONG DO và await wsrv.nl resize, wsrv gọi ngược lại worker để lấy
+    // ảnh này; nếu đi vào DO (xử lý tuần tự) nó kẹt sau filter -> timeout -> ảnh gốc không decode ->
+    // ẢNH ĐEN. Phục vụ ở top-level (isolate khác) nên không kẹt. Ảnh KẾT QUẢ (tommm_*) vẫn vào DO.
     if (env && env.STUDIO) {
       const id = env.STUDIO.idFromName("tommm-global-studio");
       return env.STUDIO.get(id).fetch(request);

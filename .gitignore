@@ -15,6 +15,9 @@ diagnose_rc.js
 .wrangler/
 cloudflare-worker/.wrangler/
 
+# Node modules (jpeg-js cho worker) — wrangler tự cài từ package-lock khi deploy
+node_modules/
+
 # Không bao giờ commit bất kỳ file key/secret nào
 *.key
 *.pem
