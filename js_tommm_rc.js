@@ -316,7 +316,7 @@ for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
 }
 for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
     var vp = CUSTOM_V2_SPECS[cv];
-    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png", vp[4], vp[5]);
+    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=2", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png", "calendar", "🇬🇧");
