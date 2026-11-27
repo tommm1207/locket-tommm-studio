@@ -602,7 +602,7 @@ const photoboothIds = [
     "pb_supperman_4cut", "pb_trung_bac_thao", "pb_vien_hello_kitty", "pb_vintage"
 ].filter(id => framesManifest[id]);
 
-const singleFrameIds = Object.keys(framesManifest).filter(id => !photoboothIds.includes(id) && !id.startsWith("nm_"));
+const singleFrameIds = Object.keys(framesManifest).filter(id => !photoboothIds.includes(id) && !id.startsWith("nm_") && !id.startsWith("fx_"));
 
 const nmFrameMeta = {
     nm_polaroid_vintage: { name: "Polaroid Vintage", colors: ["#F5ECD8", "#9A7B56"], emoji: "📸", sfSymbol: "photo.on.rectangle" },
@@ -638,7 +638,21 @@ const nmFrameMeta = {
     nm_yeu_giau_chu_co_phai: { name: "Yêu Giấu Chứ Có Phải...", colors: ["#BE123C", "#FDA4AF"], emoji: "💗", sfSymbol: "quote.bubble.fill" },
     nm_me_con_em_don_anh_ve: { name: "Mẹ Con Em Đón Anh Về", colors: ["#B45309", "#FDE047"], emoji: "🚗", sfSymbol: "quote.bubble.fill" },
     nm_meo_meme: { name: "Mèo Meme", colors: ["#B45309", "#FEF08A"], emoji: "🐱", sfSymbol: "face.smiling" },
-    nm_hai_trai_cay: { name: "Hái Trái Cây", colors: ["#FEF9C3", "#16A34A"], emoji: "🍓", sfSymbol: "leaf.fill" }
+    nm_hai_trai_cay: { name: "Hái Trái Cây", colors: ["#FEF9C3", "#16A34A"], emoji: "🍓", sfSymbol: "leaf.fill" },
+    fx_ca_cute: { name: "Cá Cute", colors: ["#A855F7", "#F472B6"], emoji: "🐠", sfSymbol: "sparkles" },
+    fx_mua_roi: { name: "Mưa Rơi", colors: ["#1E3A8A", "#38BDF8"], emoji: "🌧️", sfSymbol: "cloud.rain.fill" },
+    fx_giot_nuoc: { name: "Giọt Nước", colors: ["#0369A1", "#BAE6FD"], emoji: "💧", sfSymbol: "drop.fill" },
+    fx_bong_bong: { name: "Bong Bóng", colors: ["#4C1D95", "#F472B6"], emoji: "🫧", sfSymbol: "bubbles.and.sparkles.fill" },
+    fx_canh_hoa: { name: "Cánh Hoa", colors: ["#9D174D", "#FBCFE8"], emoji: "🌸", sfSymbol: "sparkles" },
+    fx_tuyet_roi: { name: "Tuyết Rơi", colors: ["#1E3A8A", "#E0F2FE"], emoji: "❄️", sfSymbol: "snowflake" },
+    fx_sticker_doodle: { name: "Sticker Mặt", colors: ["#BE185D", "#FDE047"], emoji: "✨", sfSymbol: "face.smiling" },
+    fx_cau_vong: { name: "Cầu Vồng", colors: ["#6D28D9", "#FACC15"], emoji: "🌈", sfSymbol: "rainbow" },
+    fx_buom_xinh: { name: "Bướm Xinh", colors: ["#4338CA", "#F9A8D4"], emoji: "🦋", sfSymbol: "sparkles" },
+    fx_sao_lap_lanh: { name: "Lấp Lánh", colors: ["#B45309", "#FEF08A"], emoji: "🌟", sfSymbol: "sparkle" },
+    nm_boi_do_hay_den: { name: "Hôm Nay Đỏ Hay Đen?", colors: ["#450A0A", "#FACC15"], emoji: "🎴", sfSymbol: "sparkles" },
+    nm_boi_duyen_tinh: { name: "Đường Tình Duyên", colors: ["#831843", "#F9A8D4"], emoji: "💘", sfSymbol: "heart.fill" },
+    nm_boi_nay_nen_an_gi: { name: "Nay Nên Ăn Gì?", colors: ["#78350F", "#FBBF24"], emoji: "🍜", sfSymbol: "fork.knife" },
+    nm_boi_xem_que: { name: "Xem Quẻ Hôm Nay", colors: ["#2E1065", "#C084FC"], emoji: "🔮", sfSymbol: "moon.stars.fill" }
 };
 const nmFrameIds = Object.keys(nmFrameMeta);
 
@@ -680,6 +694,12 @@ const v2FilterSpecs = [
     ["ai_hau_gai", "Trang Phục Hầu Gái", "#1E293B", "#F43F5E", "heart.fill", "🎀"],
     ["ai_hoang_thuong", "Hoàng Thượng", "#B45309", "#FDE047", "crown.fill", "🐉"],
     ["ai_idol_kpop", "Idol KPOP", "#9333EA", "#F472B6", "music.note", "🎤"],
+    ["ai_mua_xuan", "Mùa Xuân", "#EC4899", "#FBCFE8", "sparkles", "🌸"],
+    ["ai_mua_he", "Mùa Hè", "#0284C7", "#7DD3FC", "sun.max.fill", "☀️"],
+    ["ai_mua_thu", "Mùa Thu", "#EA580C", "#FDBA74", "leaf.fill", "🍁"],
+    ["ai_mua_dong", "Mùa Đông", "#1D4ED8", "#DBEAFE", "snowflake", "❄️"],
+    ["ai_masterchef", "MasterChef", "#334155", "#F8FAFC", "flame.fill", "👨‍🍳"],
+    ["ai_csgt", "CSGT", "#CA8A04", "#FEF08A", "shield.fill", "👮"],
     ["nm_faker", "Faker", "#111115", "#DC2626", "crown.fill", "🏆"],
     ["nm_mona_lisa", "Mona Lisa", "#926622", "#FACC15", "photo.artframe", "🖼️"],
     // Hiệu Ứng Méo Mặt & Hài Hước (0-AI)
@@ -727,10 +747,13 @@ const v2FilterSpecs = [
 
 const customFrameGroups = [
     { id: "group_weekday_depth", title: { en: "📅 Thứ Ngày & Giờ", vi: "📅 Thứ Ngày & Giờ" }, filter_ids: ["clock_weekday_overlay", "weekday_depth", "weekday_depth_en", "weekday_depth_zh", "weekday_depth_tw", "weekday_depth_ja", "weekday_depth_ko", "weekday_depth_es", "weekday_depth_fr", "weekday_depth_de"] },
+    { id: "group_fx_stickers", title: { en: "🫧 Sticker & Thời Tiết Trước Mặt", vi: "🫧 Sticker & Thời Tiết Trước Mặt" }, filter_ids: ["fx_ca_cute", "fx_mua_roi", "fx_giot_nuoc", "fx_bong_bong", "fx_canh_hoa", "fx_tuyet_roi", "fx_sticker_doodle", "fx_cau_vong", "fx_buom_xinh", "fx_sao_lap_lanh"] },
+    { id: "group_ai_seasons", title: { en: "🍂 AI Bốn Mùa", vi: "🍂 AI Bốn Mùa" }, filter_ids: ["ai_mua_xuan", "ai_mua_he", "ai_mua_thu", "ai_mua_dong"] },
     { id: "group_hot_ai_3d", title: { en: "Hiệu Ứng AI 3D Hot 🔥", vi: "Hiệu Ứng AI 3D Hot 🔥" }, filter_ids: aiHotIds },
     { id: "group_meme_ai", title: { en: "😂 Meme Giải Trí", vi: "😂 Meme Giải Trí" }, filter_ids: ["ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_lop_truong", "ai_di_phu_ho", "ai_ve_que_nuoi_ca"] },
     { id: "group_trend_ai", title: { en: "🔥 Trend Hot Mạng Xã Hội", vi: "🔥 Trend Hot Mạng Xã Hội" }, filter_ids: ["ai_figure_1_7", "ai_action_figure_box", "ai_lego_figure", "ai_cartoon_3d", "ai_polaroid_string"] },
-    { id: "group_job_ai", title: { en: "🛵 Nghề Nghiệp & Shipper", vi: "🛵 Nghề Nghiệp & Shipper" }, filter_ids: ["ai_shipper_giao_hang", "stk_shopee_food", "ai_grab_driver", "ai_xanh_sm", "ai_bac_si"] },
+    { id: "group_job_ai", title: { en: "🛵 Nghề Nghiệp & Shipper", vi: "🛵 Nghề Nghiệp & Shipper" }, filter_ids: ["ai_shipper_giao_hang", "stk_shopee_food", "ai_grab_driver", "ai_xanh_sm", "ai_bac_si", "ai_masterchef", "ai_csgt"] },
+    { id: "group_boi_toan", title: { en: "🔮 Bói Toán & Quẻ Hôm Nay", vi: "🔮 Bói Toán & Quẻ Hôm Nay" }, filter_ids: ["nm_boi_do_hay_den", "nm_boi_duyen_tinh", "nm_boi_nay_nen_an_gi", "nm_boi_xem_que"] },
     { id: "group_luxury_ai", title: { en: "👑 Tổng Tài & Phú Bà", vi: "👑 Tổng Tài & Phú Bà" }, filter_ids: ["ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen", "ai_old_money"] },
     { id: "group_beauty_ai", title: { en: "💖 Xinh Lung Linh & Hóa Trang", vi: "💖 Xinh Lung Linh & Hóa Trang" }, filter_ids: ["ai_makeup_idol", "ai_trang_diem_duyen", "ai_doi_kieu_toc", "ai_doi_mau_toc", "ai_cosplay_wibu", "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop"] },
     { id: "group_warp_fun", title: { en: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá", vi: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá" }, filter_ids: ["triple_clone", "warp_fisheye", "warp_fisheye_dazz", "warp_big_head", "warp_tiny_face", "warp_alien_vline", "warp_hamster", "warp_bug_eyes", "warp_wide_mouth", "warp_chubby", "warp_gigachad", "warp_swirl", "warp_melt"] },
@@ -1179,12 +1202,12 @@ for (var cl = 0; cl < CUSTOM_LUT_SPECS.length; cl++) {
 for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
     var sp = CUSTOM_FRAME_SPECS[cf];
     var is4 = sp[4] === 1;
-    var cfIconUrl = sp[0].indexOf("nm_") === 0 ? (F2BASE + sp[0] + ".png?v=4") : (FBASE + sp[0] + ".png");
+    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=5") : (FBASE + sp[0] + ".png");
     pushCustomFilter(sp[0], sp[1], sp[2], sp[3], cfIconUrl, is4 ? "square.grid.2x2" : "photo.on.rectangle", is4 ? "📸" : "🖼️");
 }
 for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
     var vp = CUSTOM_V2_SPECS[cv];
-    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=4", vp[4], vp[5]);
+    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=5", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png?v=4", "calendar", "🇬🇧");
