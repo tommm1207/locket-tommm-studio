@@ -39,6 +39,160 @@ if (typeof $request === "undefined" || !$request || !$request.headers) {
 fs.writeFileSync(path.join(baseDir, 'js_tommm_deleteHeader.js'), deleteHeaderJs, 'utf8');
 
 // =========================================================================
+// 1b. TÁCH RIÊNG SCRIPT 1b: js_tommm_yt_music.js (Tự động bắt nhạc YouTube / YT Music -> Music Caption)
+// =========================================================================
+const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Caption
+(function () {
+    var req = typeof $request !== "undefined" ? $request : null;
+    if (!req || !req.url) { $done({}); return; }
+    var u = String(req.url);
+    var WORKER_BASE = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev";
+
+    function isVidChar(b) {
+        return (b >= 48 && b <= 57) || (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || b === 45 || b === 95;
+    }
+
+    function extractVideoId() {
+        try {
+            if (typeof req.body === "string" && req.body.length > 0) {
+                var m = req.body.match(/"videoId"\\s*:\\s*"([A-Za-z0-9_-]{11})"/);
+                if (m && m[1]) return m[1];
+            }
+        } catch (_) {}
+        try {
+            var raw = req.bodyBytes;
+            if (raw && raw.byteLength >= 13) {
+                var bytes = new Uint8Array(raw);
+                for (var i = 0; i <= bytes.length - 13; i++) {
+                    if (bytes[i] === 0x12 && bytes[i + 1] === 0x0b) {
+                        var ok = true;
+                        var s = "";
+                        for (var j = 0; j < 11; j++) {
+                            var c = bytes[i + 2 + j];
+                            if (!isVidChar(c)) { ok = false; break; }
+                            s += String.fromCharCode(c);
+                        }
+                        if (ok) return s;
+                    }
+                }
+            }
+        } catch (_) {}
+        return "";
+    }
+
+    // Mode 1: Sniff YouTube / YouTube Music player request (0ms delay to playback)
+    if (u.indexOf("youtubei.googleapis.com/youtubei/v1/player") !== -1) {
+        try {
+            var vid = extractVideoId();
+            if (vid && typeof $httpClient !== "undefined" && typeof $persistentStore !== "undefined") {
+                var lastVid = $persistentStore.read("tommm_yt_last_vid") || "";
+                var lastTs = Number($persistentStore.read("tommm_yt_last_ts") || "0");
+                if (vid !== lastVid || (Date.now() - lastTs) > 120000) {
+                    $persistentStore.write(vid, "tommm_yt_last_vid");
+                    $persistentStore.write(String(Date.now()), "tommm_yt_last_ts");
+                    $httpClient.post({
+                        url: WORKER_BASE + "/studio/yt-now-playing",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ videoId: vid })
+                    }, function (err, resp, data) {
+                        try {
+                            if (!err && data) {
+                                var parsed = JSON.parse(data);
+                                if (parsed && parsed.ok && parsed.track) {
+                                    $persistentStore.write(JSON.stringify(parsed.track), "tommm_yt_now_playing");
+                                }
+                            }
+                        } catch (_) {}
+                    });
+                }
+            }
+        } catch (_) {}
+        $done({});
+        return;
+    }
+
+    // Mode 2: Inspect native caption:music or inject YouTube track on postMomentV2
+    if (u.indexOf("postMomentV2") !== -1) {
+        try {
+            if (typeof req.body !== "string" || !req.body) { $done({}); return; }
+            var bodyObj = JSON.parse(req.body);
+            var overlays = bodyObj && bodyObj.data && Array.isArray(bodyObj.data.overlays) ? bodyObj.data.overlays : null;
+            if (!overlays) { $done({}); return; }
+
+            var changed = false;
+            for (var k = 0; k < overlays.length; k++) {
+                var ov = overlays[k];
+                if (!ov) continue;
+                if (ov.overlay_id === "caption:music" && typeof $httpClient !== "undefined") {
+                    var describeVal = function (v, d) {
+                        if (d > 4 || v == null) return v === null ? "null" : typeof v;
+                        if (Array.isArray(v)) return v.length ? [describeVal(v[0], d + 1)] : [];
+                        if (typeof v === "object") {
+                            var out = {};
+                            var ks = Object.keys(v);
+                            for (var x = 0; x < ks.length; x++) out[ks[x]] = describeVal(v[ks[x]], d + 1);
+                            return out;
+                        }
+                        return typeof v;
+                    };
+                    $httpClient.post({
+                        url: WORKER_BASE + "/studio/music-schema-log",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ dataKeys: Object.keys(bodyObj.data || {}), overlaySchema: describeVal(ov, 0) })
+                    }, function () {});
+                }
+                if (ov.overlay_id === "caption:yt_now_playing" && typeof $persistentStore !== "undefined") {
+                    var rawYt = $persistentStore.read("tommm_yt_now_playing");
+                    if (rawYt) {
+                        var track = JSON.parse(rawYt);
+                        if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
+                            var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
+                            var displayTxt = track.artist ? (track.title + " - " + track.artist) : track.title;
+                            var musicData = {
+                                song_title: track.title,
+                                artist: track.artist || "YouTube Music",
+                                preview_url: track.previewUrl || "",
+                                image_url: track.artworkUrl || "",
+                                artwork_url: track.artworkUrl || "",
+                                apple_music_url: track.appleMusicUrl || "",
+                                isrc: "",
+                                platform: "apple_music"
+                            };
+                            overlays[k] = {
+                                overlay_id: "caption:music",
+                                overlay_type: "caption",
+                                alt_text: displayTxt,
+                                data: {
+                                    type: "music",
+                                    text: displayTxt,
+                                    text_color: "#FFFFFF",
+                                    max_lines: 1,
+                                    background: { colors: bgCols },
+                                    icon: { type: "image", data: track.artworkUrl || "", source: "url" },
+                                    payload: musicData,
+                                    music: musicData
+                                }
+                            };
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            if (changed) {
+                $done({ body: JSON.stringify(bodyObj) });
+                return;
+            }
+        } catch (_) {}
+        $done({});
+        return;
+    }
+
+    $done({});
+})();
+`;
+fs.writeFileSync(path.join(baseDir, 'js_tommm_yt_music.js'), ytMusicJs, 'utf8');
+
+// =========================================================================
 // 2. TÁCH RIÊNG SCRIPT 2: locket_gold.js (Nhẹ < 3KB - Kích hoạt Locket Gold & FilterPack)
 // Chuẩn 100% cấu trúc RevenueCat đã kiểm chứng trên Locket iOS!
 // =========================================================================
@@ -1133,7 +1287,37 @@ if (restoredItems.length > 0) {
 }
 
 for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
-    var rawItems = EXTRA_SECTIONS[i].items || [];
+    var secObj = EXTRA_SECTIONS[i];
+    var rawItems = secObj.items || [];
+    if (secObj.section && secObj.section.indexOf("Phát Nhạc") !== -1) {
+        var ytLabel = "YouTube • Mở nhạc để tự nhận";
+        var ytColors = ["#991B1B", "#DC2626"];
+        try {
+            if (typeof $persistentStore !== "undefined") {
+                var rawYt = $persistentStore.read("tommm_yt_now_playing");
+                if (rawYt) {
+                    var yt = JSON.parse(rawYt);
+                    if (yt && yt.title && (!yt.ts || (Date.now() - yt.ts) < 2700000)) {
+                        ytLabel = yt.artist ? (yt.title + " - " + yt.artist) : yt.title;
+                        if (ytLabel.length > 36) ytLabel = ytLabel.slice(0, 35) + "…";
+                        if (Array.isArray(yt.colors) && yt.colors.length >= 2) ytColors = yt.colors.slice(0, 2);
+                    }
+                }
+            }
+        } catch (_) {}
+        rawItems = [{
+            overlay_id: "caption:yt_now_playing",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: ytLabel,
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "sf_symbol", data: "music.note" },
+                background: { colors: ytColors }
+            }
+        }].concat(rawItems);
+    }
     var cleanItems = [];
     for (var j = 0; j < rawItems.length; j++) {
         var it = rawItems[j];
@@ -1143,7 +1327,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         }
     }
     if (cleanItems.length > 0) {
-        mergedOverlays.push({ section: EXTRA_SECTIONS[i].section, items: cleanItems });
+        mergedOverlays.push({ section: secObj.section, items: cleanItems });
     }
 }
 obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
@@ -1303,6 +1487,8 @@ DOMAIN-SUFFIX,appsflyersdk.com,REJECT
 AND,((DOMAIN,firebaseremoteconfig.googleapis.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
+AND,((DOMAIN,api.locketcamera.com),(PROTOCOL,UDP)),REJECT
+AND,((DOMAIN,us-central1-locket-4252a.cloudfunctions.net),(PROTOCOL,UDP)),REJECT
 
 [Header Rewrite]
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del x-revenuecat-etag
@@ -1339,6 +1525,8 @@ tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-425
 tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=53, timeout=60
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=53, requires-body=true, max-size=131072, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=53, requires-body=true, max-size=1048576, timeout=60
+tommm_yt_music_sniffer = type=http-request, pattern=^https:\\/\\/youtubei\\.googleapis\\.com\\/youtubei\\/v1\\/player, script-path=${ghRawBase}/js_tommm_yt_music.js?v=54, requires-body=true, binary-body-mode=true, max-size=65536, timeout=5
+tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*postMomentV2, script-path=${ghRawBase}/js_tommm_yt_music.js?v=54, requires-body=true, max-size=524288, timeout=10
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -1385,6 +1573,8 @@ DOMAIN-SUFFIX,appsflyersdk.com,REJECT
 AND,((DOMAIN,firebaseremoteconfig.googleapis.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN-SUFFIX,googlevideo.com),(PROTOCOL,UDP)),REJECT
 AND,((DOMAIN,youtubei.googleapis.com),(PROTOCOL,UDP)),REJECT
+AND,((DOMAIN,api.locketcamera.com),(PROTOCOL,UDP)),REJECT
+AND,((DOMAIN,us-central1-locket-4252a.cloudfunctions.net),(PROTOCOL,UDP)),REJECT
 
 [Header Rewrite]
 http-request ^https?:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/?(.*?)*$) header-del x-revenuecat-etag
@@ -1418,6 +1608,8 @@ tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-425
 tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=53, timeout=60
 tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=53, requires-body=true, max-size=131072, timeout=60
 tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=53, requires-body=true, max-size=1048576, timeout=60
+tommm_yt_music_sniffer = type=http-request, pattern=^https:\\/\\/youtubei\\.googleapis\\.com\\/youtubei\\/v1\\/player, script-path=${ghRawBase}/js_tommm_yt_music.js?v=54, requires-body=true, binary-body-mode=true, max-size=65536, timeout=5
+tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*postMomentV2, script-path=${ghRawBase}/js_tommm_yt_music.js?v=54, requires-body=true, max-size=524288, timeout=10
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com

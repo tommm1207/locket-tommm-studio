@@ -243,6 +243,9 @@ const FRAME_CACHE = new Map();
 const PHOTOBOOTH_SESSIONS = new Map();
 let LAST_DEBUG = null;
 let LAST_CAPTION_DEBUG = null;
+const YT_TRACK_CACHE = new Map();
+let LAST_YT_TRACK = null;
+let LAST_MUSIC_SCHEMA = null;
 let CAPTION_MODE_OVERRIDE = null;
 let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
@@ -3309,6 +3312,191 @@ async function handleStudioRequest(request, env) {
       });
     }
     return new Response("Image expired", { status: 404, headers: corsHeaders() });
+  }
+
+function rgbToHex(r, g, b) {
+  const h = (n) => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
+}
+
+function cleanYoutubeTitle(title, author) {
+  let t = String(title || "")
+    .replace(/[\(\[]\s*(official\s*(music\s*)?video|official\s*mv|official\s*audio|lyric\s*video|lyrics?|mv|audio|hd|4k|live|visualizer|full\s*version)[^\)\]]*[\)\]]/gi, " ")
+    .replace(/\s*\|\s*(official\s*(music\s*)?video|official\s*mv|mv|lyrics?|audio).*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const a = String(author || "").replace(/\s*-\s*Topic$/i, "").replace(/Official$/i, "").trim();
+  return { cleanTitle: t, cleanAuthor: a };
+}
+
+function extractDominantColorsFromJpeg(bytes) {
+  const fallback = ["#1E1B4B", "#4C1D95"];
+  try {
+    const dec = jpeg.decode(bytes, { useTArray: true });
+    if (!dec || !dec.data || !dec.data.length) return fallback;
+    const d = dec.data;
+    let sumR = 0, sumG = 0, sumB = 0, wSum = 0;
+    for (let i = 0; i < d.length; i += 64) {
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx < 24 || mn > 236) continue;
+      const sat = mx > 0 ? (mx - mn) / mx : 0;
+      const w = 0.5 + sat * 4.5;
+      sumR += r * w;
+      sumG += g * w;
+      sumB += b * w;
+      wSum += w;
+    }
+    if (wSum <= 0) return fallback;
+    let r = sumR / wSum, g = sumG / wSum, b = sumB / wSum;
+    // Keep brightness safe for crisp white overlay text
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    if (lum > 145) {
+      const k = 145 / lum;
+      r *= k; g *= k; b *= k;
+    }
+    const c1 = rgbToHex(r, g, b);
+    const c2 = rgbToHex(r * 0.52, g * 0.52, b * 0.58);
+    return [c1, c2];
+  } catch (_) {
+    return fallback;
+  }
+}
+
+async function resolveYoutubeTrack(videoId) {
+  const cached = YT_TRACK_CACHE.get(videoId);
+  if (cached && Date.now() - cached.ts < 3600000) {
+    LAST_YT_TRACK = { ...cached, ts: Date.now() };
+    return LAST_YT_TRACK;
+  }
+  let ytTitle = "";
+  let ytAuthor = "";
+  let thumbUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  try {
+    const oeRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`, {
+      signal: AbortSignal.timeout(3500),
+    });
+    if (oeRes.ok) {
+      const oe = await oeRes.json();
+      ytTitle = String(oe?.title || "").trim();
+      ytAuthor = String(oe?.author_name || "").trim();
+      if (oe?.thumbnail_url) thumbUrl = oe.thumbnail_url;
+    }
+  } catch (_) {}
+
+  const { cleanTitle, cleanAuthor } = cleanYoutubeTitle(ytTitle, ytAuthor);
+  const terms = [];
+  if (cleanTitle) {
+    if (cleanAuthor && !cleanTitle.toLowerCase().includes(cleanAuthor.toLowerCase())) {
+      terms.push(`${cleanTitle} ${cleanAuthor}`);
+    }
+    terms.push(cleanTitle);
+    const dashParts = cleanTitle.split(/\s*[-–|]\s*/).filter(Boolean);
+    if (dashParts.length >= 2) terms.push(`${dashParts[0]} ${dashParts[1]}`);
+  } else if (cleanAuthor) {
+    terms.push(cleanAuthor);
+  }
+
+  let itunesHit = null;
+  let deezerHit = null;
+  const searchHeaders = { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", "Accept": "application/json" };
+  for (const term of terms) {
+    try {
+      const [itRes, dzRes] = await Promise.all([
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=3`, { headers: searchHeaders, signal: AbortSignal.timeout(3500) }).catch(() => null),
+        fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=3`, { headers: searchHeaders, signal: AbortSignal.timeout(3500) }).catch(() => null),
+      ]);
+      if (itRes && itRes.ok) {
+        const itJson = await itRes.json().catch(() => null);
+        const hit = (itJson?.results || []).find((x) => x && x.previewUrl) || (itJson?.results || [])[0];
+        if (hit && hit.previewUrl) { itunesHit = hit; break; }
+      }
+      if (dzRes && dzRes.ok && !deezerHit) {
+        const dzJson = await dzRes.json().catch(() => null);
+        const dhit = (dzJson?.data || []).find((x) => x && x.preview) || (dzJson?.data || [])[0];
+        if (dhit && dhit.preview) deezerHit = dhit;
+      }
+    } catch (_) {}
+    if (deezerHit) break;
+  }
+
+  const title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || cleanTitle || "YouTube Music").trim();
+  const artist = (itunesHit?.artistName || deezerHit?.artist?.name || cleanAuthor || "YouTube").trim();
+  const artworkUrl = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb") || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
+  const previewUrl = itunesHit?.previewUrl || deezerHit?.preview || "";
+  const appleMusicUrl = itunesHit?.trackViewUrl || deezerHit?.link || "";
+  const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerHit?.id ? String(deezerHit.id) : videoId);
+
+  let colors = ["#1E1B4B", "#4C1D95"];
+  try {
+    const imgRes = await fetch(artworkUrl, { headers: searchHeaders, signal: AbortSignal.timeout(3500) });
+    if (imgRes.ok) {
+      const buf = new Uint8Array(await imgRes.arrayBuffer());
+      colors = extractDominantColorsFromJpeg(buf);
+    }
+  } catch (_) {}
+
+  const track = {
+    videoId,
+    songId,
+    title,
+    artist,
+    artworkUrl,
+    previewUrl,
+    appleMusicUrl,
+    colors,
+    source: itunesHit ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed"),
+    ts: Date.now(),
+  };
+  if (YT_TRACK_CACHE.size > 50) {
+    const firstKey = YT_TRACK_CACHE.keys().next().value;
+    if (firstKey) YT_TRACK_CACHE.delete(firstKey);
+  }
+  YT_TRACK_CACHE.set(videoId, track);
+  LAST_YT_TRACK = track;
+  return track;
+}
+
+  // 2.35 YouTube / YT Music -> Locket Music Caption Auto Sync + Schema Inspector
+  if (url.pathname === "/studio/yt-now-playing") {
+    if (request.method === "GET") {
+      return new Response(JSON.stringify({ ok: true, track: LAST_YT_TRACK }), {
+        status: 200,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
+    if (request.method === "POST") {
+      const b = await request.json().catch(() => ({}));
+      const vid = String(b?.videoId || b?.video_id || "").trim();
+      if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) {
+        return new Response(JSON.stringify({ ok: false, error: "invalid_video_id" }), {
+          status: 400,
+          headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+        });
+      }
+      const track = await resolveYoutubeTrack(vid);
+      return new Response(JSON.stringify({ ok: true, track }), {
+        status: 200,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
+  }
+
+  if (url.pathname === "/studio/music-schema-log") {
+    if (request.method === "GET") {
+      return new Response(JSON.stringify({ ok: true, schema: LAST_MUSIC_SCHEMA }), {
+        status: 200,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
+    if (request.method === "POST") {
+      const b = await request.json().catch(() => ({}));
+      LAST_MUSIC_SCHEMA = { schema: b, ts: new Date().toISOString() };
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
   }
 
   // 2.4 ENDPOINT RIÊNG cho APP CỦA BẠN (không qua Locket, không eligibility).

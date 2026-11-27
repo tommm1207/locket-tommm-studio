@@ -239,7 +239,37 @@ if (restoredItems.length > 0) {
 }
 
 for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
-    var rawItems = EXTRA_SECTIONS[i].items || [];
+    var secObj = EXTRA_SECTIONS[i];
+    var rawItems = secObj.items || [];
+    if (secObj.section && secObj.section.indexOf("Phát Nhạc") !== -1) {
+        var ytLabel = "YouTube • Mở nhạc để tự nhận";
+        var ytColors = ["#991B1B", "#DC2626"];
+        try {
+            if (typeof $persistentStore !== "undefined") {
+                var rawYt = $persistentStore.read("tommm_yt_now_playing");
+                if (rawYt) {
+                    var yt = JSON.parse(rawYt);
+                    if (yt && yt.title && (!yt.ts || (Date.now() - yt.ts) < 2700000)) {
+                        ytLabel = yt.artist ? (yt.title + " - " + yt.artist) : yt.title;
+                        if (ytLabel.length > 36) ytLabel = ytLabel.slice(0, 35) + "…";
+                        if (Array.isArray(yt.colors) && yt.colors.length >= 2) ytColors = yt.colors.slice(0, 2);
+                    }
+                }
+            }
+        } catch (_) {}
+        rawItems = [{
+            overlay_id: "caption:yt_now_playing",
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text: ytLabel,
+                max_lines: 1,
+                text_color: "#FFFFFF",
+                icon: { type: "sf_symbol", data: "music.note" },
+                background: { colors: ytColors }
+            }
+        }].concat(rawItems);
+    }
     var cleanItems = [];
     for (var j = 0; j < rawItems.length; j++) {
         var it = rawItems[j];
@@ -249,7 +279,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         }
     }
     if (cleanItems.length > 0) {
-        mergedOverlays.push({ section: EXTRA_SECTIONS[i].section, items: cleanItems });
+        mergedOverlays.push({ section: secObj.section, items: cleanItems });
     }
 }
 obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
