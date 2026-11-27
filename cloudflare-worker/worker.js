@@ -11,6 +11,7 @@ import { VERIFIED_QUOTE_BANK } from "./quotes_bank.js";
 
 const SIZE = 512;
 const WD_SIZE = 768;
+const HD_SIZE = 768;
 const GITHUB_FRAMES_BIN_BASE =
   "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/frames_bin";
 
@@ -764,7 +765,7 @@ function drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box, canvasSize = SIZE) {
   const [x1, y1, x2, y2] = box;
   const winW = x2 - x1;
   const winH = y2 - y1;
-  if (winW <= 0 || winH <= 0) return;
+  if (winW <= 0 || winH <= 0 || srcW <= 0 || srcH <= 0) return;
 
   const scale = Math.max(winW / srcW, winH / srcH);
   const cropW = winW / scale;
@@ -773,17 +774,52 @@ function drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box, canvasSize = SIZE) {
   const offY = (srcH - cropH) * 0.5;
   const invScale = 1 / scale;
 
+  const x0Arr = new Int32Array(winW);
+  const x1Arr = new Int32Array(winW);
+  const fxArr = new Int32Array(winW);
+  const ifxArr = new Int32Array(winW);
+  const maxX = srcW - 1;
+  for (let dx = 0; dx < winW; dx++) {
+    let sx = offX + (dx + 0.5) * invScale - 0.5;
+    if (sx < 0) sx = 0;
+    else if (sx > maxX) sx = maxX;
+    const x0 = sx | 0;
+    const x1i = x0 < maxX ? x0 + 1 : maxX;
+    const fx = ((sx - x0) * 256) | 0;
+    x0Arr[dx] = x0 * 3;
+    x1Arr[dx] = x1i * 3;
+    fxArr[dx] = fx;
+    ifxArr[dx] = 256 - fx;
+  }
+
+  const maxY = srcH - 1;
   for (let dy = 0; dy < winH; dy++) {
-    const sy = Math.min(srcH - 1, Math.max(0, (offY + dy * invScale) | 0));
-    const dstRowOff = (y1 + dy) * canvasSize * 3;
-    const srcRowOff = sy * srcW * 3;
+    let sy = offY + (dy + 0.5) * invScale - 0.5;
+    if (sy < 0) sy = 0;
+    else if (sy > maxY) sy = maxY;
+    const y0 = sy | 0;
+    const y1i = y0 < maxY ? y0 + 1 : maxY;
+    const fy = ((sy - y0) * 256) | 0;
+    const ify = 256 - fy;
+
+    const srcRow0 = y0 * srcW * 3;
+    const srcRow1 = y1i * srcW * 3;
+    const dstRow = (y1 + dy) * canvasSize * 3;
+
     for (let dx = 0; dx < winW; dx++) {
-      const sx = Math.min(srcW - 1, Math.max(0, (offX + dx * invScale) | 0));
-      const di = dstRowOff + (x1 + dx) * 3;
-      const si = srcRowOff + sx * 3;
-      canvasRgb[di] = srcRgb[si];
-      canvasRgb[di + 1] = srcRgb[si + 1];
-      canvasRgb[di + 2] = srcRgb[si + 2];
+      const sx0 = x0Arr[dx];
+      const sx1 = x1Arr[dx];
+      const fx = fxArr[dx];
+      const ifx = ifxArr[dx];
+      const i00 = srcRow0 + sx0;
+      const i10 = srcRow0 + sx1;
+      const i01 = srcRow1 + sx0;
+      const i11 = srcRow1 + sx1;
+      const di = dstRow + (x1 + dx) * 3;
+
+      canvasRgb[di] = ((srcRgb[i00] * ifx + srcRgb[i10] * fx) * ify + (srcRgb[i01] * ifx + srcRgb[i11] * fx) * fy + 32768) >> 16;
+      canvasRgb[di + 1] = ((srcRgb[i00 + 1] * ifx + srcRgb[i10 + 1] * fx) * ify + (srcRgb[i01 + 1] * ifx + srcRgb[i11 + 1] * fx) * fy + 32768) >> 16;
+      canvasRgb[di + 2] = ((srcRgb[i00 + 2] * ifx + srcRgb[i10 + 2] * fx) * ify + (srcRgb[i01 + 2] * ifx + srcRgb[i11 + 2] * fx) * fy + 32768) >> 16;
     }
   }
 }
@@ -802,6 +838,83 @@ function alphaCompositeRgbaOverRgb(canvasRgb, frameRgba, canvasSize = SIZE) {
       canvasRgb[i3] = (frameRgba[i4] * a + canvasRgb[i3] * invA + 128) >> 8;
       canvasRgb[i3 + 1] = (frameRgba[i4 + 1] * a + canvasRgb[i3 + 1] * invA + 128) >> 8;
       canvasRgb[i3 + 2] = (frameRgba[i4 + 2] * a + canvasRgb[i3 + 2] * invA + 128) >> 8;
+    }
+  }
+}
+
+function alphaCompositeRgbaScaledOverRgb(canvasRgb, frameRgba, srcSize = SIZE, dstSize = HD_SIZE) {
+  if (srcSize === dstSize) {
+    alphaCompositeRgbaOverRgb(canvasRgb, frameRgba, dstSize);
+    return;
+  }
+  const scaleRatio = (srcSize - 1) / Math.max(1, dstSize - 1);
+  const maxSrc = srcSize - 1;
+  const x0Arr = new Int32Array(dstSize);
+  const x1Arr = new Int32Array(dstSize);
+  const fxArr = new Int32Array(dstSize);
+  const ifxArr = new Int32Array(dstSize);
+  for (let x = 0; x < dstSize; x++) {
+    const sx = x * scaleRatio;
+    const x0 = sx | 0;
+    const x1i = x0 < maxSrc ? x0 + 1 : maxSrc;
+    const fx = ((sx - x0) * 256) | 0;
+    x0Arr[x] = x0;
+    x1Arr[x] = x1i;
+    fxArr[x] = fx;
+    ifxArr[x] = 256 - fx;
+  }
+
+  for (let y = 0; y < dstSize; y++) {
+    const sy = y * scaleRatio;
+    const y0 = sy | 0;
+    const y1i = y0 < maxSrc ? y0 + 1 : maxSrc;
+    const fy = ((sy - y0) * 256) | 0;
+    const ify = 256 - fy;
+    const row0 = y0 * srcSize;
+    const row1 = y1i * srcSize;
+    const dstRow = y * dstSize * 3;
+
+    for (let x = 0; x < dstSize; x++) {
+      const fx = fxArr[x];
+      const ifx = ifxArr[x];
+      const i00 = (row0 + x0Arr[x]) * 4;
+      const i10 = (row0 + x1Arr[x]) * 4;
+      const i01 = (row1 + x0Arr[x]) * 4;
+      const i11 = (row1 + x1Arr[x]) * 4;
+
+      const a00 = frameRgba[i00 + 3];
+      const a10 = frameRgba[i10 + 3];
+      const a01 = frameRgba[i01 + 3];
+      const a11 = frameRgba[i11 + 3];
+      if ((a00 | a10 | a01 | a11) === 0) continue;
+
+      const w00 = ifx * ify;
+      const w10 = fx * ify;
+      const w01 = ifx * fy;
+      const w11 = fx * fy;
+      const aSum = a00 * w00 + a10 * w10 + a01 * w01 + a11 * w11;
+      const a = (aSum + 32768) >> 16;
+      if (a <= 0) continue;
+
+      const wa00 = w00 * a00;
+      const wa10 = w10 * a10;
+      const wa01 = w01 * a01;
+      const wa11 = w11 * a11;
+      const r = ((frameRgba[i00] * wa00 + frameRgba[i10] * wa10 + frameRgba[i01] * wa01 + frameRgba[i11] * wa11) / aSum) | 0;
+      const g = ((frameRgba[i00 + 1] * wa00 + frameRgba[i10 + 1] * wa10 + frameRgba[i01 + 1] * wa01 + frameRgba[i11 + 1] * wa11) / aSum) | 0;
+      const b = ((frameRgba[i00 + 2] * wa00 + frameRgba[i10 + 2] * wa10 + frameRgba[i01 + 2] * wa01 + frameRgba[i11 + 2] * wa11) / aSum) | 0;
+
+      const di = dstRow + x * 3;
+      if (a >= 255) {
+        canvasRgb[di] = r;
+        canvasRgb[di + 1] = g;
+        canvasRgb[di + 2] = b;
+      } else {
+        const invA = 255 - a;
+        canvasRgb[di] = (r * a + canvasRgb[di] * invA + 128) >> 8;
+        canvasRgb[di + 1] = (g * a + canvasRgb[di + 1] * invA + 128) >> 8;
+        canvasRgb[di + 2] = (b * a + canvasRgb[di + 2] * invA + 128) >> 8;
+      }
     }
   }
 }
@@ -1207,6 +1320,7 @@ function applyWarpToRgb(srcRgb, w, h, warpId) {
 }
 
 function applyCctvOverlay(rgb, w, h) {
+  const s = w / 512;
   let rng = 0x517cc1b7;
   for (let y = 0; y < h; y++) {
     const scan = y % 3 === 0 ? 0.78 : 1.0;
@@ -1226,20 +1340,26 @@ function applyCctvOverlay(rgb, w, h) {
       rgb[i + 2] = b | 0;
     }
   }
-  // Corner viewfinder brackets
+  const m = Math.round(14 * s);
+  const len = Math.round(46 * s);
+  const thk = Math.max(3, Math.round(3 * s));
   const brk = [180, 255, 200];
-  fillRectRgb(rgb, w, h, 14, 14, 46, 17, brk);
-  fillRectRgb(rgb, w, h, 14, 14, 17, 46, brk);
-  fillRectRgb(rgb, w, h, w - 46, 14, w - 14, 17, brk);
-  fillRectRgb(rgb, w, h, w - 17, 14, w - 14, 46, brk);
-  fillRectRgb(rgb, w, h, 14, h - 17, 46, h - 14, brk);
-  fillRectRgb(rgb, w, h, 14, h - 46, 17, h - 14, brk);
-  fillRectRgb(rgb, w, h, w - 46, h - 17, w - 14, h - 14, brk);
-  fillRectRgb(rgb, w, h, w - 17, h - 46, w - 14, h - 14, brk);
+  fillRectRgb(rgb, w, h, m, m, len, m + thk, brk);
+  fillRectRgb(rgb, w, h, m, m, m + thk, len, brk);
+  fillRectRgb(rgb, w, h, w - len, m, w - m, m + thk, brk);
+  fillRectRgb(rgb, w, h, w - m - thk, m, w - m, len, brk);
+  fillRectRgb(rgb, w, h, m, h - m - thk, len, h - m, brk);
+  fillRectRgb(rgb, w, h, m, h - len, m + thk, h - m, brk);
+  fillRectRgb(rgb, w, h, w - len, h - m - thk, w - m, h - m, brk);
+  fillRectRgb(rgb, w, h, w - m - thk, h - len, w - m, h - m, brk);
   // Red REC dot
-  for (let y = 20; y <= 36; y++) {
-    for (let x = 20; x <= 36; x++) {
-      if ((x - 28) * (x - 28) + (y - 28) * (y - 28) <= 64) {
+  const dotCx = Math.round(28 * s);
+  const dotCy = Math.round(28 * s);
+  const dotR = Math.round(8 * s);
+  const dotR2 = dotR * dotR;
+  for (let y = dotCy - dotR; y <= dotCy + dotR; y++) {
+    for (let x = dotCx - dotR; x <= dotCx + dotR; x++) {
+      if ((x - dotCx) * (x - dotCx) + (y - dotCy) * (y - dotCy) <= dotR2) {
         const i = (y * w + x) * 3;
         rgb[i] = 245; rgb[i + 1] = 35; rgb[i + 2] = 35;
       }
@@ -1250,26 +1370,29 @@ function applyCctvOverlay(rgb, w, h) {
   const stamp =
     vnNow.getUTCFullYear() + "-" + pad(vnNow.getUTCMonth() + 1) + "-" + pad(vnNow.getUTCDate()) +
     " " + pad(vnNow.getUTCHours()) + ":" + pad(vnNow.getUTCMinutes()) + ":" + pad(vnNow.getUTCSeconds());
-  drawTextRgb(rgb, w, h, "REC CAM-01", 44, 21, 2, [220, 255, 225], [8, 25, 12]);
-  drawTextRgb(rgb, w, h, stamp, 24, h - 42, 2, [220, 255, 225], [8, 25, 12]);
+  const textScale = Math.max(2, Math.round(2 * s));
+  drawTextRgb(rgb, w, h, "REC CAM-01", Math.round(44 * s), Math.round(21 * s), textScale, [220, 255, 225], [8, 25, 12]);
+  drawTextRgb(rgb, w, h, stamp, Math.round(24 * s), h - Math.round(42 * s), textScale, [220, 255, 225], [8, 25, 12]);
 }
 
 function applyClockWeekdayOverlay(rgb, w, h) {
+  const s = w / 512;
   const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
   const pad = (n) => String(n).padStart(2, "0");
   const timeStr = pad(vnNow.getUTCHours()) + ":" + pad(vnNow.getUTCMinutes());
   const dayNames = ["CHU NHAT", "THU HAI", "THU BA", "THU TU", "THU NAM", "THU SAU", "THU BAY"];
   const dateStr = dayNames[vnNow.getUTCDay()] + " " + pad(vnNow.getUTCDate()) + "/" + pad(vnNow.getUTCMonth() + 1);
-  // 5 chars * 6 * 11 - 11 = ~319px wide -> centered near top
-  const tx = Math.max(16, ((w - (timeStr.length * 6 * 11 - 11)) >> 1));
-  drawTextRgb(rgb, w, h, timeStr, tx, 34, 11, [255, 255, 255], [15, 23, 42]);
-  const dx = Math.max(16, ((w - (dateStr.length * 6 * 3 - 3)) >> 1));
-  drawTextRgb(rgb, w, h, dateStr, dx, 122, 3, [254, 240, 138], [15, 23, 42]);
+  const tScale = Math.max(11, Math.round(11 * s));
+  const dScale = Math.max(3, Math.round(3 * s));
+  const tx = Math.max(16, ((w - (timeStr.length * 6 * tScale - tScale)) >> 1));
+  drawTextRgb(rgb, w, h, timeStr, tx, Math.round(34 * s), tScale, [255, 255, 255], [15, 23, 42]);
+  const dx = Math.max(16, ((w - (dateStr.length * 6 * dScale - dScale)) >> 1));
+  drawTextRgb(rgb, w, h, dateStr, dx, Math.round(122 * s), dScale, [254, 240, 138], [15, 23, 42]);
 }
 
 function applyTripleClone(rgb, w, h) {
   const copy = new Uint8Array(rgb);
-  const shift = 54;
+  const shift = Math.round(54 * (w / 512));
   for (let y = 0; y < h; y++) {
     const row = y * w * 3;
     for (let x = 0; x < w; x++) {
@@ -1289,38 +1412,55 @@ function applyTripleClone(rgb, w, h) {
 }
 
 function applyPortraitBokeh(rgb, w, h) {
-  // Fast separable 2-pass blur radius 7 (horizontal -> vertical)
+  // Fast O(1) sliding-window separable 2-pass blur (horizontal -> vertical)
   const tmp = new Uint8Array(w * h * 3);
   const blur = new Uint8Array(w * h * 3);
-  const rad = 7;
+  const rad = Math.max(7, Math.round(7 * (w / 512)));
   const win = rad * 2 + 1;
+  const maxX = w - 1;
+  const maxY = h - 1;
+
   for (let y = 0; y < h; y++) {
     const row = y * w * 3;
+    let sr = rgb[row] * (rad + 1), sg = rgb[row + 1] * (rad + 1), sb = rgb[row + 2] * (rad + 1);
+    for (let k = 1; k <= rad; k++) {
+      const si = row + Math.min(maxX, k) * 3;
+      sr += rgb[si]; sg += rgb[si + 1]; sb += rgb[si + 2];
+    }
     for (let x = 0; x < w; x++) {
-      let sr = 0, sg = 0, sb = 0;
-      for (let k = -rad; k <= rad; k++) {
-        const xx = x + k < 0 ? 0 : x + k >= w ? w - 1 : x + k;
-        const si = row + xx * 3;
-        sr += rgb[si]; sg += rgb[si + 1]; sb += rgb[si + 2];
-      }
       const di = row + x * 3;
       tmp[di] = (sr / win) | 0;
       tmp[di + 1] = (sg / win) | 0;
       tmp[di + 2] = (sb / win) | 0;
+      const xAdd = x + rad + 1;
+      const xSub = x - rad;
+      const addIdx = row + (xAdd > maxX ? maxX : xAdd) * 3;
+      const subIdx = row + (xSub < 0 ? 0 : xSub) * 3;
+      sr += rgb[addIdx] - rgb[subIdx];
+      sg += rgb[addIdx + 1] - rgb[subIdx + 1];
+      sb += rgb[addIdx + 2] - rgb[subIdx + 2];
     }
   }
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let sr = 0, sg = 0, sb = 0;
-      for (let k = -rad; k <= rad; k++) {
-        const yy = y + k < 0 ? 0 : y + k >= h ? h - 1 : y + k;
-        const si = (yy * w + x) * 3;
-        sr += tmp[si]; sg += tmp[si + 1]; sb += tmp[si + 2];
-      }
-      const di = (y * w + x) * 3;
+  const stride = w * 3;
+  for (let x = 0; x < w; x++) {
+    const colOff = x * 3;
+    let sr = tmp[colOff] * (rad + 1), sg = tmp[colOff + 1] * (rad + 1), sb = tmp[colOff + 2] * (rad + 1);
+    for (let k = 1; k <= rad; k++) {
+      const si = (k > maxY ? maxY : k) * stride + colOff;
+      sr += tmp[si]; sg += tmp[si + 1]; sb += tmp[si + 2];
+    }
+    for (let y = 0; y < h; y++) {
+      const di = y * stride + colOff;
       blur[di] = (sr / win) | 0;
       blur[di + 1] = (sg / win) | 0;
       blur[di + 2] = (sb / win) | 0;
+      const yAdd = y + rad + 1;
+      const ySub = y - rad;
+      const addIdx = (yAdd > maxY ? maxY : yAdd) * stride + colOff;
+      const subIdx = (ySub < 0 ? 0 : ySub) * stride + colOff;
+      sr += tmp[addIdx] - tmp[subIdx];
+      sg += tmp[addIdx + 1] - tmp[subIdx + 1];
+      sb += tmp[addIdx + 2] - tmp[subIdx + 2];
     }
   }
   // Smooth feathered vertical portrait ellipse matte
@@ -1534,15 +1674,16 @@ async function prepareAiInputImage(imgBytes, sourceUrl, origin, tempId, authHead
   // Decode -> RGB rồi encode JPEG 768 bằng jpeg-js (chắc chắn, không service ngoài).
   const d = await getSourceRgb(imgBytes, sourceUrl, authHeader);
   if (d && d.rgb) {
-    // scale về 768x768 cover bằng drawCoverRgb
-    const out = new Uint8Array(768 * 768 * 3);
-    drawCoverRgb(out, d.rgb, d.w, d.h, [0, 0, 768, 768], 768);
+    // scale về 1024x1024 cover bằng drawCoverRgb (bilinear)
+    const aiSize = 1024;
+    const out = new Uint8Array(aiSize * aiSize * 3);
+    drawCoverRgb(out, d.rgb, d.w, d.h, [0, 0, aiSize, aiSize], aiSize);
     try {
-      const rgba = new Uint8Array(768 * 768 * 4);
-      for (let p = 0, i3 = 0, i4 = 0; p < 768 * 768; p++, i3 += 3, i4 += 4) {
+      const rgba = new Uint8Array(aiSize * aiSize * 4);
+      for (let p = 0, i3 = 0, i4 = 0; p < aiSize * aiSize; p++, i3 += 3, i4 += 4) {
         rgba[i4] = out[i3]; rgba[i4 + 1] = out[i3 + 1]; rgba[i4 + 2] = out[i3 + 2]; rgba[i4 + 3] = 255;
       }
-      const enc = jpeg.encode({ data: rgba, width: 768, height: 768 }, 90);
+      const enc = jpeg.encode({ data: rgba, width: aiSize, height: aiSize }, 93);
       return { bytes: new Uint8Array(enc.data), mimeType: "image/jpeg" };
     } catch (_) {}
   }
@@ -1980,7 +2121,7 @@ async function encodeCanvasToImage(canvasRgb, origin, tempId, canvasSize = SIZE)
     for (let p = 0, i3 = 0, i4 = 0; p < canvasSize * canvasSize; p++, i3 += 3, i4 += 4) {
       rgba[i4] = canvasRgb[i3]; rgba[i4 + 1] = canvasRgb[i3 + 1]; rgba[i4 + 2] = canvasRgb[i3 + 2]; rgba[i4 + 3] = 255;
     }
-    const enc = jpeg.encode({ data: rgba, width: canvasSize, height: canvasSize }, 92);
+    const enc = jpeg.encode({ data: rgba, width: canvasSize, height: canvasSize }, 95);
     if (enc && enc.data && enc.data.length > 1000) finalBytes = new Uint8Array(enc.data);
   } catch (_) {}
 
@@ -4488,20 +4629,20 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       const t0 = Date.now();
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
-      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, HD_SIZE, authHeader);
 
-      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
-      const srcW = decodedUser?.w || SIZE;
-      const srcH = decodedUser?.h || SIZE;
-      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
-      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, SIZE, SIZE]);
+      const srcRgb = decodedUser?.rgb || new Uint8Array(HD_SIZE * HD_SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || HD_SIZE;
+      const srcH = decodedUser?.h || HD_SIZE;
+      const canvasRgb = new Uint8Array(HD_SIZE * HD_SIZE * 3);
+      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, HD_SIZE, HD_SIZE], HD_SIZE);
 
-      if (specialFxId === "cctv_camera") applyCctvOverlay(canvasRgb, SIZE, SIZE);
-      else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, SIZE, SIZE);
-      else if (specialFxId === "triple_clone") applyTripleClone(canvasRgb, SIZE, SIZE);
-      else if (specialFxId === "portrait_bokeh") applyPortraitBokeh(canvasRgb, SIZE, SIZE);
+      if (specialFxId === "cctv_camera") applyCctvOverlay(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "triple_clone") applyTripleClone(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "portrait_bokeh") applyPortraitBokeh(canvasRgb, HD_SIZE, HD_SIZE);
 
-      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
       const outId = `tommm_fx_${tempId}.${encoded.ext}`;
       await putImage(outId, encoded.bytes, encoded.mimeType);
 
@@ -4510,6 +4651,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         filterId: specialFxId,
         got_input: !!imgBytes,
         decoded_user: !!decodedUser,
+        out_size: HD_SIZE,
         out_mime: encoded.mimeType,
         out_bytes: encoded.bytes.length,
         ms: Date.now() - t0,
@@ -4523,6 +4665,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
 
     // Priority 1: Pixel-exact PNG Frames & 4-Cut Photobooth (100% original face)
     if (filterId && FRAMES_MANIFEST[filterId]) {
+      const t0 = Date.now();
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
 
@@ -4537,16 +4680,22 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       }
 
       const [decodedUser, frameRgba] = await Promise.all([
-        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader),
+        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, HD_SIZE, authHeader),
         getFrameRgba(frameKey).catch(() => getFrameRgba(filterId)),
       ]);
 
-      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
-      const srcW = decodedUser?.w || SIZE;
-      const srcH = decodedUser?.h || SIZE;
+      const srcRgb = decodedUser?.rgb || new Uint8Array(HD_SIZE * HD_SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || HD_SIZE;
+      const srcH = decodedUser?.h || HD_SIZE;
 
       const manifest = FRAMES_MANIFEST[filterId];
-      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
+      const canvasRgb = new Uint8Array(HD_SIZE * HD_SIZE * 3);
+      const scaleBox = (b) => [
+        Math.round((b[0] * HD_SIZE) / SIZE),
+        Math.round((b[1] * HD_SIZE) / SIZE),
+        Math.round((b[2] * HD_SIZE) / SIZE),
+        Math.round((b[3] * HD_SIZE) / SIZE),
+      ];
       let pbDebug = null;
 
       if (manifest.is4Cut) {
@@ -4571,7 +4720,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         for (let idx = 0; idx < windows.length; idx++) {
           if (idx < sess.shots.length) {
             const shot = sess.shots[idx];
-            drawCoverRgb(canvasRgb, shot.rgb, shot.w, shot.h, windows[idx]);
+            drawCoverRgb(canvasRgb, shot.rgb, shot.w, shot.h, scaleBox(windows[idx]), HD_SIZE);
           }
         }
         if (shotNum >= windows.length) {
@@ -4582,11 +4731,11 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         pbDebug = { mode: "multi_shot", shot: shotNum, total: windows.length, completed: shotNum >= windows.length };
       } else {
         const box = (manifest.windows && manifest.windows[0]) || [0, 0, SIZE, SIZE];
-        drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box);
+        drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, scaleBox(box), HD_SIZE);
       }
 
-      alphaCompositeRgbaOverRgb(canvasRgb, frameRgba);
-      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      alphaCompositeRgbaScaledOverRgb(canvasRgb, frameRgba, SIZE, HD_SIZE);
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
 
       const outId = `tommm_${tempId}.${encoded.ext}`;
       await putImage(outId, encoded.bytes, encoded.mimeType);
@@ -4598,8 +4747,10 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         photobooth: pbDebug,
         got_input: !!imgBytes,
         decoded_user: !!decodedUser,
+        out_size: HD_SIZE,
         out_mime: encoded.mimeType,
         out_bytes: encoded.bytes.length,
+        ms: Date.now() - t0,
         ts: new Date().toISOString(),
       };
 
@@ -4612,16 +4763,16 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       const t0 = Date.now();
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
-      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, HD_SIZE, authHeader);
 
-      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
-      const srcW = decodedUser?.w || SIZE;
-      const srcH = decodedUser?.h || SIZE;
-      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
-      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, SIZE, SIZE]);
-      applyLutToRgb(canvasRgb, SIZE, SIZE, LUT_FILTERS[lutId]);
+      const srcRgb = decodedUser?.rgb || new Uint8Array(HD_SIZE * HD_SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || HD_SIZE;
+      const srcH = decodedUser?.h || HD_SIZE;
+      const canvasRgb = new Uint8Array(HD_SIZE * HD_SIZE * 3);
+      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, HD_SIZE, HD_SIZE], HD_SIZE);
+      applyLutToRgb(canvasRgb, HD_SIZE, HD_SIZE, LUT_FILTERS[lutId]);
 
-      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
       const outId = `tommm_lut_${tempId}.${encoded.ext}`;
       await putImage(outId, encoded.bytes, encoded.mimeType);
 
@@ -4630,6 +4781,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         filterId: lutId,
         got_input: !!imgBytes,
         decoded_user: !!decodedUser,
+        out_size: HD_SIZE,
         out_mime: encoded.mimeType,
         out_bytes: encoded.bytes.length,
         ms: Date.now() - t0,
@@ -4645,16 +4797,16 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       const t0 = Date.now();
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
-      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, SIZE, authHeader);
+      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, HD_SIZE, authHeader);
 
-      const srcRgb = decodedUser?.rgb || new Uint8Array(SIZE * SIZE * 3).fill(28);
-      const srcW = decodedUser?.w || SIZE;
-      const srcH = decodedUser?.h || SIZE;
-      const canvasRgb = new Uint8Array(SIZE * SIZE * 3);
-      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, SIZE, SIZE]);
-      applyWarpToRgb(canvasRgb, SIZE, SIZE, warpId);
+      const srcRgb = decodedUser?.rgb || new Uint8Array(HD_SIZE * HD_SIZE * 3).fill(28);
+      const srcW = decodedUser?.w || HD_SIZE;
+      const srcH = decodedUser?.h || HD_SIZE;
+      const canvasRgb = new Uint8Array(HD_SIZE * HD_SIZE * 3);
+      drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, HD_SIZE, HD_SIZE], HD_SIZE);
+      applyWarpToRgb(canvasRgb, HD_SIZE, HD_SIZE, warpId);
 
-      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId);
+      const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
       const outId = `tommm_warp_${tempId}.${encoded.ext}`;
       await putImage(outId, encoded.bytes, encoded.mimeType);
 
@@ -4663,6 +4815,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         filterId: warpId,
         got_input: !!imgBytes,
         decoded_user: !!decodedUser,
+        out_size: HD_SIZE,
         out_mime: encoded.mimeType,
         out_bytes: encoded.bytes.length,
         ms: Date.now() - t0,

@@ -8,7 +8,7 @@ binding = "AI"
 
 [vars]
 AI_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
-AI_OUTPUT_SIZE = "768"
+AI_OUTPUT_SIZE = "1024"
 # Filter AI 3D: để TRỐNG -> dùng AI_MODEL (flux-2-klein-4b) không ép strength/steps, giống cấu hình
 # đã chạy tốt (giữ mặt+góc, chỉ thêm 3D). Chỉ đặt AI_3D_MODEL/AI_3D_STRENGTH/AI_3D_STEPS khi muốn thử.
 # AI_3D_MODEL = "@cf/black-forest-labs/flux-2-dev"
