@@ -134,18 +134,14 @@
     .video-frame {
       position: relative;
       width: 100%;
-      aspect-ratio: 16 / 9;
-      border-radius: 11px;
+      max-width: 290px;
+      aspect-ratio: 590 / 1280;
+      max-height: 540px;
+      margin: 0 auto;
+      border-radius: 14px;
       overflow: hidden;
-      background: linear-gradient(135deg, #131318, #1c1917);
-      border: 1px dashed #3f3f46;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 16px;
-      gap: 8px;
+      background: #09090b;
+      border: 1px solid var(--border);
     }
     .video-frame video, .video-frame iframe {
       position: absolute;
@@ -153,21 +149,33 @@
       width: 100%;
       height: 100%;
       border: 0;
-      object-fit: cover;
+      object-fit: contain;
+      background: #09090b;
     }
-    .play-badge {
-      width: 46px;
-      height: 46px;
-      border-radius: 999px;
-      background: var(--gold-soft);
-      border: 1.5px solid var(--gold);
-      color: var(--gold);
+    .video-foot {
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 11.5px;
+      color: var(--muted);
     }
-    .video-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
-    .video-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .video-dl {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 11px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .video-dl:active { transform: scale(0.97); border-color: var(--gold); color: var(--gold); }
 
     /* Interactive Tabs */
     .tabs {
@@ -440,15 +448,14 @@
     <section class="video-card" id="video-guide">
       <div class="video-head">
         <span>🎬 Video hướng dẫn cài đặt</span>
-        <span class="badge badge-vpn">Sắp gắn video</span>
+        <span class="badge badge-free">03:42 • HD</span>
       </div>
-      <!-- GẮN VIDEO TẠI ĐÂY: Thay khối .video-placeholder bên dưới bằng <video controls playsinline poster="assets/welcome_icon.jpg" src="assets/guide.mp4"></video> hoặc <iframe src="URL_EMBED" allowfullscreen></iframe> -->
       <div class="video-frame">
-        <div class="play-badge">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
-        </div>
-        <div class="video-title">Khung chờ Video hướng dẫn</div>
-        <div class="video-sub">Chỗ này dành sẵn để gắn video quay màn hình cài đặt từng bước.<br>Trong lúc chờ, xem hướng dẫn chữ siêu chi tiết ở bên dưới.</div>
+        <video controls playsinline preload="metadata" poster="assets/video/guide_poster.jpg" src="assets/video/huong_dan_locket_gold.mp4"></video>
+      </div>
+      <div class="video-foot">
+        <span>Nhấn phóng to để xem nét nhất</span>
+        <a class="video-dl" href="assets/video/huong_dan_locket_gold.mp4" download="Huong_dan_Locket_Gold.mp4">⬇️ Tải video</a>
       </div>
     </section>
 
