@@ -15,7 +15,7 @@ const HD_SIZE = 768;
 const GITHUB_FRAMES_BIN_BASE =
   "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/frames_bin";
 
-const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_polaroid_vintage":{"is4Cut":false,"windows":[[34,34,478,412]]},"nm_giang_sinh_len_am":{"is4Cut":false,"windows":[[32,32,480,480]]},"nm_soulmate":{"is4Cut":false,"windows":[[28,28,484,432]]},"nm_love_postcard":{"is4Cut":false,"windows":[[30,30,482,424]]},"nm_giang_sinh_tuan_loc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giang_sinh_selfie":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ho_ho_ho":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chung_minh_la_ban":{"is4Cut":false,"windows":[[28,28,484,424]]},"nm_son_tung_mtp":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ronaldo_siuuu":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_phai_luon_tu_te":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chi_can_mot_vet_xuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_trend_tic_toc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ai_cho_xinh_vay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_tam_cuoi_dang_dang":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_locket_camera":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_spotify_pc":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_spotify_hong":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_fuji_film":{"is4Cut":false,"windows":[[44,24,468,488]]},"nm_gay_meter":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chua_som":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_bang_tin_khan":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ve_gui_xe":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_vo_hoc_sinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giao_vien_cham_bai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_nhiem_vu_hom_nay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hoa_don_di_choi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_khong_can_ai_duyet":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ban_la_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ong_troi_that_bat_cong":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_yeu_giau_chu_co_phai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_me_con_em_don_anh_ve":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_meo_meme":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hai_trai_cay":{"is4Cut":false,"windows":[[24,24,488,440]]},"fx_ca_cute":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_mua_roi":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_bong_bong":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_canh_hoa":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_tuyet_roi":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sticker_doodle":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_cau_vong":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_buom_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sao_lap_lanh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_do_hay_den":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_duyen_tinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_nay_nen_an_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_xem_que":{"is4Cut":false,"windows":[[0,0,512,512]]}};
+const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_polaroid_vintage":{"is4Cut":false,"windows":[[34,34,478,412]]},"nm_giang_sinh_len_am":{"is4Cut":false,"windows":[[32,32,480,480]]},"nm_soulmate":{"is4Cut":false,"windows":[[28,28,484,432]]},"nm_love_postcard":{"is4Cut":false,"windows":[[30,30,482,424]]},"nm_giang_sinh_tuan_loc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giang_sinh_selfie":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ho_ho_ho":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chung_minh_la_ban":{"is4Cut":false,"windows":[[28,28,484,424]]},"nm_son_tung_mtp":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ronaldo_siuuu":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_phai_luon_tu_te":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chi_can_mot_vet_xuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_trend_tic_toc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ai_cho_xinh_vay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_tam_cuoi_dang_dang":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_locket_camera":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_spotify_pc":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_spotify_hong":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_fuji_film":{"is4Cut":false,"windows":[[44,24,468,488]]},"nm_gay_meter":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chua_som":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_bang_tin_khan":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ve_gui_xe":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_vo_hoc_sinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giao_vien_cham_bai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_nhiem_vu_hom_nay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hoa_don_di_choi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_khong_can_ai_duyet":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ban_la_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ong_troi_that_bat_cong":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_yeu_giau_chu_co_phai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_me_con_em_don_anh_ve":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_meo_meme":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hai_trai_cay":{"is4Cut":false,"windows":[[24,24,488,440]]},"fx_ca_cute":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_canh_hoa":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sticker_doodle":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_buom_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_do_hay_den":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_duyen_tinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_nay_nen_an_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_xem_que":{"is4Cut":false,"windows":[[0,0,512,512]]}};
 
 const RANDOM_VARIANT_FRAMES = {
   nm_boi_do_hay_den: 4,
@@ -75,6 +75,11 @@ const SPECIAL_FX_IDS = new Set([
   "cctv_camera",
   "triple_clone",
   "fx_giot_nuoc",
+  "fx_mua_roi",
+  "fx_bong_bong",
+  "fx_tuyet_roi",
+  "fx_cau_vong",
+  "fx_sao_lap_lanh",
 ]);
 
 const FACE_LOCK_KEEP_BG =
@@ -1360,30 +1365,37 @@ function applyWarpToRgb(srcRgb, w, h, warpId) {
 }
 
 function applyCctvOverlay(rgb, w, h) {
+  // Authentic desaturated night-vision IR security cam look + subtle vignette & scanlines
   const s = w / 512;
+  const halfW = w * 0.5;
+  const halfH = h * 0.5;
+  const invMaxR2 = 1 / (halfW * halfW + halfH * halfH);
   let rng = 0x517cc1b7;
   for (let y = 0; y < h; y++) {
-    const scan = y % 3 === 0 ? 0.78 : 1.0;
+    const scan = y % 3 === 0 ? 0.90 : 1.0;
+    const dy = y - halfH;
+    const dy2 = dy * dy;
     const row = y * w * 3;
     for (let x = 0; x < w; x++) {
       const i = row + x * 3;
-      const lum = (0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2]) * scan;
+      const dx = x - halfW;
+      const vig = 1.0 - 0.34 * (dx * dx + dy2) * invMaxR2;
+      let lum = 0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2];
+      lum = ((lum - 128) * 1.12 + 124) * scan * vig;
       rng = (rng ^ (rng << 13)) >>> 0;
       rng = (rng ^ (rng >>> 17)) >>> 0;
       rng = (rng ^ (rng << 5)) >>> 0;
-      const noise = ((rng & 0xff) / 127.5 - 1) * 14;
-      const r = Math.min(255, Math.max(0, lum * 0.45 + noise * 0.5));
-      const g = Math.min(255, Math.max(0, lum * 1.15 + noise));
-      const b = Math.min(255, Math.max(0, lum * 0.55 + noise * 0.5));
-      rgb[i] = r | 0;
-      rgb[i + 1] = g | 0;
-      rgb[i + 2] = b | 0;
+      const noise = ((rng & 0xff) / 127.5 - 1) * 8.5;
+      const base = lum + noise;
+      rgb[i] = Math.min(255, Math.max(0, base * 0.84)) | 0;
+      rgb[i + 1] = Math.min(255, Math.max(0, base * 0.98)) | 0;
+      rgb[i + 2] = Math.min(255, Math.max(0, base * 0.88)) | 0;
     }
   }
   const m = Math.round(14 * s);
   const len = Math.round(46 * s);
-  const thk = Math.max(3, Math.round(3 * s));
-  const brk = [180, 255, 200];
+  const thk = Math.max(2, Math.round(2.5 * s));
+  const brk = [215, 240, 224];
   fillRectRgb(rgb, w, h, m, m, len, m + thk, brk);
   fillRectRgb(rgb, w, h, m, m, m + thk, len, brk);
   fillRectRgb(rgb, w, h, w - len, m, w - m, m + thk, brk);
@@ -1392,16 +1404,15 @@ function applyCctvOverlay(rgb, w, h) {
   fillRectRgb(rgb, w, h, m, h - len, m + thk, h - m, brk);
   fillRectRgb(rgb, w, h, w - len, h - m - thk, w - m, h - m, brk);
   fillRectRgb(rgb, w, h, w - m - thk, h - len, w - m, h - m, brk);
-  // Red REC dot
   const dotCx = Math.round(28 * s);
   const dotCy = Math.round(28 * s);
-  const dotR = Math.round(8 * s);
+  const dotR = Math.round(7 * s);
   const dotR2 = dotR * dotR;
   for (let y = dotCy - dotR; y <= dotCy + dotR; y++) {
     for (let x = dotCx - dotR; x <= dotCx + dotR; x++) {
       if ((x - dotCx) * (x - dotCx) + (y - dotCy) * (y - dotCy) <= dotR2) {
         const i = (y * w + x) * 3;
-        rgb[i] = 245; rgb[i + 1] = 35; rgb[i + 2] = 35;
+        rgb[i] = 228; rgb[i + 1] = 45; rgb[i + 2] = 45;
       }
     }
   }
@@ -1411,42 +1422,183 @@ function applyCctvOverlay(rgb, w, h) {
     vnNow.getUTCFullYear() + "-" + pad(vnNow.getUTCMonth() + 1) + "-" + pad(vnNow.getUTCDate()) +
     " " + pad(vnNow.getUTCHours()) + ":" + pad(vnNow.getUTCMinutes()) + ":" + pad(vnNow.getUTCSeconds());
   const textScale = Math.max(2, Math.round(2 * s));
-  drawTextRgb(rgb, w, h, "REC CAM-01", Math.round(44 * s), Math.round(21 * s), textScale, [220, 255, 225], [8, 25, 12]);
-  drawTextRgb(rgb, w, h, stamp, Math.round(24 * s), h - Math.round(42 * s), textScale, [220, 255, 225], [8, 25, 12]);
+  drawTextRgb(rgb, w, h, "REC CAM-01", Math.round(44 * s), Math.round(21 * s), textScale, [235, 248, 240], [10, 16, 12]);
+  drawTextRgb(rgb, w, h, stamp, Math.round(24 * s), h - Math.round(40 * s), textScale, [235, 248, 240], [10, 16, 12]);
 }
 
-function applyClockWeekdayOverlay(rgb, w, h) {
-  const s = w / 512;
+function applyClockWeekdayOverlay(rgb, w, h, atlasAlpha = null) {
   const vnNow = new Date(Date.now() + 7 * 3600 * 1000);
   const pad = (n) => String(n).padStart(2, "0");
   const timeStr = pad(vnNow.getUTCHours()) + ":" + pad(vnNow.getUTCMinutes());
+  const datePart = pad(vnNow.getUTCDate()) + "/" + pad(vnNow.getUTCMonth() + 1);
+  const dayIdx = vnNow.getUTCDay();
+
+  // Subtle top dark veil so white Lock-Screen text stays readable on light backgrounds
+  const gradH = Math.round(h * 0.34);
+  for (let y = 0; y < gradH; y++) {
+    const t = 1 - y / gradH;
+    const mul = 1 - 0.36 * t * t;
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const i = row + x * 3;
+      rgb[i] = (rgb[i] * mul) | 0;
+      rgb[i + 1] = (rgb[i + 1] * mul) | 0;
+      rgb[i + 2] = (rgb[i + 2] * mul) | 0;
+    }
+  }
+
+  if (atlasAlpha && atlasAlpha.length >= 512 * 256) {
+    const AW = 512;
+    const findSpan = (cx, cy, cw, ch) => {
+      let minX = cw, maxX = -1;
+      for (let x = 0; x < cw; x++) {
+        for (let y = 0; y < ch; y++) {
+          if (atlasAlpha[(cy + y) * AW + (cx + x)] > 8) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            break;
+          }
+        }
+      }
+      if (maxX < minX) return { sx: 0, sw: Math.max(8, cw >> 1) };
+      return { sx: minX, sw: maxX - minX + 1 };
+    };
+    const blitScaledGlyph = (cx, cy, sx, sw, ch, dstX, dstY, scale, col, shOffX, shOffY, shAlpha) => {
+      const dw = Math.ceil(sw * scale);
+      const dh = Math.ceil(ch * scale);
+      const invS = 1 / scale;
+      // Soft shadow pass + crisp white foreground pass
+      for (let pass = 0; pass < 2; pass++) {
+        const ox = pass === 0 ? shOffX : 0;
+        const oy = pass === 0 ? shOffY : 0;
+        for (let dy = 0; dy < dh; dy++) {
+          const ty = Math.round(dstY + dy + oy);
+          if (ty < 0 || ty >= h) continue;
+          const ayF = dy * invS;
+          const ay0 = Math.min(ch - 1, ayF | 0);
+          const ay1 = Math.min(ch - 1, ay0 + 1);
+          const fy = ayF - ay0;
+          const r0 = (cy + ay0) * AW + cx + sx;
+          const r1 = (cy + ay1) * AW + cx + sx;
+          const dstRow = ty * w * 3;
+          for (let dx = 0; dx < dw; dx++) {
+            const tx = Math.round(dstX + dx + ox);
+            if (tx < 0 || tx >= w) continue;
+            const axF = dx * invS;
+            const ax0 = Math.min(sw - 1, axF | 0);
+            const ax1 = Math.min(sw - 1, ax0 + 1);
+            const fx = axF - ax0;
+            const a =
+              (atlasAlpha[r0 + ax0] * (1 - fx) + atlasAlpha[r0 + ax1] * fx) * (1 - fy) +
+              (atlasAlpha[r1 + ax0] * (1 - fx) + atlasAlpha[r1 + ax1] * fx) * fy;
+            if (a < 3) continue;
+            const i = dstRow + tx * 3;
+            if (pass === 0) {
+              const sMix = 1 - (a / 255) * shAlpha;
+              rgb[i] = (rgb[i] * sMix) | 0;
+              rgb[i + 1] = (rgb[i + 1] * sMix) | 0;
+              rgb[i + 2] = (rgb[i + 2] * sMix) | 0;
+            } else {
+              const alpha = a / 255;
+              const invA = 1 - alpha;
+              rgb[i] = (rgb[i] * invA + col[0] * alpha) | 0;
+              rgb[i + 1] = (rgb[i + 1] * invA + col[1] * alpha) | 0;
+              rgb[i + 2] = (rgb[i + 2] * invA + col[2] * alpha) | 0;
+            }
+          }
+        }
+      }
+    };
+
+    const s = w / 768;
+    // 1. Small crisp date line: "<WEEKDAY> • DD/MM"
+    const wdPos = [[0, 176], [170, 176], [340, 176], [0, 216], [170, 216], [340, 216], [296, 128]][dayIdx];
+    const smallChars = "0123456789/•";
+    const dateCells = [
+      { cx: wdPos[0], cy: wdPos[1], cw: 168, ch: 38, ...findSpan(wdPos[0], wdPos[1], 168, 38) },
+      { cx: 11 * 24, cy: 128, cw: 24, ch: 48, ...findSpan(11 * 24, 128, 24, 48), yNudge: -4 },
+    ];
+    for (const ch of datePart) {
+      const idx = smallChars.indexOf(ch);
+      if (idx >= 0) dateCells.push({ cx: idx * 24, cy: 128, cw: 24, ch: 48, ...findSpan(idx * 24, 128, 24, 48), yNudge: -6 });
+    }
+    const dScale = 1.0 * s;
+    const dGap = 4 * s;
+    let totalDW = 0;
+    dateCells.forEach((g, idx) => {
+      totalDW += g.sw * dScale + (idx > 0 ? (idx <= 2 ? 10 * s : dGap) : 0);
+    });
+    let curDX = (w - totalDW) * 0.5;
+    const baseDY = 24 * s;
+    dateCells.forEach((g, idx) => {
+      if (idx > 0) curDX += idx <= 2 ? 10 * s : dGap;
+      blitScaledGlyph(g.cx, g.cy, g.sx, g.sw, g.ch, curDX, baseDY + (g.yNudge || 0) * dScale, dScale, [254, 243, 199], 0, 2 * s, 0.55);
+      curDX += g.sw * dScale;
+    });
+
+    // 2. Large crisp iOS Lock-Screen time "HH:MM"
+    const bigChars = "0123456789:/";
+    const tScale = 1.08 * s;
+    const tGap = 6 * s;
+    const timeCells = [];
+    let totalTW = 0;
+    for (let i = 0; i < timeStr.length; i++) {
+      const idx = bigChars.indexOf(timeStr[i]);
+      const sp = findSpan(idx * 42, 0, 42, 128);
+      timeCells.push({ cx: idx * 42, cy: 0, ch: 128, ...sp });
+      totalTW += sp.sw * tScale + (i > 0 ? tGap : 0);
+    }
+    let curTX = (w - totalTW) * 0.5;
+    const baseTY = 60 * s;
+    for (let i = 0; i < timeCells.length; i++) {
+      const g = timeCells[i];
+      blitScaledGlyph(g.cx, g.cy, g.sx, g.sw, g.ch, curTX, baseTY, tScale, [255, 255, 255], 1 * s, 3 * s, 0.58);
+      curTX += g.sw * tScale + tGap;
+    }
+    return;
+  }
+
+  // Emergency fallback only if atlas fails to fetch
+  const s = w / 512;
   const dayNames = ["CHU NHAT", "THU HAI", "THU BA", "THU TU", "THU NAM", "THU SAU", "THU BAY"];
-  const dateStr = dayNames[vnNow.getUTCDay()] + " " + pad(vnNow.getUTCDate()) + "/" + pad(vnNow.getUTCMonth() + 1);
+  const dateStr = dayNames[dayIdx] + " " + datePart;
   const tScale = Math.max(11, Math.round(11 * s));
   const dScale = Math.max(3, Math.round(3 * s));
-  const tx = Math.max(16, ((w - (timeStr.length * 6 * tScale - tScale)) >> 1));
+  const tx = Math.max(16, (w - (timeStr.length * 6 * tScale - tScale)) >> 1);
   drawTextRgb(rgb, w, h, timeStr, tx, Math.round(34 * s), tScale, [255, 255, 255], [15, 23, 42]);
-  const dx = Math.max(16, ((w - (dateStr.length * 6 * dScale - dScale)) >> 1));
+  const dx = Math.max(16, (w - (dateStr.length * 6 * dScale - dScale)) >> 1);
   drawTextRgb(rgb, w, h, dateStr, dx, Math.round(122 * s), dScale, [254, 240, 138], [15, 23, 42]);
 }
 
 function applyTripleClone(rgb, w, h) {
+  // Subtle chromatic prism split keeping the center subject sharp and vivid
   const copy = new Uint8Array(rgb);
-  const shift = Math.round(54 * (w / 512));
+  const shift = Math.round(38 * (w / 768));
+  const halfW = w * 0.5;
+  const halfH = h * 0.5;
   for (let y = 0; y < h; y++) {
     const row = y * w * 3;
+    const dy = (y - halfH) / halfH;
     for (let x = 0; x < w; x++) {
+      const dx = (x - halfW) / halfW;
+      // Keep eyes/center cleaner, ramp prism echo toward periphery
+      const dist = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+      const mix = 0.14 + 0.18 * dist;
       const lx = Math.max(0, x - shift);
       const rx = Math.min(w - 1, x + shift);
       const i = row + x * 3;
       const li = row + lx * 3;
       const ri = row + rx * 3;
-      const r = copy[i] * 0.58 + copy[li] * 0.16 + copy[ri] * 0.26;
-      const g = copy[i + 1] * 0.58 + copy[li + 1] * 0.24 + copy[ri + 1] * 0.14;
-      const b = copy[i + 2] * 0.58 + copy[li + 2] * 0.26 + copy[ri + 2] * 0.24;
-      rgb[i] = r > 255 ? 255 : r | 0;
-      rgb[i + 1] = g > 255 ? 255 : g | 0;
-      rgb[i + 2] = b > 255 ? 255 : b | 0;
+      const rEcho = copy[ri] * 1.05;
+      const gEcho = copy[li + 1] * 0.60 + copy[ri + 1] * 0.40;
+      const bEcho = copy[li + 2] * 1.08;
+      const baseW = 1 - mix * 0.45;
+      const sr = copy[i] * baseW + rEcho * mix * 0.52;
+      const sg = copy[i + 1] * baseW + gEcho * mix * 0.42;
+      const sb = copy[i + 2] * baseW + bEcho * mix * 0.52;
+      rgb[i] = sr > 255 ? 255 : sr | 0;
+      rgb[i + 1] = sg > 255 ? 255 : sg | 0;
+      rgb[i + 2] = sb > 255 ? 255 : sb | 0;
     }
   }
 }
@@ -1686,6 +1838,363 @@ function applyWaterDropletsGlass(rgb, w, h) {
         else if (dc > 255) dc = 255;
         const mixed = blur[i3 + c] * invA + dc * edgeA;
         rgb[i3 + c] = mixed > 255 ? 255 : mixed < 0 ? 0 : mixed | 0;
+      }
+    }
+  }
+}
+
+function makeFxRng(seedBase) {
+  let rng = (((Date.now() & 0xffff) ^ seedBase) >>> 0) || 0x13579bdf;
+  return () => {
+    rng = (rng ^ (rng << 13)) >>> 0;
+    rng = (rng ^ (rng >>> 17)) >>> 0;
+    rng = (rng ^ (rng << 5)) >>> 0;
+    if (rng === 0) rng = 0x9e3779b9;
+    return rng / 4294967296;
+  };
+}
+
+function screenPixel(rgb, i3, sr, sg, sb) {
+  const r0 = rgb[i3], g0 = rgb[i3 + 1], b0 = rgb[i3 + 2];
+  rgb[i3] = (255 - (((255 - r0) * (255 - Math.min(255, sr))) / 255)) | 0;
+  rgb[i3 + 1] = (255 - (((255 - g0) * (255 - Math.min(255, sg))) / 255)) | 0;
+  rgb[i3 + 2] = (255 - (((255 - b0) * (255 - Math.min(255, sb))) / 255)) | 0;
+}
+
+function applyRainOverlayGlass(rgb, w, h) {
+  const s = w / 768;
+  const total = w * h;
+  // Subtle cool overcast cinema rain tone
+  for (let p = 0, i = 0; p < total; p++, i += 3) {
+    let r = (rgb[i] * 0.93 - 128) * 1.05 + 128;
+    let g = (rgb[i + 1] * 0.97 - 128) * 1.05 + 128;
+    let b = (rgb[i + 2] * 1.06 - 128) * 1.05 + 128;
+    rgb[i] = r < 0 ? 0 : r > 255 ? 255 : r | 0;
+    rgb[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g | 0;
+    rgb[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b | 0;
+  }
+
+  const rnd = makeFxRng(0x51a7b3c9);
+  const ang = -0.26; // ~ -15 deg tilt
+  const ux = Math.sin(ang);
+  const uy = Math.cos(ang);
+  const vx = uy;
+  const vy = -ux;
+
+  // ~145 multi-depth motion-blurred rainfall streaks
+  for (let k = 0; k < 145; k++) {
+    const cx = rnd() * w;
+    const cy = rnd() * h;
+    const depth = rnd();
+    const halfLen = (14 + depth * 36) * s;
+    const halfW = (0.75 + (1 - depth) * 1.15) * s;
+    const peakA = 0.12 + depth * 0.25;
+    const boxR = Math.ceil(halfLen + halfW + 2);
+    const x0 = Math.max(0, Math.floor(cx - boxR));
+    const x1 = Math.min(w - 1, Math.ceil(cx + boxR));
+    const y0 = Math.max(0, Math.floor(cy - boxR));
+    const y1 = Math.min(h - 1, Math.ceil(cy + boxR));
+    const invHalfLen = 1 / halfLen;
+    const invHalfW = 1 / halfW;
+
+    for (let y = y0; y <= y1; y++) {
+      const dy = y - cy;
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - cx;
+        const along = dx * ux + dy * uy;
+        if (Math.abs(along) >= halfLen) continue;
+        const perp = Math.abs(dx * vx + dy * vy);
+        if (perp >= halfW) continue;
+        const tA = 1 - Math.abs(along) * invHalfLen;
+        const tW = 1 - perp * invHalfW;
+        const a = peakA * tA * (tW * tW);
+        if (a > 0.01) {
+          screenPixel(rgb, (row + x) * 3, 224 * a, 240 * a, 255 * a);
+        }
+      }
+    }
+  }
+
+  // ~35 tiny subtle water micro-beads near outer lens border
+  for (let k = 0; k < 35; k++) {
+    let bx = rnd() * w;
+    let by = rnd() * h;
+    if (bx > w * 0.24 && bx < w * 0.76 && by > h * 0.20 && by < h * 0.80) {
+      bx = rnd() < 0.5 ? rnd() * w * 0.20 : w * (0.80 + rnd() * 0.20);
+    }
+    const r = (2.2 + rnd() * 3.2) * s;
+    const x0 = Math.max(0, Math.floor(bx - r - 1));
+    const x1 = Math.min(w - 1, Math.ceil(bx + r + 1));
+    const y0 = Math.max(0, Math.floor(by - r - 1));
+    const y1 = Math.min(h - 1, Math.ceil(by + r + 1));
+    const invR = 1 / r;
+    for (let y = y0; y <= y1; y++) {
+      const ny = (y - by) * invR;
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const nx = (x - bx) * invR;
+        const d2 = nx * nx + ny * ny;
+        if (d2 >= 1) continue;
+        const rim = d2 > 0.65 ? (1 - d2) / 0.35 : 0.25;
+        const hl = Math.max(0, -nx * 0.6 - ny * 0.7);
+        const lum = 190 * (hl * hl * 0.6 + rim * 0.25);
+        screenPixel(rgb, (row + x) * 3, lum, lum * 1.03, lum * 1.08);
+      }
+    }
+  }
+}
+
+function applySoapBubblesOptical(rgb, w, h) {
+  const orig = new Uint8Array(rgb);
+  const s = w / 768;
+  const rnd = makeFxRng(0xb0bb1e55);
+  const specs = [
+    [0.12, 0.13, 62], [0.28, 0.08, 30], [0.87, 0.14, 68], [0.74, 0.07, 34],
+    [0.08, 0.42, 42], [0.92, 0.38, 46], [0.10, 0.70, 56], [0.90, 0.68, 52],
+    [0.15, 0.89, 64], [0.34, 0.92, 32], [0.68, 0.91, 36], [0.86, 0.88, 60],
+    [0.21, 0.26, 24], [0.80, 0.25, 26], [0.78, 0.76, 25], [0.22, 0.75, 24],
+  ];
+  const maxW = w - 1.001;
+  const maxH = h - 1.001;
+
+  for (let idx = 0; idx < specs.length; idx++) {
+    const cx = (specs[idx][0] + (rnd() - 0.5) * 0.04) * w;
+    const cy = (specs[idx][1] + (rnd() - 0.5) * 0.04) * h;
+    const rad = specs[idx][2] * (0.90 + rnd() * 0.20) * s;
+    const phase = rnd() * 6.283;
+    const refract = Math.min(11 * s, rad * 0.22);
+    const x0 = Math.max(0, Math.floor(cx - rad - 2));
+    const x1 = Math.min(w - 1, Math.ceil(cx + rad + 2));
+    const y0 = Math.max(0, Math.floor(cy - rad - 2));
+    const y1 = Math.min(h - 1, Math.ceil(cy + rad + 2));
+    const invR = 1 / rad;
+
+    for (let y = y0; y <= y1; y++) {
+      const ny = (y - cy) * invR;
+      const ny2 = ny * ny;
+      if (ny2 >= 1) continue;
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const nx = (x - cx) * invR;
+        const r2 = nx * nx + ny2;
+        if (r2 >= 1) continue;
+        const r = Math.sqrt(r2);
+        const nz = Math.sqrt(Math.max(0.01, 1 - r2));
+
+        // Mild convex lens refraction inside bubble
+        let sx = x - nx * r * refract;
+        let sy = y - ny * r * refract;
+        if (sx < 0) sx = 0; else if (sx > maxW) sx = maxW;
+        if (sy < 0) sy = 0; else if (sy > maxH) sy = maxH;
+        const sx0 = sx | 0, sy0 = sy | 0;
+        const fx = sx - sx0, fy = sy - sy0;
+        const i00 = (sy0 * w + sx0) * 3;
+        const i10 = (sy0 * w + sx0 + 1) * 3;
+        const i01 = ((sy0 + 1) * w + sx0) * 3;
+        const i11 = ((sy0 + 1) * w + sx0 + 1) * 3;
+
+        const edgeSoft = r > 0.94 ? (1 - r) / 0.06 : 1.0;
+        const ang = Math.atan2(ny, nx);
+        // Thin-film iridescent Fresnel interference
+        const fresnel = Math.pow(r, 3.0) * (0.58 + 0.42 * Math.sin(ang * 2.0 + phase));
+        const shift = ang * 1.4 + r * 4.5 + phase;
+        const ir = 128 + 127 * Math.cos(shift);
+        const ig = 128 + 127 * Math.cos(shift + 2.094);
+        const ib = 128 + 127 * Math.cos(shift + 4.188);
+
+        // Two crisp curved specular window highlights
+        const h1 = Math.max(0, -nx * 0.62 - ny * 0.68 + nz * 0.39);
+        const h2 = Math.max(0, nx * 0.52 + ny * 0.64 + nz * 0.56);
+        const spec = (Math.pow(h1, 22) * 230 + Math.pow(h2, 30) * 105) * edgeSoft;
+
+        const filmA = (0.04 + 0.54 * fresnel) * edgeSoft;
+        const refractMix = 0.65 * edgeSoft;
+        const i3 = (row + x) * 3;
+
+        for (let c = 0; c < 3; c++) {
+          const rc =
+            (orig[i00 + c] * (1 - fx) + orig[i10 + c] * fx) * (1 - fy) +
+            (orig[i01 + c] * (1 - fx) + orig[i11 + c] * fx) * fy;
+          const base = rgb[i3 + c] * (1 - refractMix) + rc * refractMix;
+          const irCol = c === 0 ? ir : c === 1 ? ig : ib;
+          const screened = 255 - ((255 - base) * (255 - Math.min(255, irCol * filmA + spec))) / 255;
+          rgb[i3 + c] = screened > 255 ? 255 : screened | 0;
+        }
+      }
+    }
+  }
+}
+
+function applyBokehSnowfall(rgb, w, h) {
+  const s = w / 768;
+  const total = w * h;
+  // Crisp cool winter daylight balance
+  for (let p = 0, i = 0; p < total; p++, i += 3) {
+    rgb[i] = Math.min(255, (rgb[i] * 0.96) | 0);
+    rgb[i + 1] = Math.min(255, (rgb[i + 1] * 0.99) | 0);
+    rgb[i + 2] = Math.min(255, (rgb[i + 2] * 1.05 + 2) | 0);
+  }
+  const rnd = makeFxRng(0x5000f411);
+
+  const splatFlake = (cx, cy, rx, ry, alpha, softPow) => {
+    const maxR = Math.max(rx, ry);
+    const x0 = Math.max(0, Math.floor(cx - maxR - 1));
+    const x1 = Math.min(w - 1, Math.ceil(cx + maxR + 1));
+    const y0 = Math.max(0, Math.floor(cy - maxR - 1));
+    const y1 = Math.min(h - 1, Math.ceil(cy + maxR + 1));
+    const invRx = 1 / rx;
+    const invRy = 1 / ry;
+    for (let y = y0; y <= y1; y++) {
+      const ny = (y - cy) * invRy;
+      const ny2 = ny * ny;
+      if (ny2 >= 1) continue;
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const nx = (x - cx) * invRx;
+        const d2 = nx * nx + ny2;
+        if (d2 >= 1) continue;
+        const f = Math.pow(1 - d2, softPow);
+        const a = alpha * f;
+        screenPixel(rgb, (row + x) * 3, 246 * a, 250 * a, 255 * a);
+      }
+    }
+  };
+
+  // Layer 1: ~18 large soft out-of-focus foreground bokeh discs (outer frame bias)
+  for (let k = 0; k < 18; k++) {
+    let cx = rnd() * w;
+    let cy = rnd() * h;
+    if (cx > w * 0.25 && cx < w * 0.75 && cy > h * 0.22 && cy < h * 0.78) {
+      cx = rnd() < 0.5 ? rnd() * w * 0.22 : w * (0.78 + rnd() * 0.22);
+    }
+    const r = (16 + rnd() * 18) * s;
+    splatFlake(cx, cy, r, r * (0.94 + rnd() * 0.14), 0.14 + rnd() * 0.14, 1.35);
+  }
+  // Layer 2: ~65 mid-ground softly blurred snowflakes
+  for (let k = 0; k < 65; k++) {
+    const r = (4.2 + rnd() * 5.8) * s;
+    splatFlake(rnd() * w, rnd() * h, r, r * (0.88 + rnd() * 0.26), 0.42 + rnd() * 0.30, 1.8);
+  }
+  // Layer 3: ~160 fine distant crisp snow grains
+  for (let k = 0; k < 160; k++) {
+    const r = (1.6 + rnd() * 2.1) * s;
+    splatFlake(rnd() * w, rnd() * h, r, r * (0.9 + rnd() * 0.2), 0.30 + rnd() * 0.32, 1.6);
+  }
+}
+
+function applyPrismRainbowLeak(rgb, w, h) {
+  // Optical camera prism rainbow light leak via pure screen blend
+  const invW = 1 / w;
+  const invH = 1 / h;
+  for (let y = 0; y < h; y++) {
+    const ny = y * invH;
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const nx = x * invW;
+      // Diagonal dispersion coordinate across frame
+      const u = nx * 0.68 + ny * 0.52 - 0.16;
+      const v = nx * 0.52 - ny * 0.68 + 0.08;
+      // Soft diagonal prism beam envelope
+      const beamEnv = Math.exp(-Math.pow((u - 0.44) / 0.27, 2)) * Math.exp(-Math.pow(v / 0.62, 2));
+      const entryBloom = Math.exp(-((nx * nx + ny * ny) / 0.26)) * 0.38;
+      if (beamEnv < 0.01 && entryBloom < 0.01) continue;
+
+      // Smooth Gaussian spectral dispersion (red -> orange -> gold -> green -> cyan -> violet)
+      const rSpec = Math.exp(-Math.pow((u - 0.29) / 0.10, 2)) * 1.0 + Math.exp(-Math.pow((u - 0.62) / 0.08, 2)) * 0.55;
+      const gSpec = Math.exp(-Math.pow((u - 0.39) / 0.11, 2)) * 0.92 + Math.exp(-Math.pow((u - 0.48) / 0.09, 2)) * 0.55;
+      const bSpec = Math.exp(-Math.pow((u - 0.54) / 0.12, 2)) * 1.0 + Math.exp(-Math.pow((u - 0.62) / 0.09, 2)) * 0.72;
+
+      const strength = 0.48 * beamEnv;
+      const lr = 255 * Math.min(1, rSpec * strength + entryBloom * 1.00);
+      const lg = 255 * Math.min(1, gSpec * strength + entryBloom * 0.86);
+      const lb = 255 * Math.min(1, bSpec * strength + entryBloom * 0.68);
+      screenPixel(rgb, row + x * 3, lr, lg, lb);
+    }
+  }
+}
+
+function applyKiraSparkleLens(rgb, w, h) {
+  // Real optical cross-screen star filter anchored to top highlight peaks
+  const s = w / 768;
+  const cells = 16;
+  const cw = w / cells;
+  const ch = h / cells;
+  const candidates = [];
+
+  for (let cy = 0; cy < cells; cy++) {
+    for (let cx = 0; cx < cells; cx++) {
+      let bestL = -1, bestX = 0, bestY = 0;
+      const sx0 = Math.floor(cx * cw), sx1 = Math.floor((cx + 1) * cw);
+      const sy0 = Math.floor(cy * ch), sy1 = Math.floor((cy + 1) * ch);
+      for (let y = sy0; y < sy1; y += 3) {
+        const row = y * w * 3;
+        for (let x = sx0; x < sx1; x += 3) {
+          const i = row + x * 3;
+          const lum = 0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2];
+          if (lum > bestL) { bestL = lum; bestX = x; bestY = y; }
+        }
+      }
+      if (bestL > 145) candidates.push({ x: bestX, y: bestY, lum: bestL });
+    }
+  }
+  candidates.sort((a, b) => b.lum - a.lum);
+  const chosen = [];
+  const minDist2 = (68 * s) * (68 * s);
+  for (const c of candidates) {
+    let ok = true;
+    for (const p of chosen) {
+      const dx = c.x - p.x, dy = c.y - p.y;
+      if (dx * dx + dy * dy < minDist2) { ok = false; break; }
+    }
+    if (ok) {
+      chosen.push(c);
+      if (chosen.length >= 16) break;
+    }
+  }
+  // Fallback outer highlights if input photo is uniformly dark
+  const rnd = makeFxRng(0x9a1c1e55);
+  while (chosen.length < 8) {
+    chosen.push({ x: (0.08 + rnd() * 0.84) * w, y: (0.08 + rnd() * 0.84) * h, lum: 210 });
+  }
+
+  for (let idx = 0; idx < chosen.length; idx++) {
+    const cx = chosen[idx].x;
+    const cy = chosen[idx].y;
+    const inten = Math.min(1.0, Math.max(0.55, (chosen[idx].lum - 135) / 110));
+    const armLen = (24 + (idx < 6 ? 18 : 8)) * s * inten;
+    const ang0 = idx % 2 === 0 ? 0.7854 : 0.22; // cross-screen ~45deg or tilted diffraction
+    const cA = Math.cos(ang0), sA = Math.sin(ang0);
+    const box = Math.ceil(armLen + 4);
+    const x0 = Math.max(0, Math.floor(cx - box));
+    const x1 = Math.min(w - 1, Math.ceil(cx + box));
+    const y0 = Math.max(0, Math.floor(cy - box));
+    const y1 = Math.min(h - 1, Math.ceil(cy + box));
+    const coreR = 7.5 * s;
+    const thick = 1.65 * s;
+
+    for (let y = y0; y <= y1; y++) {
+      const dy = y - cy;
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - cx;
+        const r = Math.sqrt(dx * dx + dy * dy);
+        if (r > armLen) continue;
+        // Rotated diffraction axes
+        const u = Math.abs(dx * cA + dy * sA);
+        const v = Math.abs(-dx * sA + dy * cA);
+        const ray1 = Math.exp(-v / thick) * Math.max(0, 1 - u / armLen);
+        const ray2 = Math.exp(-u / thick) * Math.max(0, 1 - v / armLen);
+        const core = Math.exp(-(r * r) / (coreR * coreR));
+        const pow = inten * Math.min(1, core * 0.92 + (ray1 + ray2) * 0.82);
+        if (pow < 0.015) continue;
+
+        // Subtle prism RGB dispersion along outer ray tips
+        const tip = Math.min(1, r / armLen);
+        const sr = 255 * pow * (1.0 + 0.14 * tip);
+        const sg = 248 * pow;
+        const sb = 235 * pow * (1.0 - 0.10 * tip + 0.22 * Math.sin(r * 0.28));
+        screenPixel(rgb, (row + x) * 3, sr, sg, sb);
       }
     }
   }
@@ -4939,7 +5448,10 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       const t0 = Date.now();
       const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
       const tempId = crypto.randomUUID().slice(0, 12);
-      const decodedUser = await decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, HD_SIZE, authHeader);
+      const [decodedUser, clockAtlas] = await Promise.all([
+        decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, HD_SIZE, authHeader),
+        specialFxId === "clock_weekday_overlay" ? getFrameRgba("clock_font_atlas").catch(() => null) : Promise.resolve(null),
+      ]);
 
       const srcRgb = decodedUser?.rgb || new Uint8Array(HD_SIZE * HD_SIZE * 3).fill(28);
       const srcW = decodedUser?.w || HD_SIZE;
@@ -4948,10 +5460,15 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, [0, 0, HD_SIZE, HD_SIZE], HD_SIZE);
 
       if (specialFxId === "cctv_camera") applyCctvOverlay(canvasRgb, HD_SIZE, HD_SIZE);
-      else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, HD_SIZE, HD_SIZE, clockAtlas);
       else if (specialFxId === "triple_clone") applyTripleClone(canvasRgb, HD_SIZE, HD_SIZE);
       else if (specialFxId === "portrait_bokeh") applyPortraitBokeh(canvasRgb, HD_SIZE, HD_SIZE);
       else if (specialFxId === "fx_giot_nuoc") applyWaterDropletsGlass(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_mua_roi") applyRainOverlayGlass(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_bong_bong") applySoapBubblesOptical(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_tuyet_roi") applyBokehSnowfall(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_cau_vong") applyPrismRainbowLeak(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_sao_lap_lanh") applyKiraSparkleLens(canvasRgb, HD_SIZE, HD_SIZE);
 
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
       const outId = `tommm_fx_${tempId}.${encoded.ext}`;
