@@ -127,89 +127,101 @@
         }
     }
 
-    // Mode 2: Inspect native caption:music or inject YouTube track on postMomentV2
-    if (u.indexOf("postMomentV2") !== -1) {
+    function findOverlaysArrays(node, out, depth) {
+        if (!node || typeof node !== "object" || depth > 5) return;
+        if (Array.isArray(node.overlays)) out.push(node.overlays);
+        var keys = Object.keys(node);
+        for (var i = 0; i < keys.length; i++) {
+            var v = node[keys[i]];
+            if (v && typeof v === "object" && !Array.isArray(v)) findOverlaysArrays(v, out, depth + 1);
+        }
+    }
+
+    // Mode 2: Inspect native caption:music or swap live YouTube track in-place on postMoment / createMoment
+    if (/\/(?:postMoment\w*|createMoment\w*)/i.test(u)) {
         try {
             if (typeof req.body !== "string" || !req.body) { finishOnce({}); return; }
             var bodyObj = JSON.parse(req.body);
-            var overlays = bodyObj && bodyObj.data && Array.isArray(bodyObj.data.overlays) ? bodyObj.data.overlays : null;
-            if (!overlays) { finishOnce({}); return; }
+            var overlayLists = [];
+            findOverlaysArrays(bodyObj, overlayLists, 0);
+            if (overlayLists.length === 0) { finishOnce({}); return; }
 
             var changed = false;
+            var replacedWith = "";
             var hasNativeMusicLog = false;
-            for (var k = 0; k < overlays.length; k++) {
-                var ov = overlays[k];
-                if (!ov) continue;
-                if (ov.overlay_id === "caption:music" && typeof $httpClient !== "undefined") {
-                    hasNativeMusicLog = true;
-                    var describeVal = function (v, d) {
-                        if (d > 4 || v == null) return v === null ? "null" : typeof v;
-                        if (Array.isArray(v)) return v.length ? [describeVal(v[0], d + 1)] : [];
-                        if (typeof v === "object") {
-                            var out = {};
-                            var ks = Object.keys(v);
-                            for (var x = 0; x < ks.length; x++) out[ks[x]] = describeVal(v[ks[x]], d + 1);
-                            return out;
-                        }
-                        return typeof v;
-                    };
-                    var logTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 800) : null;
-                    $httpClient.post({
-                        url: WORKER_BASE + "/studio/music-schema-log",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ dataKeys: Object.keys(bodyObj.data || {}), overlaySchema: describeVal(ov, 0) })
-                    }, function () {
-                        if (logTimer && typeof clearTimeout !== "undefined") clearTimeout(logTimer);
-                        finishOnce({});
-                    });
-                }
-                var isYtOv = (ov.overlay_id === "caption:yt_now_playing" || ov.overlay_id === "caption:yt_vinyl_spin" || (ov.overlay_id && ov.overlay_id.indexOf("yt_now_playing") !== -1));
-                if (isYtOv && typeof $persistentStore !== "undefined") {
-                    var isVinylIconMode = ov.overlay_id === "caption:yt_vinyl_spin";
-                    var rawYt = $persistentStore.read("tommm_yt_now_playing");
-                    if (rawYt) {
-                        var track = JSON.parse(rawYt);
-                        if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
-                            var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
-                            var displayTxt = formatTrackLabel(track.title, track.artist, 34);
-                            var chosenIcon = isVinylIconMode ? VINYL_ICON_URL : (track.artworkUrl || VINYL_ICON_URL);
-                            var chosenBg = vinylBgUrl(bgCols, isVinylIconMode ? "wave" : "peek");
-                            var musicData = {
-                                song_title: track.title,
-                                artist: track.artist || "YouTube Music",
-                                preview_url: track.previewUrl || "",
-                                image_url: track.artworkUrl || "",
-                                artwork_url: track.artworkUrl || "",
-                                apple_music_url: track.appleMusicUrl || "",
-                                isrc: "",
-                                platform: "apple_music"
-                            };
-                            overlays[k] = {
-                                overlay_id: "caption:music",
-                                overlay_type: "caption",
-                                alt_text: displayTxt,
-                                data: {
-                                    type: "music",
-                                    text: displayTxt,
-                                    text_color: "#FFFFFF",
-                                    max_lines: 1,
-                                    background: {
-                                        colors: bgCols,
-                                        image: { type: "image", data: chosenBg, source: "url" }
-                                    },
-                                    icon: { type: "image", data: chosenIcon, source: "url" },
-                                    payload: musicData,
-                                    music: musicData
-                                }
-                            };
-                            try { console.log("[TommmYT] Injected: " + displayTxt); } catch (_) {}
-                            changed = true;
+            for (var li = 0; li < overlayLists.length; li++) {
+                var overlays = overlayLists[li];
+                for (var k = 0; k < overlays.length; k++) {
+                    var ov = overlays[k];
+                    if (!ov) continue;
+                    if (ov.overlay_id === "caption:music" && typeof $httpClient !== "undefined") {
+                        hasNativeMusicLog = true;
+                        var describeVal = function (v, d) {
+                            if (d > 4 || v == null) return v === null ? "null" : typeof v;
+                            if (Array.isArray(v)) return v.length ? [describeVal(v[0], d + 1)] : [];
+                            if (typeof v === "object") {
+                                var out = {};
+                                var ks = Object.keys(v);
+                                for (var x = 0; x < ks.length; x++) out[ks[x]] = describeVal(v[ks[x]], d + 1);
+                                return out;
+                            }
+                            return typeof v;
+                        };
+                        var logTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 800) : null;
+                        $httpClient.post({
+                            url: WORKER_BASE + "/studio/music-schema-log",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ dataKeys: Object.keys(bodyObj.data || {}), overlaySchema: describeVal(ov, 0) })
+                        }, function () {
+                            if (logTimer && typeof clearTimeout !== "undefined") clearTimeout(logTimer);
+                            finishOnce({});
+                        });
+                    }
+                    var isYtOv = (ov.overlay_id === "caption:yt_now_playing" || ov.overlay_id === "caption:yt_vinyl_spin" || (ov.overlay_id && ov.overlay_id.indexOf("yt_now_playing") !== -1));
+                    if (isYtOv && typeof $persistentStore !== "undefined") {
+                        var isVinylIconMode = ov.overlay_id === "caption:yt_vinyl_spin";
+                        var rawYt = $persistentStore.read("tommm_yt_now_playing");
+                        if (rawYt) {
+                            var track = JSON.parse(rawYt);
+                            if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
+                                var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
+                                var displayTxt = formatTrackLabel(track.title, track.artist, 28);
+                                var chosenIcon = isVinylIconMode ? VINYL_ICON_URL : (track.artworkUrl || VINYL_ICON_URL);
+                                var chosenBg = vinylBgUrl(bgCols, isVinylIconMode ? "wave" : "peek");
+                                ov.alt_text = displayTxt;
+                                ov.data = ov.data || {};
+                                if (!ov.data.type) ov.data.type = "static_content";
+                                ov.data.text = displayTxt;
+                                ov.data.text_color = "#FFFFFF";
+                                ov.data.max_lines = 1;
+                                ov.data.background = Object.assign({}, ov.data.background || {}, {
+                                    colors: bgCols,
+                                    image: { type: "image", data: chosenBg, source: "url" }
+                                });
+                                ov.data.icon = { type: "image", data: chosenIcon, source: "url" };
+                                replacedWith = displayTxt;
+                                try { console.log("[TommmYT] Swapped postMoment -> " + displayTxt); } catch (_) {}
+                                changed = true;
+                            }
                         }
                     }
                 }
             }
             if (changed) {
-                finishOnce({ body: JSON.stringify(bodyObj) });
+                var updatedBody = JSON.stringify(bodyObj);
+                if (typeof $httpClient !== "undefined") {
+                    var swapTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({ body: updatedBody }); }, 250) : null;
+                    $httpClient.post({
+                        url: WORKER_BASE + "/studio/music-schema-log",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0], matched: true, replacedWith: replacedWith })
+                    }, function () {
+                        if (swapTimer && typeof clearTimeout !== "undefined") clearTimeout(swapTimer);
+                        finishOnce({ body: updatedBody });
+                    });
+                    return;
+                }
+                finishOnce({ body: updatedBody });
                 return;
             }
             if (hasNativeMusicLog) return;
