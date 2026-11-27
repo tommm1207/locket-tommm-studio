@@ -15,7 +15,7 @@ const HD_SIZE = 768;
 const GITHUB_FRAMES_BIN_BASE =
   "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/frames_bin";
 
-const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_polaroid_vintage":{"is4Cut":false,"windows":[[34,34,478,412]]},"nm_giang_sinh_len_am":{"is4Cut":false,"windows":[[32,32,480,480]]},"nm_soulmate":{"is4Cut":false,"windows":[[28,28,484,432]]},"nm_love_postcard":{"is4Cut":false,"windows":[[30,30,482,424]]},"nm_giang_sinh_tuan_loc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giang_sinh_selfie":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ho_ho_ho":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chung_minh_la_ban":{"is4Cut":false,"windows":[[28,28,484,424]]},"nm_son_tung_mtp":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ronaldo_siuuu":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_phai_luon_tu_te":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chi_can_mot_vet_xuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_trend_tic_toc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ai_cho_xinh_vay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_tam_cuoi_dang_dang":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_locket_camera":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_spotify_pc":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_spotify_hong":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_fuji_film":{"is4Cut":false,"windows":[[44,24,468,488]]},"nm_gay_meter":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chua_som":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_bang_tin_khan":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ve_gui_xe":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_vo_hoc_sinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giao_vien_cham_bai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_nhiem_vu_hom_nay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hoa_don_di_choi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_khong_can_ai_duyet":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ban_la_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ong_troi_that_bat_cong":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_yeu_giau_chu_co_phai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_me_con_em_don_anh_ve":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_meo_meme":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hai_trai_cay":{"is4Cut":false,"windows":[[24,24,488,440]]},"fx_canh_hoa":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sticker_doodle":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_do_hay_den":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_duyen_tinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_nay_nen_an_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_xem_que":{"is4Cut":false,"windows":[[0,0,512,512]]}};
+const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_polaroid_vintage":{"is4Cut":false,"windows":[[34,34,478,412]]},"nm_giang_sinh_len_am":{"is4Cut":false,"windows":[[32,32,480,480]]},"nm_soulmate":{"is4Cut":false,"windows":[[28,28,484,432]]},"nm_love_postcard":{"is4Cut":false,"windows":[[30,30,482,424]]},"nm_giang_sinh_tuan_loc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giang_sinh_selfie":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ho_ho_ho":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chung_minh_la_ban":{"is4Cut":false,"windows":[[28,28,484,424]]},"nm_son_tung_mtp":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ronaldo_siuuu":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_phai_luon_tu_te":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chi_can_mot_vet_xuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_trend_tic_toc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ai_cho_xinh_vay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_tam_cuoi_dang_dang":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_locket_camera":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_spotify_pc":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_spotify_hong":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_fuji_film":{"is4Cut":false,"windows":[[44,24,468,488]]},"nm_gay_meter":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chua_som":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_bang_tin_khan":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ve_gui_xe":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_vo_hoc_sinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giao_vien_cham_bai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_nhiem_vu_hom_nay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hoa_don_di_choi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_khong_can_ai_duyet":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ban_la_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ong_troi_that_bat_cong":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_yeu_giau_chu_co_phai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_me_con_em_don_anh_ve":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_meo_meme":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hai_trai_cay":{"is4Cut":false,"windows":[[24,24,488,440]]},"fx_ca_cute":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_canh_hoa":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sticker_doodle":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_buom_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_do_hay_den":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_duyen_tinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_nay_nen_an_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_xem_que":{"is4Cut":false,"windows":[[0,0,512,512]]}};
 
 const RANDOM_VARIANT_FRAMES = {
   nm_boi_do_hay_den: 4,
@@ -142,8 +142,7 @@ const CUSTOM_AI_IDS = new Set([
   "ai_makeup_idol", "ai_trang_diem_duyen", "ai_doi_kieu_toc", "ai_doi_mau_toc",
   "ai_cosplay_wibu", "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop",
   "nm_mona_lisa", "nm_faker",
-  "ai_mua_xuan", "ai_mua_he", "ai_mua_thu", "ai_mua_dong", "ai_masterchef", "ai_csgt",
-  "fx_ca_cute", "fx_buom_xinh"
+  "ai_mua_xuan", "ai_mua_he", "ai_mua_thu", "ai_mua_dong", "ai_masterchef", "ai_csgt"
 ]);
 
 const AI_FILTER_PROMPTS = {
@@ -291,10 +290,6 @@ const AI_FILTER_PROMPTS = {
     "Dress the person in a real matte white cotton chef coat and chef toque hat standing naturally inside an authentic stainless-steel restaurant kitchen with realistic fluorescent/ambient indoor light and natural smartphone camera texture.",
   ai_csgt:
     "Dress the person in an authentic matte golden-tan Vietnamese traffic police (CSGT) uniform jacket with neat badges and matching peaked cap on a real sunlit tree-lined city street in candid daylight.",
-  fx_ca_cute:
-    "Keep the person's exact face, glasses, hair, clothing, pose, lighting, and the exact original background completely untouched. Add a few real live small bright orange-and-white Japanese koi goldfish swimming naturally in shallow soft-focus foreground depth around the lower corners and outer edges of the frame, with subtle realistic water refraction caustics and natural shallow depth-of-field lens bokeh—never covering the face or eyes.",
-  fx_buom_xinh:
-    "Keep the person's exact face, glasses, hair, clothing, pose, lighting, and the exact original background completely untouched. Add a few real delicate monarch and soft pastel swallowtail butterflies fluttering naturally in mid-air around the outer frame edges and softly near one shoulder, with realistic translucent wing texture, natural motion blur, and soft ambient daylight shadows—never covering the face or eyes.",
 };
 
 const MEMORY_IMAGES = new Map();
@@ -1963,21 +1958,25 @@ function applySoapBubblesOptical(rgb, w, h) {
   const orig = new Uint8Array(rgb);
   const s = w / 768;
   const rnd = makeFxRng(0xb0bb1e55);
+  // Organic asymmetric diagonal drift across corners & edges (no stiff ring)
   const specs = [
-    [0.12, 0.13, 62], [0.28, 0.08, 30], [0.87, 0.14, 68], [0.74, 0.07, 34],
-    [0.08, 0.42, 42], [0.92, 0.38, 46], [0.10, 0.70, 56], [0.90, 0.68, 52],
-    [0.15, 0.89, 64], [0.34, 0.92, 32], [0.68, 0.91, 36], [0.86, 0.88, 60],
-    [0.21, 0.26, 24], [0.80, 0.25, 26], [0.78, 0.76, 25], [0.22, 0.75, 24],
+    [0.88, 0.13, 72], [0.11, 0.86, 68], // 2 large soft close-to-lens bubbles at corners
+    [0.14, 0.16, 40], [0.74, 0.21, 34], [0.85, 0.44, 44],
+    [0.10, 0.56, 36], [0.76, 0.84, 42],
+    [0.26, 0.11, 18], [0.64, 0.09, 15], [0.92, 0.68, 22], // delicate small & micro bubbles
+    [0.19, 0.34, 14], [0.81, 0.64, 17], [0.27, 0.91, 20],
+    [0.61, 0.90, 14], [0.07, 0.30, 12],
   ];
   const maxW = w - 1.001;
   const maxH = h - 1.001;
 
   for (let idx = 0; idx < specs.length; idx++) {
-    const cx = (specs[idx][0] + (rnd() - 0.5) * 0.04) * w;
-    const cy = (specs[idx][1] + (rnd() - 0.5) * 0.04) * h;
-    const rad = specs[idx][2] * (0.90 + rnd() * 0.20) * s;
+    const cx = (specs[idx][0] + (rnd() - 0.5) * 0.03) * w;
+    const cy = (specs[idx][1] + (rnd() - 0.5) * 0.03) * h;
+    const rad = specs[idx][2] * (0.92 + rnd() * 0.16) * s;
     const phase = rnd() * 6.283;
-    const refract = Math.min(11 * s, rad * 0.22);
+    const isLargeFG = idx < 2;
+    const refract = Math.min(8 * s, rad * 0.16);
     const x0 = Math.max(0, Math.floor(cx - rad - 2));
     const x1 = Math.min(w - 1, Math.ceil(cx + rad + 2));
     const y0 = Math.max(0, Math.floor(cy - rad - 2));
@@ -1996,9 +1995,10 @@ function applySoapBubblesOptical(rgb, w, h) {
         const r = Math.sqrt(r2);
         const nz = Math.sqrt(Math.max(0.01, 1 - r2));
 
-        // Mild convex lens refraction inside bubble
-        let sx = x - nx * r * refract;
-        let sy = y - ny * r * refract;
+        // Mild spherical lens refraction near outer soap shell
+        const pull = r * r * refract;
+        let sx = x - nx * pull;
+        let sy = y - ny * pull;
         if (sx < 0) sx = 0; else if (sx > maxW) sx = maxW;
         if (sy < 0) sy = 0; else if (sy > maxH) sy = maxH;
         const sx0 = sx | 0, sy0 = sy | 0;
@@ -2008,22 +2008,29 @@ function applySoapBubblesOptical(rgb, w, h) {
         const i01 = ((sy0 + 1) * w + sx0) * 3;
         const i11 = ((sy0 + 1) * w + sx0 + 1) * 3;
 
-        const edgeSoft = r > 0.94 ? (1 - r) / 0.06 : 1.0;
+        const softOuter = isLargeFG ? 0.88 : 0.94;
+        const edgeSoft = r > softOuter ? Math.pow((1 - r) / (1 - softOuter), 1.35) : 1.0;
         const ang = Math.atan2(ny, nx);
-        // Thin-film iridescent Fresnel interference
-        const fresnel = Math.pow(r, 3.0) * (0.58 + 0.42 * Math.sin(ang * 2.0 + phase));
-        const shift = ang * 1.4 + r * 4.5 + phase;
-        const ir = 128 + 127 * Math.cos(shift);
-        const ig = 128 + 127 * Math.cos(shift + 2.094);
-        const ib = 128 + 127 * Math.cos(shift + 4.188);
 
-        // Two crisp curved specular window highlights
-        const h1 = Math.max(0, -nx * 0.62 - ny * 0.68 + nz * 0.39);
+        // Pearlescent thin-film Fresnel concentrated tightly along outer membrane (crystal-clear center)
+        const fresnel = Math.pow(r, 5.5) * (0.55 + 0.45 * Math.sin(ang * 2.0 + phase));
+        const shift = ang * 1.15 + r * 3.8 + phase;
+        const rawR = 135 + 120 * Math.cos(shift);
+        const rawG = 135 + 120 * Math.cos(shift + 2.094);
+        const rawB = 135 + 120 * Math.cos(shift + 4.188);
+        // Desaturated pearlescent pastel reflection (42% thin-film + 58% soft sky white)
+        const ir = rawR * 0.42 + 245 * 0.58;
+        const ig = rawG * 0.42 + 249 * 0.58;
+        const ib = rawB * 0.42 + 255 * 0.58;
+
+        // Curved sky-window arc highlight + secondary tiny catchlight + membrane rim glint
+        const h1 = Math.max(0, -nx * 0.60 - ny * 0.70 + nz * 0.39);
         const h2 = Math.max(0, nx * 0.52 + ny * 0.64 + nz * 0.56);
-        const spec = (Math.pow(h1, 22) * 230 + Math.pow(h2, 30) * 105) * edgeSoft;
+        const rimGlow = Math.exp(-Math.pow((r - 0.955) / 0.032, 2)) * 52;
+        const spec = (Math.pow(h1, 26) * 205 + Math.pow(h2, 34) * 85 + rimGlow) * edgeSoft * (isLargeFG ? 0.82 : 1.0);
 
-        const filmA = (0.04 + 0.54 * fresnel) * edgeSoft;
-        const refractMix = 0.65 * edgeSoft;
+        const filmA = (0.012 + 0.34 * fresnel) * edgeSoft * (isLargeFG ? 0.82 : 1.0);
+        const refractMix = 0.52 * edgeSoft;
         const i3 = (row + x) * 3;
 
         for (let c = 0; c < 3; c++) {
@@ -2098,7 +2105,7 @@ function applyBokehSnowfall(rgb, w, h) {
 }
 
 function applyPrismRainbowLeak(rgb, w, h) {
-  // Optical camera prism rainbow light leak via pure screen blend, focused softly in upper-left corner
+  // Authentic sunlit crystal-prism pastel rainbow flare confined softly to upper-left corner
   const invW = 1 / w;
   const invH = 1 / h;
   for (let y = 0; y < h; y++) {
@@ -2106,39 +2113,42 @@ function applyPrismRainbowLeak(rgb, w, h) {
     const row = y * w * 3;
     for (let x = 0; x < w; x++) {
       const nx = x * invW;
-      // Diagonal dispersion coordinate lifted cleanly into upper-left frame
-      const u = nx * 0.72 + ny * 0.68 - 0.08;
-      const v = nx * 0.68 - ny * 0.72 + 0.08;
-      // Delicate diagonal prism beam envelope
-      const beamEnv = Math.exp(-Math.pow((u - 0.34) / 0.21, 2)) * Math.exp(-Math.pow(v / 0.56, 2));
-      const entryBloom = Math.exp(-((nx * nx + ny * ny) / 0.22)) * 0.34;
-      if (beamEnv < 0.01 && entryBloom < 0.01) continue;
+      const u = nx * 0.76 + ny * 0.65;
+      const v = (nx - 0.14) * 0.65 - (ny - 0.10) * 0.76;
+      const beamEnv = Math.exp(-Math.pow((u - 0.25) / 0.14, 2)) * Math.exp(-Math.pow(v / 0.44, 2));
+      const entryBloom = Math.exp(-((nx * nx + ny * ny) / 0.14)) * 0.28;
 
-      // Smooth Gaussian spectral dispersion (red -> orange -> gold -> green -> cyan -> violet)
-      const rSpec = Math.exp(-Math.pow((u - 0.22) / 0.08, 2)) * 1.0 + Math.exp(-Math.pow((u - 0.48) / 0.07, 2)) * 0.55;
-      const gSpec = Math.exp(-Math.pow((u - 0.30) / 0.09, 2)) * 0.92 + Math.exp(-Math.pow((u - 0.38) / 0.08, 2)) * 0.55;
-      const bSpec = Math.exp(-Math.pow((u - 0.42) / 0.10, 2)) * 1.0 + Math.exp(-Math.pow((u - 0.48) / 0.08, 2)) * 0.72;
+      // Faint secondary warm optical lens-flare bokeh orb diagonally along sun axis
+      const odx = nx - 0.36;
+      const ody = ny - 0.25;
+      const orbR = Math.sqrt(odx * odx + ody * ody) / 0.068;
+      const orbGlow = orbR < 1.25 ? Math.exp(-orbR * orbR * 2.2) * (0.045 + 0.035 * Math.exp(-Math.pow((orbR - 0.85) / 0.15, 2))) : 0;
 
-      const strength = 0.34 * beamEnv;
-      const lr = 255 * Math.min(1, rSpec * strength + entryBloom * 1.00);
-      const lg = 255 * Math.min(1, gSpec * strength + entryBloom * 0.86);
-      const lb = 255 * Math.min(1, bSpec * strength + entryBloom * 0.68);
+      if (beamEnv < 0.01 && entryBloom < 0.008 && orbGlow < 0.005) continue;
+
+      // Pastel spectral bands (coral-rose -> warm peach -> pale mint -> airy sky-blue -> soft lavender)
+      const g1 = Math.exp(-Math.pow((u - 0.145) / 0.054, 2));
+      const g2 = Math.exp(-Math.pow((u - 0.200) / 0.054, 2));
+      const g3 = Math.exp(-Math.pow((u - 0.255) / 0.052, 2));
+      const g4 = Math.exp(-Math.pow((u - 0.310) / 0.054, 2));
+      const g5 = Math.exp(-Math.pow((u - 0.362) / 0.052, 2));
+
+      const rBand = g1 * 1.00 + g2 * 1.00 + g3 * 0.68 + g4 * 0.56 + g5 * 0.78 + 0.18;
+      const gBand = g1 * 0.52 + g2 * 0.82 + g3 * 0.96 + g4 * 0.84 + g5 * 0.64 + 0.16;
+      const bBand = g1 * 0.58 + g2 * 0.48 + g3 * 0.88 + g4 * 1.00 + g5 * 1.00 + 0.15;
+
+      const strength = 0.27 * beamEnv;
+      const lr = 255 * Math.min(1, rBand * strength + entryBloom * 1.00 + orbGlow * 1.00);
+      const lg = 255 * Math.min(1, gBand * strength + entryBloom * 0.85 + orbGlow * 0.82);
+      const lb = 255 * Math.min(1, bBand * strength + entryBloom * 0.66 + orbGlow * 0.68);
       screenPixel(rgb, row + x * 3, lr, lg, lb);
     }
   }
 }
 
 function applyKiraSparkleLens(rgb, w, h) {
-  // Real optical cross-screen star filter anchored to high-contrast highlight peaks
+  // Razor-thin KiraKira+ diffraction needle filter preserving 100% original photo exposure
   const s = w / 768;
-  const total = w * h;
-  // Gentle exposure headroom so specular star rays shimmer clearly even on bright scenes
-  for (let p = 0, i = 0; p < total; p++, i += 3) {
-    rgb[i] = (rgb[i] * 0.94) | 0;
-    rgb[i + 1] = (rgb[i + 1] * 0.94) | 0;
-    rgb[i + 2] = (rgb[i + 2] * 0.94) | 0;
-  }
-
   const cells = 16;
   const cw = w / cells;
   const ch = h / cells;
@@ -2159,7 +2169,7 @@ function applyKiraSparkleLens(rgb, w, h) {
         for (let x = sx0; x < sx1; x += 3) {
           const i = row + x * 3;
           const lum = 0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2];
-          if (lum < 110) continue;
+          if (lum < 118) continue;
           const iR = row + (x + step) * 3;
           const iL = row + (x - step) * 3;
           const iU = rowU + x * 3;
@@ -2177,45 +2187,72 @@ function applyKiraSparkleLens(rgb, w, h) {
           if (score > bestScore) { bestScore = score; bestLum = lum; bestX = x; bestY = y; }
         }
       }
-      if (bestScore > 10 && bestLum > 115) {
+      if (bestScore > 11 && bestLum > 122) {
         candidates.push({ x: bestX, y: bestY, lum: bestLum, score: bestScore });
       }
     }
   }
   candidates.sort((a, b) => b.score - a.score);
-  const chosen = [];
-  const minDist2 = (62 * s) * (62 * s);
-  for (const c of candidates) {
-    let ok = true;
-    for (const p of chosen) {
-      const dx = c.x - p.x, dy = c.y - p.y;
-      if (dx * dx + dy * dy < minDist2) { ok = false; break; }
-    }
-    if (ok) {
-      chosen.push(c);
-      if (chosen.length >= 16) break;
-    }
-  }
-  // Fallback highlights if scene is completely flat
+
   const rnd = makeFxRng(0x9a1c1e55);
-  while (chosen.length < 8) {
-    chosen.push({ x: (0.10 + rnd() * 0.80) * w, y: (0.10 + rnd() * 0.80) * h, lum: 215, score: 45 });
+  const glints = [];
+  if (candidates.length >= 4) {
+    // Normal lit photo: up to 4 hero glints (well spaced) + up to 10 delicate micro-twinkles
+    const heroDist2 = (92 * s) * (92 * s);
+    for (const c of candidates) {
+      let ok = true;
+      for (const p of glints) {
+        const dx = c.x - p.x, dy = c.y - p.y;
+        if (dx * dx + dy * dy < heroDist2) { ok = false; break; }
+      }
+      if (ok) {
+        glints.push({ x: c.x, y: c.y, inten: Math.min(1.0, 0.72 + (c.lum - 120) / 320), hero: true });
+        if (glints.length >= 4) break;
+      }
+    }
+    const minDist2 = (55 * s) * (55 * s);
+    for (const c of candidates) {
+      let ok = true;
+      for (const p of glints) {
+        const dx = c.x - p.x, dy = c.y - p.y;
+        if (dx * dx + dy * dy < minDist2) { ok = false; break; }
+      }
+      if (ok) {
+        glints.push({ x: c.x, y: c.y, inten: Math.min(0.85, 0.48 + (c.lum - 120) / 400), hero: false });
+        if (glints.length >= 14) break;
+      }
+    }
+  } else {
+    // Dark/black frame fallback: delicate varied starry micro-twinkles + 2 subtle refined glints
+    glints.push({ x: 0.16 * w, y: 0.18 * h, inten: 0.80, hero: true });
+    glints.push({ x: 0.84 * w, y: 0.24 * h, inten: 0.74, hero: true });
+    for (let k = 0; k < 14; k++) {
+      glints.push({
+        x: (0.08 + rnd() * 0.84) * w,
+        y: (0.08 + rnd() * 0.84) * h,
+        inten: 0.42 + rnd() * 0.36,
+        hero: false,
+      });
+    }
   }
 
-  for (let idx = 0; idx < chosen.length; idx++) {
-    const cx = chosen[idx].x;
-    const cy = chosen[idx].y;
-    const inten = Math.min(1.0, Math.max(0.65, (chosen[idx].lum - 110) / 115));
-    const armLen = (30 + (idx < 6 ? 26 : 12)) * s * inten;
-    const ang0 = idx % 2 === 0 ? 0.7854 : 0.22; // cross-screen ~45deg or tilted diffraction
+  for (let idx = 0; idx < glints.length; idx++) {
+    const g = glints[idx];
+    const cx = g.x;
+    const cy = g.y;
+    const isHero = g.hero;
+    const armLen = (isHero ? (26 + (idx % 2) * 8) : (7 + rnd() * 9)) * s * g.inten;
+    const ang0 = isHero ? (idx % 2 === 0 ? 0.7854 : 0.0) : (rnd() * 1.57);
     const cA = Math.cos(ang0), sA = Math.sin(ang0);
-    const box = Math.ceil(armLen + 4);
+    const cB = Math.cos(ang0 + 0.7854), sB = Math.sin(ang0 + 0.7854);
+    const box = Math.ceil(armLen + 6 * s);
     const x0 = Math.max(0, Math.floor(cx - box));
     const x1 = Math.min(w - 1, Math.ceil(cx + box));
     const y0 = Math.max(0, Math.floor(cy - box));
     const y1 = Math.min(h - 1, Math.ceil(cy + box));
-    const coreR = 8.5 * s;
-    const thick = 1.85 * s;
+    const thick = (isHero ? 0.64 : 0.44) * s;
+    const coreR = (isHero ? 2.5 : 1.7) * s;
+    const haloR = (isHero ? 12.0 : 6.0) * s;
 
     for (let y = y0; y <= y1; y++) {
       const dy = y - cy;
@@ -2224,20 +2261,29 @@ function applyKiraSparkleLens(rgb, w, h) {
         const dx = x - cx;
         const r = Math.sqrt(dx * dx + dy * dy);
         if (r > armLen) continue;
-        // Rotated diffraction axes
         const u = Math.abs(dx * cA + dy * sA);
         const v = Math.abs(-dx * sA + dy * cA);
-        const ray1 = Math.exp(-v / thick) * Math.max(0, 1 - u / armLen);
-        const ray2 = Math.exp(-u / thick) * Math.max(0, 1 - v / armLen);
-        const core = Math.exp(-(r * r) / (coreR * coreR));
-        const pow = inten * Math.min(1, core * 0.96 + (ray1 + ray2) * 0.92);
-        if (pow < 0.015) continue;
+        const ray1 = Math.exp(-v / thick) * Math.pow(Math.max(0, 1 - u / armLen), 2.3);
+        const ray2 = Math.exp(-u / thick) * Math.pow(Math.max(0, 1 - v / armLen), 2.3);
 
-        // Warm champagne-gold + crisp white diffraction dispersion along rays
+        let sec = 0;
+        if (isHero) {
+          const u2 = Math.abs(dx * cB + dy * sB);
+          const v2 = Math.abs(-dx * sB + dy * cB);
+          const subLen = armLen * 0.46;
+          sec = (Math.exp(-v2 / (thick * 0.85)) * Math.pow(Math.max(0, 1 - u2 / subLen), 2.5)
+               + Math.exp(-u2 / (thick * 0.85)) * Math.pow(Math.max(0, 1 - v2 / subLen), 2.5)) * 0.24;
+        }
+
+        const core = Math.exp(-(r * r) / (coreR * coreR));
+        const halo = Math.exp(-(r * r) / (haloR * haloR)) * (isHero ? 0.16 : 0.11);
+        const pow = g.inten * Math.min(1, core * 0.96 + (ray1 + ray2) * 0.92 + sec + halo);
+        if (pow < 0.012) continue;
+
         const tip = Math.min(1, r / armLen);
-        const sr = 255 * pow * (1.06 + 0.14 * tip);
-        const sg = 248 * pow;
-        const sb = 224 * pow * (1.0 - 0.12 * tip + 0.20 * Math.sin(r * 0.28));
+        const sr = 255 * pow;
+        const sg = 250 * pow * (1.0 - 0.04 * tip);
+        const sb = 238 * pow * (1.0 - 0.06 * tip + 0.12 * Math.sin(r * 0.25));
         screenPixel(rgb, (row + x) * 3, sr, sg, sb);
       }
     }
@@ -5606,7 +5652,8 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, scaleBox(box), HD_SIZE);
       }
 
-      alphaCompositeRgbaScaledOverRgb(canvasRgb, frameRgba, SIZE, HD_SIZE);
+      const frameSrcSize = Math.round(Math.sqrt(frameRgba.length / 4)) || SIZE;
+      alphaCompositeRgbaScaledOverRgb(canvasRgb, frameRgba, frameSrcSize, HD_SIZE);
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
 
       const outId = `tommm_${tempId}.${encoded.ext}`;

@@ -737,12 +737,11 @@ def main():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as mf:
         manifest = json.load(mf)
 
-    # Part B: 2 decorative petal/sticker overlays (the 6 optical shaders use worker.js; fx_ca_cute & fx_buom_xinh use photorealistic AI)
-    fx_specs = [
-        ("fx_canh_hoa", "Cánh Hoa", fx_canh_hoa, (157, 23, 77, 205)),
-        ("fx_sticker_doodle", "Sticker Mặt", fx_sticker_doodle, (190, 24, 93, 205)),
-    ]
-    for old_shader_fx in ("fx_giot_nuoc", "fx_mua_roi", "fx_bong_bong", "fx_tuyet_roi", "fx_cau_vong", "fx_sao_lap_lanh", "fx_ca_cute", "fx_buom_xinh"):
+    # Part B: Decorative overlay frames (fx_ca_cute, fx_buom_xinh, fx_canh_hoa, fx_sticker_doodle)
+    # are owned by build_real_fx_overlays.py (native 768x768 photographic sprites), and the 6 weather/optical
+    # shaders live in worker.js — keep fx_specs empty so PIL never overwrites them.
+    fx_specs = []
+    for old_shader_fx in ("fx_giot_nuoc", "fx_mua_roi", "fx_bong_bong", "fx_tuyet_roi", "fx_cau_vong", "fx_sao_lap_lanh"):
         manifest.pop(old_shader_fx, None)
     for fid, label, fn, pill_bg in fx_specs:
         ov = fn().convert("RGBA").resize((SIZE, SIZE), Image.Resampling.LANCZOS)
