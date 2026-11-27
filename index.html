@@ -3,98 +3,230 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Locket Gold — ✨Tommm✨</title>
+  <title>Locket Gold — ✨Tommm✨ Cloud 24/7</title>
   <style>
     :root {
-      --bg: #000000;
-      --surface: #111113;
-      --surface-2: #18181b;
-      --border: #27272a;
+      --bg: #070709;
+      --surface: #111114;
+      --surface-2: #18181d;
+      --border: #27272e;
       --text: #f4f4f5;
       --muted: #a1a1aa;
-      --accent: #facc15;
+      --gold: #facc15;
+      --gold-soft: rgba(250, 204, 21, 0.13);
+      --green: #4ade80;
+      --green-soft: rgba(74, 222, 128, 0.13);
+      --blue: #60a5fa;
+      --blue-soft: rgba(96, 165, 250, 0.13);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-      background: var(--bg);
+      background: radial-gradient(circle at top center, rgba(250, 204, 21, 0.08), transparent 42%), var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
       justify-content: center;
-      padding: 28px 16px 40px;
+      padding: 24px 14px 48px;
       -webkit-font-smoothing: antialiased;
     }
-    .wrap {
-      width: 100%;
-      max-width: 420px;
-    }
+    .wrap { width: 100%; max-width: 520px; }
+
+    /* Header */
     .header {
       display: flex;
       align-items: center;
       gap: 14px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
     .avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
       object-fit: cover;
-      border: 1px solid var(--border);
+      border: 1.5px solid rgba(250, 204, 21, 0.45);
       background: var(--surface);
       flex-shrink: 0;
     }
     .header h1 {
       font-size: 20px;
-      font-weight: 700;
+      font-weight: 750;
       letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+    .pill-cloud {
+      font-size: 11px;
+      font-weight: 700;
+      color: #09090b;
+      background: var(--gold);
+      padding: 2px 8px;
+      border-radius: 999px;
     }
     .header p {
       font-size: 13px;
       color: var(--muted);
-      margin-top: 2px;
+      margin-top: 3px;
     }
+
+    /* Action buttons with copy */
     .actions {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      margin-bottom: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      margin-bottom: 18px;
+    }
+    .action-row {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
     }
     .btn {
+      flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 9px;
-      padding: 14px 16px;
-      border-radius: 14px;
-      font-size: 14.5px;
+      gap: 8px;
+      padding: 13px 14px;
+      border-radius: 13px;
+      font-size: 14px;
       font-weight: 600;
       text-decoration: none;
-      transition: opacity 0.15s, transform 0.1s;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: transform 0.1s, opacity 0.15s;
     }
     .btn:active { transform: scale(0.985); opacity: 0.9; }
-    .btn-primary {
-      background: var(--accent);
+    .btn-primary { background: var(--gold); color: #09090b; }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-copy {
+      width: 46px;
+      flex: 0 0 46px;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .btn-copy:active { transform: scale(0.95); color: var(--gold); border-color: var(--gold); }
+
+    /* Video placeholder */
+    .video-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      padding: 12px;
+      margin-bottom: 18px;
+    }
+    .video-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 9px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .video-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 11px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #131318, #1c1917);
+      border: 1px dashed #3f3f46;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+      gap: 8px;
+    }
+    .video-frame video, .video-frame iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      object-fit: cover;
+    }
+    .play-badge {
+      width: 46px;
+      height: 46px;
+      border-radius: 999px;
+      background: var(--gold-soft);
+      border: 1.5px solid var(--gold);
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .video-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+    .video-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
+
+    /* Interactive Tabs */
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 5px;
+      margin-bottom: 18px;
+      position: sticky;
+      top: 10px;
+      z-index: 20;
+    }
+    .tab-btn {
+      background: transparent;
+      border: 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 9px 4px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      background: var(--gold);
       color: #09090b;
     }
-    .btn-secondary {
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Shared cards & accordions */
     .section-title {
       font-size: 11.5px;
-      font-weight: 600;
+      font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: #71717a;
-      margin: 24px 0 10px 4px;
+      margin: 18px 0 9px 4px;
     }
-    .card-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
+    .card-list { display: flex; flex-direction: column; gap: 9px; }
+    .info-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 13px 14px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--muted);
     }
+    .info-box b { color: var(--text); }
+    .info-box.highlight {
+      border-color: rgba(250, 204, 21, 0.35);
+      background: linear-gradient(180deg, rgba(250, 204, 21, 0.06), var(--surface));
+    }
+
     details {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -114,18 +246,15 @@
       color: var(--text);
     }
     summary::-webkit-details-marker { display: none; }
-    .sum-left {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
+    .sum-left { display: flex; align-items: center; gap: 10px; }
     .num {
-      width: 22px;
-      height: 22px;
+      min-width: 23px;
+      height: 23px;
+      padding: 0 5px;
       border-radius: 7px;
       background: var(--surface-2);
       border: 1px solid var(--border);
-      color: var(--accent);
+      color: var(--gold);
       font-size: 11.5px;
       font-weight: 700;
       display: flex;
@@ -133,60 +262,131 @@
       justify-content: center;
       flex-shrink: 0;
     }
-    .chev {
-      color: #71717a;
-      transition: transform 0.2s ease;
-      flex-shrink: 0;
-    }
+    .chev { color: #71717a; transition: transform 0.2s ease; flex-shrink: 0; }
     details[open] .chev { transform: rotate(180deg); }
     .detail-body {
-      padding: 0 14px 13px 46px;
+      padding: 0 14px 14px 47px;
       font-size: 13px;
-      line-height: 1.55;
+      line-height: 1.6;
       color: var(--muted);
     }
     .detail-body b { color: var(--text); font-weight: 600; }
-    .detail-body code, .app-desc code {
+    code {
       background: var(--surface-2);
       border: 1px solid var(--border);
       border-radius: 5px;
       padding: 1px 5px;
-      font-family: inherit;
-      font-size: 12px;
-      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11.5px;
+      color: var(--gold);
     }
-    .app-row {
+
+    /* Feature cards */
+    .feat-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 13px;
-      padding: 12px 14px;
+      border-radius: 14px;
+      padding: 13px 14px;
     }
-    .app-head {
+    .feat-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 5px;
+      gap: 8px;
+      margin-bottom: 6px;
     }
-    .app-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
+    .feat-title { font-size: 14px; font-weight: 650; color: var(--text); }
     .badge {
       font-size: 11px;
       font-weight: 600;
-      color: var(--accent);
-      background: rgba(250, 204, 21, 0.12);
       padding: 2px 8px;
       border-radius: 6px;
+      white-space: nowrap;
     }
-    .app-desc {
+    .badge-vpn { color: var(--gold); background: var(--gold-soft); }
+    .badge-free { color: var(--green); background: var(--green-soft); }
+    .badge-auto { color: var(--blue); background: var(--blue-soft); }
+    .feat-desc { font-size: 12.8px; line-height: 1.55; color: var(--muted); }
+    .feat-desc b { color: var(--text); }
+
+    /* Matrix grid */
+    .matrix {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-bottom: 12px;
+    }
+    .matrix-col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 12px;
       font-size: 12.5px;
-      line-height: 1.5;
+      line-height: 1.55;
       color: var(--muted);
     }
+    .matrix-col h3 {
+      font-size: 12.5px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .matrix-col.on h3 { color: var(--gold); }
+    .matrix-col.off h3 { color: var(--green); }
+
+    /* Gallery grid */
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 9px;
+    }
+    .g-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 6px;
+      text-align: center;
+    }
+    .g-item img {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border-radius: 9px;
+      display: block;
+    }
+    .g-item span {
+      display: block;
+      margin-top: 5px;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: var(--muted);
+      line-height: 1.25;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #18181b;
+      color: var(--gold);
+      border: 1px solid rgba(250, 204, 21, 0.45);
+      padding: 9px 16px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s, transform 0.2s;
+      z-index: 50;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
     .footer {
-      margin-top: 22px;
+      margin-top: 26px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -194,10 +394,7 @@
       color: #71717a;
       padding: 0 2px;
     }
-    .footer a {
-      color: var(--muted);
-      text-decoration: none;
-    }
+    .footer a { color: var(--muted); text-decoration: none; }
   </style>
 </head>
 <body>
@@ -205,178 +402,349 @@
     <div class="header">
       <img class="avatar" src="assets/welcome_icon.jpg" alt="Tommm">
       <div>
-        <h1>Locket Gold</h1>
-        <p>By ✨Tommm✨ &middot; Private Cloud</p>
+        <h1>Locket Gold <span class="pill-cloud">Cloud 24/7</span></h1>
+        <p>By ✨Tommm✨ &middot; Tự cập nhật Filter, AI, Tarot &amp; Nhạc</p>
       </div>
     </div>
 
     <div class="actions">
-      <a class="btn btn-primary" href="shadowrocket://config/add/https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/Locket_Tommm_Cloud.conf">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
-        <span>Cài Config Shadowrocket</span>
-      </a>
+      <div class="action-row">
+        <a class="btn btn-primary" href="shadowrocket://config/add/https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/Locket_Tommm_Cloud.conf">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span>Cài Config Shadowrocket (Lần đầu)</span>
+        </a>
+        <button class="btn-copy" type="button" data-copy="https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/Locket_Tommm_Cloud.conf" aria-label="Sao chép link Config" title="Sao chép link Config">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
 
-      <a class="btn btn-secondary" href="Locket_Tommm_DNS.mobileconfig">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-        </svg>
-        <span>Cài Hồ Sơ DNS Giữ Gold (Safari)</span>
-      </a>
+      <div class="action-row">
+        <a class="btn btn-secondary" href="shadowrocket://install?module=https%3A%2F%2Fraw.githubusercontent.com%2Ftommm1207%2Flocket-tommm-studio%2Fmain%2FLocket_Tommm_Cloud.sgmodule">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9"/></svg>
+          <span>Cài / Update Module Only (Giữ CA)</span>
+        </a>
+        <button class="btn-copy" type="button" data-copy="https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/Locket_Tommm_Cloud.sgmodule" aria-label="Sao chép link Module" title="Sao chép link Module">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+
+      <div class="action-row">
+        <a class="btn btn-secondary" href="Locket_Tommm_DNS.mobileconfig">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Cài Hồ Sơ DNS Giữ Gold (Mở bằng Safari)</span>
+        </a>
+      </div>
     </div>
 
-    <div class="section-title">Hướng dẫn kích hoạt</div>
-    <section>
+    <!-- Video hướng dẫn cài đặt -->
+    <section class="video-card" id="video-guide">
+      <div class="video-head">
+        <span>🎬 Video hướng dẫn cài đặt</span>
+        <span class="badge badge-vpn">Sắp gắn video</span>
+      </div>
+      <!-- GẮN VIDEO TẠI ĐÂY: Thay khối .video-placeholder bên dưới bằng <video controls playsinline poster="assets/welcome_icon.jpg" src="assets/guide.mp4"></video> hoặc <iframe src="URL_EMBED" allowfullscreen></iframe> -->
+      <div class="video-frame">
+        <div class="play-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+        </div>
+        <div class="video-title">Khung chờ Video hướng dẫn</div>
+        <div class="video-sub">Chỗ này dành sẵn để gắn video quay màn hình cài đặt từng bước.<br>Trong lúc chờ, xem hướng dẫn chữ siêu chi tiết ở bên dưới.</div>
+      </div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab-btn active" type="button" data-tab="install">Cài đặt</button>
+      <button class="tab-btn" type="button" data-tab="locket">Dùng Locket</button>
+      <button class="tab-btn" type="button" data-tab="gallery">Xem trước</button>
+      <button class="tab-btn" type="button" data-tab="apps">VIP &amp; Lỗi</button>
+    </nav>
+
+    <!-- TAB 1: CÀI ĐẶT -->
+    <section class="tab-panel active" id="tab-install">
+      <div class="info-box highlight">
+        <b>Cần chuẩn bị trước khi cài:</b><br>
+        • iPhone đã cài sẵn ứng dụng <b>Shadowrocket</b> &amp; <b>Locket</b> (nên cập nhật bản mới).<br>
+        • Mở trang này bằng trình duyệt <b>Safari</b> để cài được Config và Hồ sơ DNS.<br>
+        • Nếu chỉ cập nhật để nhận thêm luật mới (như YouTube tự động), dùng nút <b>Module Only</b> hoặc bấm <b>Update</b> trên file cũ để không mất chứng chỉ CA.
+      </div>
+
+      <div class="section-title">6 bước kích hoạt lần đầu (từ A–Z)</div>
       <div class="card-list">
         <details open>
           <summary>
             <span class="sum-left"><span class="num">1</span>Nạp Config vào Shadowrocket</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
-          <div class="detail-body">Bấm nút <b>Cài Config Shadowrocket</b> → chọn <b>Mở</b>. Trong tab <b>Cấu hình</b>, chạm vào <b>Locket_Tommm_Cloud.conf</b> → chọn <b>Sử dụng Config</b> để hiện chấm cam.</div>
+          <div class="detail-body">
+            Bấm nút vàng <b>Cài Config Shadowrocket</b> → chọn <b>Mở</b>.<br>
+            Vào tab <b>Cấu hình</b> trong Shadowrocket, chạm dòng <code>Locket_Tommm_Cloud.conf</code> → chọn <b>Sử dụng Config</b> (sẽ hiện chấm màu cam bên cạnh).
+          </div>
+        </details>
+
+        <details open>
+          <summary>
+            <span class="sum-left"><span class="num">2</span>Bật Giải mã HTTPS &amp; Tạo chứng chỉ CA</span>
+            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="detail-body">
+            Bấm chữ <b>(i)</b> bên cạnh <code>Locket_Tommm_Cloud.conf</code> → chọn <b>Giải mã HTTPS</b> → gạt <b>Bật</b>.<br>
+            Chạm mục <b>Chứng chỉ</b> → chọn <b>Tạo chứng chỉ CA mới</b> → bấm <b>Cài đặt Chứng chỉ CA vào Hệ thống</b> → bấm <b>Cho phép</b>.
+          </div>
         </details>
 
         <details>
           <summary>
-            <span class="sum-left"><span class="num">2</span>Bật Giải mã HTTPS &amp; Tạo CA</span>
+            <span class="sum-left"><span class="num">3</span>Lưu chứng chỉ trong Shadowrocket (Bắt buộc)</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
-          <div class="detail-body">Bấm chữ <b>(i)</b> cạnh <b>Locket_Tommm_Cloud.conf</b> → <b>Giải mã HTTPS</b> → gạt bật → chọn <b>Tạo chứng chỉ CA mới</b> → <b>Cài đặt Chứng chỉ CA vào Hệ thống</b> → bấm <b>Cho phép</b>.</div>
+          <div class="detail-body">
+            Sau khi tải hồ sơ xong, quay lại màn hình <b>Giải mã HTTPS</b> trong Shadowrocket và bấm dấu <b>✓ ở góc trên bên phải</b> để lưu chứng chỉ vào cấu hình. <i>(Rất nhiều bạn quên bước này nên mở Locket không nhận.)</i>
+          </div>
         </details>
 
         <details>
           <summary>
-            <span class="sum-left"><span class="num">3</span>Lưu chứng chỉ (Bắt buộc)</span>
+            <span class="sum-left"><span class="num">4</span>Cài &amp; Tin cậy chứng chỉ trong Cài đặt iPhone</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
-          <div class="detail-body">Quay lại màn hình <b>Giải mã HTTPS</b> trong Shadowrocket và bấm dấu <b>✓ ở góc trên bên phải</b> để lưu chứng chỉ vào cấu hình.</div>
+          <div class="detail-body">
+            • Vào <b>Cài đặt iPhone → Đã tải về hồ sơ → Cài đặt</b> (nhập mật khẩu máy nếu hỏi).<br>
+            • Tiếp theo vào <b>Cài đặt chung → Giới thiệu → Cài đặt tin cậy chứng nhận</b> → gạt bật xanh mục <b>Shadowrocket</b>.
+          </div>
         </details>
 
         <details>
           <summary>
-            <span class="sum-left"><span class="num">4</span>Tin cậy CA trong Cài đặt iPhone</span>
+            <span class="sum-left"><span class="num">5</span>Lên Gold &amp; Nạp toàn bộ Filter / Caption</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
-          <div class="detail-body">Vào <b>Cài đặt</b> → <b>Đã tải về hồ sơ</b> → <b>Cài đặt</b>. Tiếp theo vào <b>Cài đặt chung</b> → <b>Giới thiệu</b> → <b>Cài đặt tin cậy chứng nhận</b> → bật xanh mục <b>Shadowrocket</b>.</div>
+          <div class="detail-body">
+            • Kiểm tra <b>Cài đặt iPhone → VPN &amp; Quản lý thiết bị → DNS</b> đang để <b>Tự động</b>.<br>
+            • Bật công tắc <b>VPN</b> trong Shadowrocket.<br>
+            • <b>Xóa app Locket rồi tải lại</b> (chỉ cần làm đúng lần đầu để xóa cache cũ) → đăng nhập lại sẽ lên Gold, 360+ Captions, Filter AI, Tarot, Photobooth &amp; Thứ Ngày.
+          </div>
         </details>
 
         <details>
           <summary>
-            <span class="sum-left"><span class="num">5</span>Kích hoạt Locket Gold Full</span>
+            <span class="sum-left"><span class="num">6</span>Cài DNS để giữ Gold khi tắt VPN (Khuyên dùng)</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
-          <div class="detail-body">Để <b>DNS iPhone = Tự động</b> → bật <b>VPN</b> trong Shadowrocket → <b>xóa tải lại app Locket</b> (lần đầu để xóa cache cũ) → mở Locket đăng nhập để nhận đủ Gold &amp; 360+ Captions.</div>
+          <div class="detail-body">
+            Bấm nút <b>Cài Hồ Sơ DNS Giữ Gold</b> ở trên bằng Safari → chọn <b>Cho phép</b> → vào <b>Cài đặt → Đã tải về hồ sơ → Cài đặt</b>.<br>
+            Từ giờ khi không dùng Filter/AI hay app VIP khác, bạn có thể tắt VPN mà vẫn giữ được Locket Gold. <b>Lưu ý:</b> lúc cần tải filter/caption mới thì đổi DNS về Tự động trước rồi bật VPN lại.
+          </div>
         </details>
+      </div>
 
-        <details>
-          <summary>
-            <span class="sum-left"><span class="num">6</span>Cài DNS để giữ Gold khi tắt VPN</span>
-            <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </summary>
-          <div class="detail-body">Mở trang này bằng <b>Safari</b> → bấm <b>Cài Hồ Sơ DNS Giữ Gold</b> → <b>Cho phép</b> → vào <b>Cài đặt</b> → <b>Đã tải về hồ sơ</b> → <b>Cài đặt</b>. Khi cần cập nhật Config / Caption / Filter mới, nhớ chuyển <b>DNS về Tự động</b> trước rồi bật lại VPN Shadowrocket.</div>
-        </details>
+      <div class="section-title">Cập nhật bản mới sau này</div>
+      <div class="info-box">
+        • <b>Khi chỉ thêm Filter / Tarot / Giao diện mới:</b> Không cần cài lại Config — chỉ cần bật VPN Shadowrocket, vuốt tắt hẳn app Locket rồi mở lại là tự nhận.<br>
+        • <b>Khi có rule mới (như YouTube tự động):</b> Đổi DNS về Tự động → bấm nút <b>Cài / Update Module Only</b> (hoặc vuốt sang trái chọn Update trên config cũ trong Shadowrocket) → bật lại VPN.
       </div>
     </section>
 
-    <div class="section-title">Lưu ý quan trọng (VPN &amp; DNS)</div>
-    <section>
+    <!-- TAB 2: CÁCH DÙNG LOCKET -->
+    <section class="tab-panel" id="tab-locket">
+      <div class="section-title">Tóm tắt nhanh: Khi nào cần VPN?</div>
+      <div class="matrix">
+        <div class="matrix-col on">
+          <h3>⚡ BẮT BUỘC BẬT VPN</h3>
+          • Chụp <b>Photobooth 4 ô</b>, <b>Thứ Ngày 3D</b><br>
+          • <b>Tarot bốc quẻ</b>, <b>Sticker/Mưa/Cá</b><br>
+          • <b>AI</b>, <b>Mắt cá</b>, <b>26 Màu LUT</b><br>
+          • <b>Nhạc YouTube tự động</b>, Caption AI
+        </div>
+        <div class="matrix-col off">
+          <h3>🛡️ TẮT VPN VẪN CHẠY</h3>
+          • Quyền <b>Locket Gold</b> (nhờ DNS)<br>
+          • Tải ảnh từ thư viện, <b>Video 45s</b><br>
+          • <b>360+ Caption</b> tĩnh đã nạp cache<br>
+          • Nút Micro, không quảng cáo
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-bottom:18px;border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.07)">
+        <strong style="color:#f87171">⚠️ Giới hạn thực tế (Chưa dùng được trên bản này):</strong><br>
+        • <b>Không bật được huy hiệu / logo Gold kế bên tên</b> (<code>Bạn</code> / <code>You</code>): Phần huy hiệu bên cạnh tên do server kiểm tra nên không thể kích hoạt trên bản Shadowrocket + DNS này.<br>
+        • <b>Không có nút Hẹn giờ &amp; nút đổi ống kính 0.5x / 2x</b>: Giao diện camera hiện chỉ có nút <b>Micro</b> và zoom mặc định <code>1x</code>.<br>
+        • <b>Không chồng nhiều Filter cùng lúc</b>: Mỗi lần chụp chỉ chọn được 1 filter hoặc 1 khung.<br>
+        • <b>Tắt VPN chỉ giữ Gold cơ bản &amp; caption đã cache</b>: Tất cả Filter, Photobooth, Tarot, LUT màu, AI và tự động đồng bộ nhạc YouTube đều bắt buộc bật VPN Shadowrocket khi chụp.
+      </div>
+
+      <div class="section-title">Chi tiết từng tính năng &amp; cách dùng</div>
+      <div class="card-list">
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">📸 Photobooth 4 ô chụp 4 kiểu thật</span><span class="badge badge-vpn">Cần VPN</span></div>
+          <div class="feat-desc">Chọn bất kỳ khung 4 ô nào trong nhóm <b>Khung &amp; Photobooth</b>. Bấm chụp lần 1 (hiện ô 1) → chụp tiếp lần 2, 3, 4 (tạo dáng khác nhau mỗi lần). Đủ 4 tấm hệ thống tự ghép hoàn chỉnh và reset cho lượt mới.</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">📅 Thứ Ngày Sau Chủ Thể (9 nước + Giờ)</span><span class="badge badge-vpn">Cần VPN</span></div>
+          <div class="feat-desc">Vào mục <b>Thứ Ngày &amp; Giờ</b>: ô đầu là <b>Giờ &amp; Thứ</b>, tiếp theo là hiệu ứng chữ khổng lồ nằm <b>sau lưng chủ thể</b> cho 9 ngôn ngữ: Việt Nam, Anh, Trung (CN), Đài Loan (TW), Nhật (JP), Hàn (KR), Tây Ban Nha (ES), Pháp (FR), Đức (DE).</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">🫧 10 Sticker &amp; Thời Tiết Trước Mặt</span><span class="badge badge-vpn">Cần VPN</span></div>
+          <div class="feat-desc">Nằm ở nhóm <b>Sticker &amp; Thời Tiết Trước Mặt</b>: <b>Cá Cute</b>, <b>Mưa Rơi</b>, <b>Giọt Nước</b>, <b>Bong Bóng</b>, <b>Cánh Hoa</b>, <b>Tuyết Rơi</b>, <b>Sticker Mặt Y2K</b>, <b>Cầu Vồng</b>, <b>Bướm Xinh</b>, <b>Lấp Lánh</b>. Chạy tức thì 0-AI nên giữ nguyên mặt thật 100%.</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">🎨 26 Màu LUT &amp; Dazz Cam</span><span class="badge badge-vpn">Cần VPN</span></div>
+          <div class="feat-desc">Ở 2 nhóm <b>Máy Ảnh Retro &amp; Màu Film</b> và <b>Làm Đẹp &amp; Tone Da</b>. Mỗi icon đều có sẵn ảnh mẫu đã áp đúng bộ lọc màu (CPM35, Film Hàn, Hồng Đào, Matcha, Đêm Xanh...) để bạn nhìn màu là chọn trúng ngay.</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">🔮 Bói Toán Tarot (Bốc Quẻ Ngẫu Nhiên)</span><span class="badge badge-vpn">Cần VPN</span></div>
+          <div class="feat-desc">Vào nhóm <b>Bói Toán &amp; Quẻ Hôm Nay</b> (4 chủ đề: <i>Đỏ Hay Đen</i>, <i>Tình Duyên</i>, <i>Nay Nên Ăn Gì</i>, <i>Xem Quẻ</i>). Mỗi lần bạn bấm chụp, Worker tự bốc ngẫu nhiên 1 lá bài Tarot kèm kết quả khác nhau trong 16 quẻ.</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">🤖 AI Bốn Mùa, Ghép Mặt &amp; Tạo Diện Mạo</span><span class="badge badge-vpn">Cần VPN</span></div>
+          <div class="feat-desc">• Có sẵn: <b>Mona Lisa</b>, <b>Faker T1</b> (ghép mặt vào tranh/ảnh), <b>AI Bốn Mùa</b> (Xuân/Hè/Thu/Đông), <b>Nghề Nghiệp</b> (MasterChef, CSGT, Shipper, Grab, Xanh SM, Bác Sĩ...), <b>Tổng Tài &amp; Phú Bà</b>.<br>• Hoặc bấm nút vàng <b>✨ Tạo diện mạo</b> để tự gõ mô tả biến hình bất kỳ (dùng model AI miễn phí nên các câu lệnh quá phức tạp có thể ra kết quả khác nhau).</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">🎵 Phát Nhạc &amp; Tự Động YouTube / YT Music</span><span class="badge badge-auto">Tự động</span></div>
+          <div class="feat-desc">• <b>Dùng Spotify / Apple Music:</b> Chụp xong mở Caption → chọn ô <b>Âm nhạc</b> (vị trí số 2) → tự nhận bài đang phát hoặc gõ tìm bài, có màu theo bìa + phát preview 30s.<br>• <b>Dùng YouTube / YouTube Music:</b> Bật VPN → mở bài hát trên YouTube bình thường (không cần bấm Share) → vào Locket chụp xong kéo xuống mục <b>🎵 Phát Nhạc &amp; Mood 🎧</b> chọn ô đầu tiên <code>🎵 Tên bài - Ca sĩ</code> → bấm Đăng.</div>
+        </div>
+
+        <div class="feat-card">
+          <div class="feat-head"><span class="feat-title">💬 360+ Caption, Caption Động &amp; Video 45s</span><span class="badge badge-free">DNS giữ được</span></div>
+          <div class="feat-desc">• Quay video dài tới <b>45 giây</b>, tải ảnh/video từ thư viện, bật <b>Micro</b> thu tiếng (zoom mặc định <code>1x</code>).<br>• Kho <b>360+ Caption</b> (gồm cả Caption Động GIF &amp; Caption Thứ Ngày nhiều thứ tiếng). Riêng nút <b>Tin nóng / Trích dẫn AI</b> cần bật VPN để Worker nhìn ảnh viết câu theo ngữ cảnh.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: XEM TRƯỚC GALLERY -->
+    <section class="tab-panel" id="tab-gallery">
+      <div class="info-box">Tất cả icon bên dưới là ảnh thật đang phục vụ trực tiếp trên máy chủ Cloud của hệ thống.</div>
+
+      <div class="section-title">Sticker, Thời Tiết &amp; Màu Film</div>
+      <div class="gallery-grid">
+        <div class="g-item"><img src="assets/filters_v2/fx_ca_cute.png" alt="Cá Cute" loading="lazy"><span>Cá Cute</span></div>
+        <div class="g-item"><img src="assets/filters_v2/fx_mua_roi.png" alt="Mưa Rơi" loading="lazy"><span>Mưa Rơi</span></div>
+        <div class="g-item"><img src="assets/filters_v2/fx_giot_nuoc.png" alt="Giọt Nước" loading="lazy"><span>Giọt Nước</span></div>
+        <div class="g-item"><img src="assets/filters_v2/fx_bong_bong.png" alt="Bong Bóng" loading="lazy"><span>Bong Bóng</span></div>
+        <div class="g-item"><img src="assets/filters_v2/dazz_cpm35.png" alt="Dazz CPM35" loading="lazy"><span>CPM35</span></div>
+        <div class="g-item"><img src="assets/filters_v2/lut_hong_dao.png" alt="Hồng Đào" loading="lazy"><span>Hồng Đào</span></div>
+        <div class="g-item"><img src="assets/filters_v2/lut_matcha.png" alt="Matcha" loading="lazy"><span>Matcha</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_dem_xanh.png" alt="Đêm Xanh" loading="lazy"><span>Đêm Xanh</span></div>
+      </div>
+
+      <div class="section-title">Tarot Bốc Quẻ, Meme &amp; AI</div>
+      <div class="gallery-grid">
+        <div class="g-item"><img src="assets/filters_v2/nm_boi_do_hay_den.png" alt="Đỏ Hay Đen" loading="lazy"><span>Đỏ Hay Đen</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_boi_duyen_tinh.png" alt="Tình Duyên" loading="lazy"><span>Tình Duyên</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_boi_nay_nen_an_gi.png" alt="Nay Ăn Gì" loading="lazy"><span>Nay Ăn Gì</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_boi_xem_que.png" alt="Xem Quẻ" loading="lazy"><span>Xem Quẻ</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_son_tung_mtp.png" alt="Sơn Tùng" loading="lazy"><span>Sơn Tùng</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_faker.png" alt="Faker" loading="lazy"><span>Faker AI</span></div>
+        <div class="g-item"><img src="assets/filters_v2/nm_mona_lisa.png" alt="Mona Lisa" loading="lazy"><span>Mona Lisa</span></div>
+        <div class="g-item"><img src="assets/filters_v2/ai_mua_xuan.png" alt="AI Mùa Xuân" loading="lazy"><span>Mùa Xuân</span></div>
+      </div>
+
+      <div class="section-title">Thứ Ngày Địa Danh 3D</div>
+      <div class="gallery-grid">
+        <div class="g-item"><img src="assets/frames/weekday_depth.png" alt="Việt Nam" loading="lazy"><span>Việt Nam</span></div>
+        <div class="g-item"><img src="assets/frames/weekday_depth_ja.png" alt="Nhật Bản" loading="lazy"><span>Nhật Bản</span></div>
+        <div class="g-item"><img src="assets/frames/weekday_depth_ko.png" alt="Hàn Quốc" loading="lazy"><span>Hàn Quốc</span></div>
+        <div class="g-item"><img src="assets/frames/weekday_depth_fr.png" alt="Pháp" loading="lazy"><span>Pháp</span></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: APP VIP & XỬ LÝ LỖI -->
+    <section class="tab-panel" id="tab-apps">
+      <div class="section-title">Xử lý lỗi nhanh</div>
       <div class="card-list">
         <details open>
           <summary>
-            <span class="sum-left"><span class="num">!</span>Khi nào phải BẬT VPN Shadowrocket?</span>
+            <span class="sum-left"><span class="num">?</span>Đã cập nhật mà chưa thấy Filter / Tarot mới</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
           <div class="detail-body">
-            • <b>Bắt buộc bật VPN</b> khi kích hoạt lần đầu, khi vừa <b>Update Config</b> mới, hoặc khi cần tải bộ <b>Caption / Filter</b> mới.<br>
-            • <b>Bắt buộc bật VPN</b> khi dùng <b>Filter AI, Mắt Cá (Fisheye), Dazz Cam, Photobooth, Khung viền</b> và <b>Caption Động (AI / LNN / Quote)</b> (vì ảnh &amp; caption cần đi qua proxy sang Worker xử lý).<br>
-            • <b>Các app khác</b> (YouTube, Spotify, SoundCloud, PicsArt, Lightroom, Alight Motion, KineMaster, CamScanner, Truecaller, BeautyPlus...) đều cần bật VPN lúc mở app hoặc lúc dùng tính năng VIP.
+            Bật <b>VPN Shadowrocket</b> (đảm bảo DNS đang là Tự động), vuốt tắt hẳn Locket khỏi đa nhiệm rồi mở lại. Nếu vẫn còn cache cũ của Firebase, tắt VPN → bật lại → mở Locket lại 1 lần.
           </div>
         </details>
 
         <details>
           <summary>
-            <span class="sum-left"><span class="num">!</span>Tắt VPN bật DNS giữ được gì &amp; mất gì?</span>
+            <span class="sum-left"><span class="num">?</span>Không hiện Locket Gold sau khi cài</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
           <div class="detail-body">
-            • <b>Vẫn giữ:</b> Quyền Locket Gold, bộ Caption &amp; cấu hình đã lưu cache trong máy (do DNS chặn RevenueCat &amp; Firebase kiểm tra lại).<br>
-            • <b>Không hoạt động khi tắt VPN:</b> Filter AI, Mắt Cá, Dazz Cam, Photobooth, Caption AI/LNN, chặn quảng cáo YouTube và các app VIP cần check trực tuyến.<br>
-            • <b>Huy hiệu <code>Bạn 💛</code>:</b> Có thể còn tạm theo cache, nhưng khi Locket đồng bộ lại user từ server mà không có VPN thì <code>💛</code> sẽ mất (bật VPN lại 1 nhịp sẽ hiện lại).
+            Kiểm tra lại bước 3 (dấu <b>✓</b> ở Giải mã HTTPS) và bước 4 (bật xanh Shadowrocket trong Cài đặt tin cậy chứng nhận). Sau đó bật VPN, tắt hẳn Locket (vuốt bỏ khỏi đa nhiệm) rồi mở lại để nạp quyền Gold (lưu ý: logo/tim vàng kế bên tên <code>Bạn</code> / <code>You</code> do server kiểm tra nên không bật được trên bản này).
           </div>
         </details>
 
         <details>
           <summary>
-            <span class="sum-left"><span class="num">!</span>Mẹo xử lý lỗi nhanh &amp; Update Config</span>
+            <span class="sum-left"><span class="num">?</span>Mạng bị chậm / đứng lúc chuyển Wi-Fi &harr; 4G</span>
             <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
           </summary>
           <div class="detail-body">
-            • <b>Trước khi Update Config/Module:</b> Đặt <b>Cài đặt iPhone → VPN &amp; Quản lý thiết bị → DNS = Tự động</b> → mở Shadowrocket bấm <b>Update</b> → bật VPN → vuốt tắt hẳn app muốn dùng rồi mở lại.<br>
-            • <b>Nếu dùng Module Only:</b> Không bị mất chứng chỉ CA đang có khi cập nhật.<br>
-            • <b>Không thấy tim vàng <code>Bạn 💛</code>:</b> Bật VPN Shadowrocket → tắt hẳn Locket mở lại, hoặc vào <b>Cài đặt Locket → Locket Gold → Huy hiệu</b> gạt bật lại 1 lần.<br>
-            • <b>Mạng Wi-Fi/4G bị khựng lúc chuyển mạng:</b> Tắt rồi bật lại VPN trong Shadowrocket.
+            Tắt công tắc VPN trong Shadowrocket 2 giây rồi gạt bật lại để nạp lại kết nối mạng mới.
           </div>
         </details>
       </div>
-    </section>
 
-    <div class="section-title">Ứng dụng hỗ trợ &amp; cách dùng VPN</div>
-    <section>
+      <div class="section-title">Các app VIP đi kèm trong Config (Cần bật VPN)</div>
       <div class="card-list">
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">Locket</span><span class="badge">Gold VIP</span></div>
-          <div class="app-desc">Bật VPN → xóa tải lại app lần đầu → đăng nhập để lên Gold, 360+ Captions, Thứ Ngày, Mắt Cá, Dazz Cam &amp; Filter AI. <b>Giữ Gold cache được bằng DNS</b>, nhưng dùng Filter AI / Mắt Cá / Photobooth / tim vàng <code>Bạn 💛</code> cần bật VPN.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">YouTube</span><span class="badge">No Ads • Cần VPN</span></div>
-          <div class="app-desc"><b>Phải bật VPN khi xem</b> để tự động chặn quảng cáo video và phát nền/PiP khi tắt màn hình. Tắt VPN sẽ có quảng cáo lại.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">Spotify</span><span class="badge">Premium • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN khi mở/nghe nhạc</b> (lần đầu cần đăng xuất đăng nhập lại hoặc tải mới app) để bỏ quảng cáo &amp; chọn bài tự do.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">SoundCloud</span><span class="badge">Go+ • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN</b> → vuốt tắt hẳn SoundCloud rồi mở lại để lên Go+ và bỏ quảng cáo khi nghe.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">PicsArt</span><span class="badge">Gold • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN khi mở app &amp; xuất ảnh</b> để toàn bộ công cụ và bộ lọc Gold được mở khóa không bị đòi mua gói.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">Lightroom</span><span class="badge">Premium • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN</b> → đăng nhập tài khoản Adobe (ưu tiên tài khoản từng dùng thử Premium) và giữ VPN khi dùng Preset/công cụ Pro.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">Alight Motion</span><span class="badge">Pro • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN khi mở app &amp; xuất video</b> → chạm vào biểu tượng Premium để mở Pro, xuất video không watermark.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">KineMaster</span><span class="badge">Pro • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN</b> → mở lại app, tạo dự án mới và xuất video để tự động xóa logo watermark.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">CamScanner</span><span class="badge">VIP • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN</b> → khởi động lại app → kiểm tra mục Premium sẽ hiện VIP (nên bật VPN khi quét/xuất PDF không watermark).</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">Truecaller</span><span class="badge">Gold • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN</b> → vào Cài đặt (Settings) → Premium để kích hoạt Truecaller Gold.</div>
-        </div>
-        <div class="app-row">
-          <div class="app-head"><span class="app-title">BeautyPlus • Snow • Meitu • Wink</span><span class="badge">VIP • Cần VPN</span></div>
-          <div class="app-desc"><b>Bật VPN khi mở app &amp; lưu ảnh/video</b>, vào mục VIP/Premium để kích hoạt bộ lọc và làm đẹp trả phí.</div>
-        </div>
+        <div class="feat-card"><div class="feat-head"><span class="feat-title">YouTube</span><span class="badge badge-vpn">No Ads + PiP</span></div><div class="feat-desc">Bật VPN khi xem để chặn quảng cáo video, phát nền và bắt nhạc tự động sang Locket.</div></div>
+        <div class="feat-card"><div class="feat-head"><span class="feat-title">Spotify &amp; SoundCloud</span><span class="badge badge-vpn">Premium / Go+</span></div><div class="feat-desc">Bật VPN khi mở app nghe nhạc (Spotify lần đầu nên đăng xuất đăng nhập lại) để bỏ quảng cáo &amp; chọn bài tự do.</div></div>
+        <div class="feat-card"><div class="feat-head"><span class="feat-title">PicsArt &amp; Lightroom</span><span class="badge badge-vpn">Gold / Premium</span></div><div class="feat-desc">Bật VPN khi mở app và xuất ảnh để mở khóa công cụ chỉnh sửa &amp; preset trả phí.</div></div>
+        <div class="feat-card"><div class="feat-head"><span class="feat-title">Alight Motion &amp; KineMaster</span><span class="badge badge-vpn">Pro</span></div><div class="feat-desc">Bật VPN khi mở app &amp; xuất video để bỏ logo watermark và mở hiệu ứng Pro.</div></div>
+        <div class="feat-card"><div class="feat-head"><span class="feat-title">CamScanner • Truecaller • BeautyPlus • Snow • Meitu • Wink</span><span class="badge badge-vpn">VIP</span></div><div class="feat-desc">Bật VPN khi mở app hoặc lưu ảnh/PDF để sử dụng các tính năng VIP không watermark.</div></div>
       </div>
     </section>
 
     <div class="footer">
-      <span>100% Private &middot; Self-Hosted</span>
-      <a href="shadowrocket://install?module=https%3A%2F%2Fraw.githubusercontent.com%2Ftommm1207%2Flocket-tommm-studio%2Fmain%2FLocket_Tommm_Cloud.sgmodule">Module Only</a>
+      <span>100% Private &middot; ✨Tommm✨ Cloud</span>
+      <a href="#video-guide">Hướng dẫn Video</a>
     </div>
   </main>
+
+  <div class="toast" id="toast">Đã sao chép link</div>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll(".tab-btn");
+      var panels = document.querySelectorAll(".tab-panel");
+      tabs.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var target = btn.getAttribute("data-tab");
+          tabs.forEach(function (b) { b.classList.remove("active"); });
+          panels.forEach(function (p) { p.classList.remove("active"); });
+          btn.classList.add("active");
+          var panel = document.getElementById("tab-" + target);
+          if (panel) panel.classList.add("active");
+        });
+      });
+
+      var toast = document.getElementById("toast");
+      var timer = null;
+      function showToast(msg) {
+        toast.textContent = msg;
+        toast.classList.add("show");
+        clearTimeout(timer);
+        timer = setTimeout(function () { toast.classList.remove("show"); }, 1800);
+      }
+
+      document.querySelectorAll("[data-copy]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var val = btn.getAttribute("data-copy");
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(val).then(function () {
+              showToast("Đã sao chép link!");
+            }, function () {
+              showToast("Không sao chép tự động được");
+            });
+          } else {
+            showToast("Không hỗ trợ clipboard trên trình duyệt này");
+          }
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
