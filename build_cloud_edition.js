@@ -410,7 +410,22 @@ const animatedCaptionsSection = {
         { overlay_id: "caption:anim_quay_het_minh", source: "remote", caption: { type: "static_content", text: "Quẩy Hết Mình", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🎆" }, background: { colors: ["#090D26", "#312E81"], image: { type: "image", data: `${ANIM_BASE}/fireworks_night.gif`, source: "url" } } } },
     ],
 };
-const customExtraSections = [animatedCaptionsSection].concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
+const musicCaptionsSection = {
+    section: "🎵 Phát Nhạc & Mood 🎧",
+    items: [
+        { overlay_id: "caption:music_now_playing", source: "remote", caption: { type: "static_content", text: "Đang nghe nhạc", max_lines: 1, text_color: "#FFFFFF", icon: { type: "sf_symbol", data: "music.note" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: `${ANIM_BASE}/music_spotify_eq.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_chill_vibes", source: "remote", caption: { type: "static_content", text: "Now Playing • Chill", max_lines: 1, text_color: "#86EFAC", icon: { type: "emoji", data: "🎧" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: `${ANIM_BASE}/music_spotify_eq.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_replay_all_day", source: "remote", caption: { type: "static_content", text: "Replay bài này cả ngày", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🔁" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: `${ANIM_BASE}/music_spotify_eq.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_het_buon", source: "remote", caption: { type: "static_content", text: "Nhạc lên là hết buồn", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "✨" }, background: { colors: ["#4C0519", "#BE123C"], image: { type: "image", data: `${ANIM_BASE}/music_apple_pink.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_gu_dinh_cao", source: "remote", caption: { type: "static_content", text: "Gu âm nhạc đỉnh cao", max_lines: 1, text_color: "#FFE4E6", icon: { type: "emoji", data: "🔥" }, background: { colors: ["#4C0519", "#BE123C"], image: { type: "image", data: `${ANIM_BASE}/music_apple_pink.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_gui_bai_hat", source: "remote", caption: { type: "static_content", text: "Gửi bạn một bài hát", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "💌" }, background: { colors: ["#4C0519", "#BE123C"], image: { type: "image", data: `${ANIM_BASE}/music_apple_pink.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_lofi_khuya", source: "remote", caption: { type: "static_content", text: "Lofi đêm khuya", max_lines: 1, text_color: "#E0E7FF", icon: { type: "emoji", data: "🌙" }, background: { colors: ["#1E1B4B", "#5B21B6"], image: { type: "image", data: `${ANIM_BASE}/music_lofi_violet.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_vibe_hom_nay", source: "remote", caption: { type: "static_content", text: "Vibe hôm nay", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🎶" }, background: { colors: ["#1E1B4B", "#5B21B6"], image: { type: "image", data: `${ANIM_BASE}/music_lofi_violet.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_doi_em", source: "remote", caption: { type: "static_content", text: "Một chút nhạc cho đời êm", max_lines: 1, text_color: "#C4B5FD", icon: { type: "emoji", data: "🎹" }, background: { colors: ["#1E1B4B", "#5B21B6"], image: { type: "image", data: `${ANIM_BASE}/music_lofi_violet.gif`, source: "url" } } } },
+        { overlay_id: "caption:music_bat_nhac_chill", source: "remote", caption: { type: "static_content", text: "Bật nhạc lên chill thôi", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "📻" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: `${ANIM_BASE}/music_spotify_eq.gif`, source: "url" } } } },
+    ],
+};
+const customExtraSections = [musicCaptionsSection, animatedCaptionsSection].concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
     dvOverlays.filter(s => !s.section.includes("General") && !s.section.includes("Decorative by Locket"))
 );
 
@@ -485,8 +500,11 @@ for (const gk of [
     if (dvRc[gk] !== undefined) baseRcEntries[gk] = dvRc[gk];
 }
 baseRcEntries["profile_badge_visible"] = "true";
+baseRcEntries["captions_enabled"] = "true";
 baseRcEntries["music_caption_enabled"] = "true";
 baseRcEntries["music_caption_song_preview_enabled"] = "true";
+baseRcEntries["video_sound_enabled"] = "true";
+baseRcEntries["audio_session_deactivation_enabled"] = "true";
 baseRcEntries["fetch_users_from_cloud_function"] = "true";
 baseRcEntries["user_cache_max_age_sec"] = "0";
 baseRcEntries["friends_cache_max_age_sec"] = "0";
@@ -1020,8 +1038,8 @@ if (mergedOverlays.length > 0 && mergedOverlays[0]) {
         if (liveGen[gi] && liveGen[gi].overlay_id) genById[liveGen[gi].overlay_id] = liveGen[gi];
     }
     var reqGen = [
-        "caption:standard", "caption:poll", "caption:color_palette", "caption:review",
-        "caption:quote", "caption:breaking_news", "caption:music", "caption:location",
+        "caption:standard", "caption:music", "caption:poll", "caption:color_palette", "caption:review",
+        "caption:quote", "caption:breaking_news", "caption:location",
         "caption:weather", "caption:time", "caption:streak", "caption:star_sign"
     ];
     var rebuiltGen = [];
