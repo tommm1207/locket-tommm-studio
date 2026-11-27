@@ -1,7 +1,54 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
+(function() {
+var RC_VER = "47";
+function readRcStore(k) {
+    try { return (typeof $persistentStore !== "undefined" ? $persistentStore.read(k) : "") || ""; } catch (_) { return ""; }
+}
+function writeRcStore(v, k) {
+    try { if (typeof $persistentStore !== "undefined") $persistentStore.write(String(v), k); } catch (_) {}
+}
 var obj = {};
 try { obj = JSON.parse($response.body || "{}"); } catch (_) { obj = {}; }
 if (!obj || typeof obj !== "object") obj = {};
+var rawState = String(obj.state || "");
+var hasLiveEntries = !!(obj.entries && typeof obj.entries === "object" && Object.keys(obj.entries).length > 10);
+var appliedVer = readRcStore("tommm_rc_applied_ver");
+
+// CRITICAL FIX: Never turn Firebase NO_CHANGE (empty entries) into a destructive partial UPDATE once v47 is applied!
+if (!hasLiveEntries && (rawState === "NO_CHANGE" || !obj.entries || Object.keys(obj.entries).length === 0)) {
+    if (appliedVer === RC_VER) {
+        $done({});
+        return;
+    }
+    // Upgrading to v47 on a NO_CHANGE response: hydrate previously captured live server keys first
+    obj.entries = {};
+    try {
+        var savedSnap = JSON.parse(readRcStore("tommm_live_rc_snapshot") || "{}");
+        if (savedSnap && typeof savedSnap === "object") {
+            for (var sk in savedSnap) {
+                if (Object.prototype.hasOwnProperty.call(savedSnap, sk)) obj.entries[sk] = savedSnap[sk];
+            }
+        }
+    } catch (_) {}
+} else if (hasLiveEntries) {
+    // Save a compact snapshot of critical live server keys (feature_gates, overlay navigator, camera UI)
+    try {
+        var liveSnap = {};
+        var snapAllow = {
+            feature_gates: 1, overlay_navigator_enabled: 1, overlays_v2_config: 1,
+            journal_settings: 1, journal_activity_bar_enabled: 1, streak_config: 1,
+            camera: 1, camera_config: 1, camera_roll: 1, live_photos: 1
+        };
+        for (var lk in obj.entries) {
+            if (!Object.prototype.hasOwnProperty.call(obj.entries, lk)) continue;
+            var lv = obj.entries[lk];
+            if (typeof lv === "string" && (snapAllow[lk] || (/camera|timer|zoom|dazz|digi|retro|film|lens|overlay|caption|ui|nav|toolbar|v2|roll|photo/i.test(lk) && lv.length <= 2500))) {
+                liveSnap[lk] = lv;
+            }
+        }
+        writeRcStore(JSON.stringify(liveSnap), "tommm_live_rc_snapshot");
+    } catch (_) {}
+}
 obj.state = "UPDATE";
 obj.entries = obj.entries || {};
 
@@ -50,7 +97,7 @@ for (var ek in obj.entries) {
 }
 
 // Điền default-only cho các key hạ tầng upload/storage nếu server chưa trả
-var TOMMM_DEFAULTS = {"upload_main":"false","cdn_domain_replacements":"{\"firebasestorage.googleapis.com\":\"cdn.locketcamera.com\"}","cdn_domain_replacements_video":"true","storage_bucket":"gs://locket-img","storage_bucket_video":"gs://locket-video","camera_filter_storage_bucket":"gs://locket-filters","firestore_refresh_v2":"true","firestore_refresh_v3":"true"};
+var TOMMM_DEFAULTS = {"upload_main":"false","cdn_domain_replacements":"{\"firebasestorage.googleapis.com\":\"cdn.locketcamera.com\"}","cdn_domain_replacements_video":"true","storage_bucket":"gs://locket-img","storage_bucket_video":"gs://locket-video","camera_filter_storage_bucket":"gs://locket-filters","firestore_refresh_v2":"true","firestore_refresh_v3":"true","overlay_navigator_enabled":"true","overlays_v2_config":"{\"suggestions_enabled\":true}","journal_activity_bar_enabled":"true","streak_config":"{\"minimum_recovery_count\":0,\"minimum_display_count\":0}"};
 for (var dk in TOMMM_DEFAULTS) {
     if (Object.prototype.hasOwnProperty.call(TOMMM_DEFAULTS, dk) && typeof obj.entries[dk] === "undefined") {
         obj.entries[dk] = TOMMM_DEFAULTS[dk];
@@ -373,4 +420,6 @@ activeFilterCfg.remote_filters = mergedRemote;
 // Chèn đầy đủ filter custom của Tommm (AI 3D, khung viền, weekday_depth, photobooth) vào camera_filter_config.
 obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 
+writeRcStore(RC_VER, "tommm_rc_applied_ver");
 $done({ body: JSON.stringify(obj) });
+})();
