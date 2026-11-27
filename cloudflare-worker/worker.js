@@ -66,6 +66,9 @@ const SPECIAL_FX_IDS = new Set([
 const FACE_LOCK =
   "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
 
+const CUSTOM_LOOK_LOCK =
+  "Keep the exact same person, facial features, skin tone, and identity from the input photo, and realistically apply this edit: ";
+
 const CUSTOM_AI_IDS = new Set([
   "stk_tai_tho", "stk_mu_ngu_khoc", "stk_jollibee", "stk_nak_ve_than",
   "stk_gojo_satoru", "stk_shopee_food", "fireworks", "harry_potter",
@@ -1283,37 +1286,43 @@ function applyPortraitBokeh(rgb, w, h) {
 async function translateCustomLookPromptToEn(env, rawText) {
   const clean = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 500);
   if (!clean) return "";
-  if (!/[^\x00-\x7F]/.test(clean)) return clean;
   const sys =
-    "Translate this user photo-editing request (often in Vietnamese) into concise, vivid, photorealistic English image-editing instructions (under 45 words). Describe exact clothing, accessories, hairstyle, makeup, expression, or mood to add/change. Output ONLY the English edit instruction, no quotes or commentary.";
+    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete, vivid, photorealistic English image-editing prompt (35-65 words). Rules: 1) Always start with: 'Keep the exact same person, facial features, skin tone, and identity from the input photo.' 2) Describe exact realistic clothing, costume, cape, accessories, hairstyle, makeup, props, or background requested, worn naturally with realistic fabric folds, lighting, and proportions (do NOT cover the face with a mask/helmet unless explicitly requested). 3) Keep the original background and pose unless the user asked to change them. 4) Output ONLY the English prompt, no quotes or commentary.";
   for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
     try {
       const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
-      const bodyObj = { model, messages: [{ role: "system", content: sys }, { role: "user", content: clean }], temperature: 0.2 };
-      if (/gpt-oss/i.test(model)) { bodyObj.reasoning_effort = "low"; bodyObj.max_completion_tokens = 140; }
-      else bodyObj.max_tokens = 90;
+      const bodyObj = { model, messages: [{ role: "system", content: sys }, { role: "user", content: clean }], temperature: 0.25 };
+      if (/gpt-oss/i.test(model)) { bodyObj.reasoning_effort = "low"; bodyObj.max_completion_tokens = 420; }
+      else bodyObj.max_tokens = 160;
       const r = await fetch(`${(env && env.GROQ_BASE_URL) || "https://api.groq.com/openai/v1"}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
         body: JSON.stringify(bodyObj),
-        signal: AbortSignal.timeout(2500),
+        signal: AbortSignal.timeout(4000),
       });
       if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
       const j = await r.json();
-      const out = String(j?.choices?.[0]?.message?.content || "").replace(/[\r\n]+/g, " ").trim();
-      if (out && out.length >= 4 && !/[^\x00-\x7F]/.test(out)) return out;
+      const out = String(j?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[\r\n]+/g, " ").trim();
+      if (out && out.length >= 12 && !/[^\x00-\x7F]/.test(out)) return out;
+    } catch (_) {}
+  }
+  if (env && env.NVIDIA_API_KEY) {
+    try {
+      const nv = await nvidiaTextWriter(env, sys, clean, 160, 0.25);
+      const out = String(nv?.text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[\r\n]+/g, " ").trim();
+      if (out && out.length >= 12 && !/[^\x00-\x7F]/.test(out)) return out;
     } catch (_) {}
   }
   for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-    const g = await geminiGenerateCaption(env, sys, clean, null, null, k, 90, true, 0.2);
+    const g = await geminiGenerateCaption(env, sys, clean, null, null, k, 160, true, 0.25);
     const out = String(g?.text || "").replace(/[\r\n]+/g, " ").trim();
-    if (out && out.length >= 4) return out;
+    if (out && out.length >= 12) return out;
   }
   if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
     try {
-      const res = await runCfTextChatPooled(env, [{ role: "system", content: sys }, { role: "user", content: clean }], 90, 0.2);
+      const res = await runCfTextChatPooled(env, [{ role: "system", content: sys }, { role: "user", content: clean }], 160, 0.25);
       const out = String(res?.text || "").replace(/[\r\n]+/g, " ").trim();
-      if (out && out.length >= 4) return out;
+      if (out && out.length >= 12) return out;
     } catch (_) {}
   }
   return clean;
@@ -1627,18 +1636,21 @@ async function runFluxPooled(env, promptText, inputImg, refImg, modelOverride = 
     const ordered = accounts.slice(start).concat(accounts.slice(0, start));
     const fresh = ordered.filter((a) => keyAvailable(a.token));
     const tryList = fresh.length > 0 ? fresh : ordered;
-    for (const a of tryList) {
+    const maxTries = opts && opts.maxPoolTries ? opts.maxPoolTries : tryList.length;
+    for (const a of tryList.slice(0, maxTries)) {
       try {
         const out = await cfRestFluxRun(a.acct, a.token, aiModel, promptText, inputImg, refImg, outSize, opts);
         return { ...out, via: "cf_rest:" + a.acct.slice(0, 8) };
       } catch (e) {
         lastErr = e;
-        // 4006 hoặc rate limit -> cho token này nghỉ 20', thử account kế tiếp.
-        if (isQuotaOrCapacityError(e) || e.cfCode === 3030) {
-          // 3030 = output flagged (safety) -> KHÔNG phải hết quota, đừng bench; chỉ bỏ qua ảnh này.
-          if (isQuotaOrCapacityError(e)) benchKey(a.token);
+        const msg = String(e?.message || e || "");
+        if (e.cfCode === 3030 || /flagged|choose another prompt|no such model|not found/i.test(msg)) {
+          throw e;
+        }
+        if (isQuotaOrCapacityError(e)) {
+          benchKey(a.token);
         } else {
-          benchKey(a.token, 5); // lỗi lạ -> nghỉ ngắn
+          benchKey(a.token, 5);
         }
       }
     }
@@ -4090,9 +4102,16 @@ async function handleStudioRequest(request, env) {
     // Priority 2: Official Locket AI filters -> pass through to Locket server FIRST (real official AI),
     // and fall back to Cloudflare FLUX.2 only for custom AI filters or if Locket server rejects (403/gold/credits)
     const aiReq = detectAiRequest(dataNode, rawBodyText);
+    if (aiReq && aiReq.source === "dynamic_filter_id" && aiReq.filterId) {
+      const savedPrompt = await getCustomLookPrompt(aiReq.filterId);
+      if (savedPrompt) {
+        aiReq.source = "custom_prompt";
+        aiReq.rawUserPrompt = savedPrompt;
+      }
+    }
     const isCustomAi = !!(
       aiReq &&
-      (CUSTOM_AI_IDS.has(aiReq.filterId) || aiReq.source === "custom_prompt")
+      (CUSTOM_AI_IDS.has(aiReq.filterId) || aiReq.source === "custom_prompt" || String(aiReq.filterId || "").startsWith("custom_"))
     );
     const origHost = request.headers.get("X-Locket-Orig-Host") || "api.locketcamera.com";
     const upstreamUrl = `https://${origHost}${url.pathname}${url.search}`;
@@ -4132,18 +4151,11 @@ async function handleStudioRequest(request, env) {
       } catch (_) {}
     }
 
-    // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 4B) cho Custom AI 3D Hot / Custom Prompt,
+    // Priority 3: Cloudflare Workers AI (FLUX.2 Klein 9B / 4B) cho Custom AI 3D Hot / Custom Prompt,
     // kèm FALLBACK provider ảnh ngoài (NVIDIA img2img / Gemini) khi Cloudflare hết quota 4006.
     if (aiReq && env && (env.AI || env.CF_AI_ACCOUNTS || env.NVIDIA_IMAGE_MODEL || env.GEMINI_API_KEY)) {
       const t0 = Date.now();
       try {
-        if (aiReq.source === "dynamic_filter_id" && aiReq.filterId) {
-          const savedPrompt = await getCustomLookPrompt(aiReq.filterId);
-          if (savedPrompt) {
-            aiReq.source = "custom_prompt";
-            aiReq.rawUserPrompt = savedPrompt;
-          }
-        }
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
         const tempId = crypto.randomUUID().slice(0, 12);
         const [preparedInput, refImg, translatedCustomEn] = await Promise.all([
@@ -4158,27 +4170,35 @@ async function handleStudioRequest(request, env) {
             : Promise.resolve(null),
         ]);
         const effectivePrompt = translatedCustomEn
-          ? FACE_LOCK + "Apply this natural photorealistic edit: " + translatedCustomEn
-          : aiReq.prompt;
+          ? (/keep the exact same person/i.test(translatedCustomEn) ? translatedCustomEn : CUSTOM_LOOK_LOCK + translatedCustomEn)
+          : (aiReq.source === "custom_prompt" && aiReq.rawUserPrompt ? CUSTOM_LOOK_LOCK + aiReq.rawUserPrompt : aiReq.prompt);
 
         let aiOut = null;
         let usedModel = null;
         let cfErr = null;
-        // FLUX với POOL: binding account chính -> xoay vòng tài khoản Cloudflare phụ (REST) khi 4006.
+        // FLUX với POOL: cho Tạo diện mạo (custom_prompt) ưu tiên chạy FLUX.2-klein-9B trước để bám yêu cầu chuẩn hơn hẳn, lỗi mới hạ về 4B.
         if (env.AI || env.CF_AI_ACCOUNTS) {
-          try {
-            // Filter AI 3D: dùng ĐÚNG cấu hình "trưa nay" đã chạy tốt (giữ mặt+góc, chỉ thêm 3D):
-            // flux-2-klein-4b mặc định, KHÔNG ép strength/steps (để model tự quyết -> bám ảnh gốc).
-            // Chỉ đổi qua env nếu muốn thử model khác.
-            const ai3dModel = (env && env.AI_3D_MODEL) || null; // null -> dùng AI_MODEL (4B)
-            const ai3dOpts = (env && (env.AI_3D_STEPS || env.AI_3D_STRENGTH))
-              ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
-                  strength: env.AI_3D_STRENGTH ? parseFloat(env.AI_3D_STRENGTH) : undefined }
-              : null;
-            aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
-            usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
-          } catch (err) {
-            cfErr = String(err?.message || err);
+          const ai3dModel = (env && env.AI_3D_MODEL) || null;
+          const ai3dOpts = (env && (env.AI_3D_STEPS || env.AI_3D_STRENGTH))
+            ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
+                strength: env.AI_3D_STRENGTH ? parseFloat(env.AI_3D_STRENGTH) : undefined }
+            : null;
+          if (aiReq.source === "custom_prompt" && !ai3dModel) {
+            try {
+              const opts9b = Object.assign({}, ai3dOpts || {}, { maxPoolTries: 1 });
+              aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, "@cf/black-forest-labs/flux-2-klein-9b", null, opts9b);
+              usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
+            } catch (err9b) {
+              cfErr = "9b:" + String(err9b?.message || err9b);
+            }
+          }
+          if (!aiOut || !aiOut.bytes) {
+            try {
+              aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
+              usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
+            } catch (err) {
+              cfErr = (cfErr ? cfErr + " | " : "") + String(err?.message || err);
+            }
           }
         }
         // Fallback cuối: provider ảnh ngoài (NVIDIA img2img / Gemini) nếu mọi account Cloudflare đều hết.
@@ -4196,6 +4216,7 @@ async function handleStudioRequest(request, env) {
             cfErr,
             filterId: aiReq.filterId,
             source: aiReq.source,
+            promptPreview: effectivePrompt.slice(0, 220),
             got_input: !!imgBytes,
             input_bytes: preparedInput?.bytes?.length || 0,
             out_mime: aiOut.mimeType,
