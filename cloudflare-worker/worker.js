@@ -76,11 +76,50 @@ const SPECIAL_FX_IDS = new Set([
   "triple_clone",
 ]);
 
-const FACE_LOCK =
-  "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
+const FACE_LOCK_KEEP_BG =
+  "Edit input_image_0 keeping the exact same person, identical face, eyes, nose, mouth, natural skin texture, expression, head position, hair, and original background untouched. Candid smartphone photo, matte realistic lighting: ";
+
+const FACE_LOCK_SWAP_BG =
+  "Edit input_image_0 keeping the exact same person, identical face, eyes, nose, mouth, natural skin texture, expression, head angle, and exact head position in frame untouched. Candid smartphone photo, matte natural lighting: ";
+
+const FACE_LOCK_STYLIZED =
+  "Preserve the person's recognizable facial features, identity, and expression while cleanly rendering this stylized effect: ";
 
 const CUSTOM_LOOK_LOCK =
-  "CRITICAL: keep the person's exact same face, facial features, eyes, nose, mouth, skin tone, identity, head position, face angle, camera viewpoint and pose EXACTLY as in the input photo — do not move, rotate, retouch or regenerate the face. Only change clothing/costume/accessories/background as requested, realistically applying this edit: ";
+  "Edit input_image_0 keeping the exact same person, identical face, eyes, nose, mouth, natural skin texture, expression, and exact head position untouched. Candid smartphone photo, matte natural lighting: ";
+
+const SWAP_BG_AI_IDS = new Set([
+  "ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_di_phu_ho", "ai_ve_que_nuoi_ca",
+  "ai_bac_si", "ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen",
+  "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop", "ai_cosplay_wibu",
+  "ai_masterchef", "ai_csgt", "ai_mua_xuan", "ai_mua_he", "ai_mua_thu", "ai_mua_dong",
+  "ocean_underwater", "volcano_lava", "jungle_leaf", "wedding", "fireworks", "rain_storm",
+  "ufo_alien", "spooky_ghost", "fortnite_llama", "golden_hour", "nm_faker",
+]);
+
+const STYLIZED_AI_IDS = new Set([
+  "ai_figure_1_7", "ai_action_figure_box", "ai_lego_figure", "ai_cartoon_3d",
+  "minecraft", "watercolor_art", "nm_mona_lisa",
+]);
+
+const FOREGROUND_SEG_PROMPT =
+  "Create a solid pure black-and-white silhouette matte of this exact photo. Paint the ENTIRE main foreground subject (person including ALL dark hair, bangs, head, face, neck, shoulders, hands, and clothing, or main pet/object/dish) as ONE continuous solid pure white (#FFFFFF) shape with ZERO dark holes or missing hair strands inside. Paint ONLY the distant background pure black (#000000). Keep exact pixel alignment with zero cropping or shifting.";
+
+const BG_PRESERVE_HARMONY = {
+  ai_mua_xuan: { rMul: 1.03, gMul: 1.00, bMul: 1.01, brightness: 3 },
+  ai_mua_he: { rMul: 1.04, gMul: 1.02, bMul: 0.96, brightness: 4 },
+  ai_mua_thu: { rMul: 1.05, gMul: 1.01, bMul: 0.94, brightness: 1 },
+  ai_mua_dong: { rMul: 0.96, gMul: 0.99, bMul: 1.05, brightness: 1 },
+  fireworks: { rMul: 1.02, gMul: 1.00, bMul: 0.98, brightness: -4 },
+  ocean_underwater: { rMul: 0.94, gMul: 1.01, bMul: 1.07, brightness: 0 },
+  volcano_lava: { rMul: 1.07, gMul: 0.99, bMul: 0.93, brightness: -2 },
+  rain_storm: { rMul: 0.95, gMul: 0.98, bMul: 1.05, brightness: -3 },
+  jungle_leaf: { rMul: 0.99, gMul: 1.03, bMul: 0.98, brightness: 1 },
+  ufo_alien: { rMul: 0.97, gMul: 1.01, bMul: 1.03, brightness: -2 },
+  spooky_ghost: { rMul: 0.96, gMul: 0.99, bMul: 1.04, brightness: -4 },
+  fortnite_llama: { rMul: 1.01, gMul: 1.00, bMul: 1.02, brightness: 2 },
+  golden_hour: { rMul: 1.08, gMul: 1.02, bMul: 0.90, brightness: 5 },
+};
 
 const CUSTOM_AI_IDS = new Set([
   "stk_tai_tho", "stk_mu_ngu_khoc", "stk_jollibee", "stk_nak_ve_than",
@@ -107,144 +146,144 @@ const AI_FILTER_PROMPTS = {
   stk_mu_ngu_khoc:
     "Apply the exact cartoon face filter from the second reference image to the person's face in the first photo: 1) A cream-colored pixel-art sleeping hat with thick black outlines and a light cyan pom-pom on the left side. 2) Large thin round black wire-frame glasses over both eyes. 3) Two glossy cyan-blue anime crying streams from the inner corners of both eyes. 4) A tiny black spiral doodle on the nose and two small curved whisker lines on each cheek. Precisely align all elements with the person's facial features while keeping their identity, hairstyle, clothing, pose, and background.",
   stk_jollibee:
-    "Edit the first photograph while keeping the exact same person, face, hairstyle, pose, hands, and background unchanged. Change ONLY the person's clothing into a realistic Jollibee employee uniform genuinely worn on their body: bright red short-sleeved polo shirt with yellow shoulder panels, blue-and-yellow striped collar, Jollibee mascot logo on the left chest, small name tag on the right chest, and dark navy waist apron. Natural fabric folds and shadows; no cartoon or sticker outline.",
+    "Change ONLY the person's clothing into a realistic matte cotton Jollibee employee uniform genuinely worn on their body: red short-sleeved polo shirt with yellow shoulder panels, blue-and-yellow striped collar, Jollibee mascot logo on the left chest, small name tag on the right chest, and dark navy waist apron with natural fabric folds and natural ambient shadows.",
   stk_nak_ve_than:
-    "Edit the photograph into a photorealistic real-life cosplay of Nakroth Dimensional Guardian while keeping the person's exact face, expression, body proportions, pose, framing, and background unchanged. ONLY change: 1) Voluminous spiky silver-white hair with a center part and two long shoulder-length side locks. 2) A tailored black cropped blazer with white piping, royal-blue and gold armor accents, and leather gloves. Real hair strands and real fabric; not anime or CGI.",
+    "Edit the photograph into a realistic real-life cosplay of Nakroth Dimensional Guardian while keeping the person's face, expression, body proportions, pose, framing, and background unchanged. ONLY change: 1) Textured spiky silver-white hair with a center part and shoulder-length side locks. 2) A tailored matte black cropped blazer with white piping, royal-blue and gold accents, and leather gloves with natural real-world lighting.",
   stk_gojo_satoru:
-    "Edit the photograph while strictly preserving the exact half-body framing, crop, face shape, pose, and background. ONLY replace the hairstyle and outfit with a realistic Satoru Gojo cosplay: spiky silver-white hair, a sleek black fabric blindfold covering both eyes, and a black high-collar Jujutsu uniform jacket with natural fabric folds.",
+    "Strictly preserve the exact half-body framing, crop, face shape, pose, and background. ONLY replace the hairstyle and outfit with a realistic Satoru Gojo cosplay: natural-textured spiky silver-white hair, a matte black fabric blindfold covering both eyes, and a matte black high-collar Jujutsu jacket with natural fabric folds.",
   stk_shopee_food:
-    "Edit the photograph while keeping the exact same person, face, expression, pose, and background unchanged. Dress the person in an authentic bright orange ShopeeFood delivery rider jacket with white logo on the left chest, front zipper, natural fabric folds, and an orange ShopeeFood motorcycle helmet with white branding. Ultra-photorealistic photo, not pasted or cartoon.",
-  fireworks: "Fill the night sky background behind the person with vibrant colorful fireworks bursting with warm glowing sparks and bokeh.",
-  harry_potter: "Dress the person in a classic black Hogwarts wizard robe with a red-and-gold striped Gryffindor scarf and thin round metal glasses.",
+    "Dress the person in an authentic matte bright orange ShopeeFood delivery rider jacket with white logo on the left chest, front zipper, natural fabric folds, and an orange ShopeeFood motorcycle helmet with natural outdoor lighting.",
+  fireworks: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Fill ONLY the night sky background behind them with colorful fireworks bursting with warm glowing sparks and natural camera bokeh.",
+  harry_potter: "Dress the person in a matte black wool Hogwarts wizard robe with a red-and-gold striped Gryffindor scarf and thin round metal glasses in natural candid lighting.",
   minecraft: "Restyle the background and clothing into blocky 3D Minecraft voxel geometry and pixelated textures while keeping the person's face recognizable.",
-  fire_flame: "Surround the background and edges of the frame with dramatic glowing orange fire flames and rising golden sparks illuminated naturally on the clothing.",
+  fire_flame: "Surround the background and edges of the frame with warm orange fire flames and rising sparks in realistic night photography lighting.",
   giant_spider: "Add a realistic fuzzy dark spider perched playfully near the person's shoulder with natural shadows.",
-  ocean_underwater: "Transform the scene into a serene underwater aquarium with cool blue water caustics, rising air bubbles, and small colorful tropical fish swimming in the background.",
-  ufo_alien: "Place a subtle glowing metallic UFO saucer hovering in the distant sky behind the person with soft beam light.",
-  sweat_hearts: "Float glossy pastel pink and red 3D hearts softly in the air around the person with dreamy romantic lighting.",
-  volcano_lava: "Replace the distant background with glowing molten volcanic lava streams and warm floating orange embers.",
-  rain_storm: "Add a moody cinematic rainstorm atmosphere with falling rain streaks, subtle water droplets, soft mist, and distant lightning in the background sky.",
-  fortnite_llama: "Add a colorful purple-and-blue Fortnite loot llama piñata peeking playfully into the background behind the person.",
+  ocean_underwater: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a serene underwater aquarium interior showing cool blue water caustics and tropical fish in natural ambient lighting.",
+  ufo_alien: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Add a subtle metallic UFO saucer hovering in the distant sky behind them in natural outdoor lighting.",
+  sweat_hearts: "Float subtle pastel pink and red hearts softly in the air around the person with warm natural ambient lighting.",
+  volcano_lava: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the distant background behind them with glowing volcanic lava streams and warm floating embers.",
+  rain_storm: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background atmosphere behind them with an overcast realistic rainstorm, falling rain streaks, and natural mist.",
+  fortnite_llama: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Add a colorful purple-and-blue loot llama piñata peeking playfully into the background behind them.",
   watercolor_art: "Render the scene as a delicate hand-painted watercolor illustration with soft brush strokes and paper texture while keeping the face recognizable.",
-  golden_hour: "Bathe the scene in warm golden hour sunset sunlight rays, soft lens flare, and flattering warm golden rim lighting.",
-  rose_flower: "Place a single fresh red rose stem held gently in the person's mouth with realistic petals and shadows.",
-  shrek_ogre: "Add funny green Shrek ogre trumpet ears on both sides of the head with a playful green fairytale ogre vibe while keeping the face recognizable.",
-  superhero_cape: "Add a classic blue-and-red superhero suit collar and a flowing red superhero cape over the person's shoulders.",
-  spooky_ghost: "Add a cute translucent white ghostly figure floating playfully in the background behind the person.",
-  pirate_hat: "Put a weathered dark tricorn pirate captain hat with gold trim on the person's head and add subtle pirate coat lapels.",
-  jungle_leaf: "Frame the background with lush green tropical jungle monstera leaves and warm dappled forest sunlight.",
-  cute_zombie: "Apply playful Halloween zombie face paint with pale greenish skin tint and cute chibi stitch marks while keeping the person's features clear.",
+  golden_hour: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Bathe the background behind them in warm late-afternoon golden sunset sunlight and soft natural window bokeh.",
+  rose_flower: "Place a single fresh red rose stem held gently in the person's mouth with realistic petals and natural shadows.",
+  shrek_ogre: "Add funny green Shrek ogre trumpet ears on both sides of the head with natural lighting while keeping the face recognizable.",
+  superhero_cape: "Add a matte blue-and-red superhero suit collar and a red cloth superhero cape over the person's shoulders with realistic fabric folds.",
+  spooky_ghost: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Add a subtle translucent white ghostly figure floating playfully in the background behind them.",
+  pirate_hat: "Put a weathered dark felt tricorn pirate captain hat with gold trim on the person's head and add pirate coat lapels in natural lighting.",
+  jungle_leaf: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with lush green tropical jungle monstera leaves and soft natural filtered daylight.",
+  cute_zombie: "Apply playful Halloween zombie face paint with pale greenish tint and chibi stitch marks while keeping the person's features clear.",
 
   // 35 Official Native Locket AI filters + locket + hom_nay_an_gi
-  okay_wig: "Place an oversized glossy funny salon wig comically perched on the person's head with realistic hair strands.",
-  influencer: "Add glamorous studio ring-light eye catchlights, trendy chic sunglasses resting on top of the head, and clean luxury lifestyle studio lighting.",
-  looks_maxxing: "Enhance the portrait with crisp high-fashion studio sculpting light, subtle chiseled jawline shadow, and glossy magazine editorial clarity.",
+  okay_wig: "Place an oversized funny salon wig comically perched on the person's head with natural hair strands.",
+  influencer: "Add subtle natural window eye catchlights and chic sunglasses resting on top of the head in realistic candid indoor lighting, keeping real natural skin texture.",
+  looks_maxxing: "Keep real skin pores and natural texture intact without smoothing; add crisp natural side directional light and realistic lens contrast.",
   toothless: "Give the person a playful goofy comedy edit showing a funny gap-tooth smile.",
-  bye_brows: "Apply a lighthearted comedy edit cleanly removing the person's eyebrows with smooth natural forehead skin.",
-  bowling_ball: "Apply a funny comedy edit making the top of the person's head completely smooth, bald, and glossy like a polished bowling ball.",
-  blonde_bleached: "Change the person's hair color cleanly to bright platinum bleached blonde with natural roots and lighting.",
-  beard: "Add a realistic thick well-groomed full beard and mustache seamlessly matching the person's hair color.",
-  bob_cut: "Restyle the person's hair into a sleek chin-length straight bob haircut with natural volume.",
-  buns: "Restyle the person's hair into cute high double space buns on top of the head.",
-  tatted: "Add realistic black-and-grey fine-line aesthetic tattoos gently along the neck and visible skin.",
-  mohawk: "Restyle the person's hair into a tall edgy punk mohawk down the center of the head.",
+  bye_brows: "Apply a lighthearted comedy edit cleanly removing the person's eyebrows with natural forehead skin matching their real skin texture.",
+  bowling_ball: "Apply a funny comedy edit making the top of the person's head smooth and bald while keeping real skin texture.",
+  blonde_bleached: "Change the person's hair color cleanly to natural platinum bleached blonde with subtle dark roots and realistic hair strands.",
+  beard: "Add a realistic well-groomed full beard and mustache seamlessly matching the person's hair color and natural texture.",
+  bob_cut: "Restyle the person's hair into a neat chin-length straight bob haircut with natural hair volume and texture.",
+  buns: "Restyle the person's hair into cute high double space buns on top of the head with natural stray hairs.",
+  tatted: "Add realistic black-and-grey fine-line tattoos naturally following skin contours along the neck and visible skin.",
+  mohawk: "Restyle the person's hair into a tall edgy punk mohawk down the center of the head with natural hair texture.",
   braces: "Add realistic metallic orthodontic braces cleanly aligned on the person's visible teeth.",
-  slimed: "Splash bright neon green glossy Nickelodeon-style slime dripping playfully over the person's hair and shoulders.",
-  princess: "Place a sparkling crystal silver tiara crown on the head and add a pastel fairytale princess dress collar with gentle sparkles.",
-  disco_lights: "Illuminate the scene with colorful spinning disco ball light reflections and vibrant neon magenta and cyan party beams.",
-  cash_money: "Add crisp US dollar bills fluttering and raining joyfully through the air around the person.",
-  happy_birthday: "Put a festive colorful polka-dot birthday party hat on the head and add floating confetti with warm glowing birthday cake candles in the foreground.",
-  cutesy: "Add soft kawaii pastel pink blush, tiny sparkling star stickers on the cheeks, and a dreamy soft glow.",
+  slimed: "Splash bright green Nickelodeon-style slime dripping playfully over the person's hair and shoulders.",
+  princess: "Place a delicate silver tiara crown on the head and add a matte pastel princess dress collar in soft natural daylight.",
+  disco_lights: "Illuminate the scene with colorful spinning disco ball reflections and magenta-cyan party ambient light, keeping realistic night grain and real skin.",
+  cash_money: "Add crisp US dollar bills fluttering and raining joyfully through the air around the person in natural lighting.",
+  happy_birthday: "Put a festive polka-dot birthday party hat on the head and add confetti with warm birthday cake candles in the foreground.",
+  cutesy: "Add soft natural rosy blush and tiny pastel star stickers on the cheeks with soft natural daylight, preserving real skin texture.",
   sticker_face: "Place playful colorful vinyl stickers like tiny stars, pastel hearts, and smiley faces neatly on the person's cheeks and nose.",
   flower_crown: "Place a delicate crown woven from fresh white daisies and pastel roses resting naturally on the person's head.",
   love_bug: "Put a cute red plush ladybug antennae headband on the head and float soft pink hearts in the background.",
-  wedding: "Dress the person in elegant white wedding attire such as a delicate veil collar or crisp tuxedo with romantic floral bokeh behind.",
-  cowboy_cowgirl: "Put a classic brown suede cowboy hat on the head and add a patterned western bandana loosely around the neck.",
-  giraffe: "Put a funny cozy plush giraffe hood with cute stuffed horns and spotted giraffe ears over the person's head.",
-  clown: "Apply playful colorful clown makeup with a shiny red nose, painted cheeks, and a curly rainbow wig.",
+  wedding: "Dress the person in realistic matte white wedding attire such as a delicate veil collar or crisp tuxedo with natural soft garden bokeh behind.",
+  cowboy_cowgirl: "Put a classic worn brown suede cowboy hat on the head and add a patterned western cotton bandana loosely around the neck.",
+  giraffe: "Put a cozy plush giraffe hood with cute stuffed horns and spotted giraffe ears over the person's head.",
+  clown: "Apply playful colorful clown makeup with a red nose, painted cheeks, and a curly rainbow wig.",
   easter_bunney_cutout: "Place cute pastel plush Easter bunny ears on the head surrounded by soft spring pastel flowers in the background.",
   easter_chick_cutout: "Place a cute fluffy yellow plush Easter chick hat perched playfully on top of the person's head.",
-  bearded: "Add a long majestic wizard or lumberjack beard matching the person's natural hair tone.",
+  bearded: "Add a long realistic wizard or lumberjack beard matching the person's natural hair tone.",
   leprechaun: "Put a festive green St. Patrick's Day leprechaun top hat with a gold buckle on the head and float green shamrocks behind.",
-  lucky_face: "Add cute sparkling green four-leaf clover stickers on the cheeks with warm golden lucky shimmer in the air.",
-  sweet_hearts: "Float pastel candy conversation hearts in the air around the person with soft pink romantic studio lighting.",
-  elf_cutout: "Put a festive green-and-red Christmas elf hat with cute pointy elf ears and a golden jingle bell on the head.",
+  lucky_face: "Add cute green four-leaf clover stickers on the cheeks with warm natural sunlight.",
+  sweet_hearts: "Float pastel candy conversation hearts in the air around the person with soft natural warm lighting.",
+  elf_cutout: "Put a festive green-and-red Christmas elf hat with cute pointy elf ears and a tiny jingle bell on the head.",
   santa_cutout: "Put a cozy fluffy red-and-white Santa Claus hat on the head with soft falling snow bokeh in the background.",
-  frosty: "Wrap a cozy winter knit scarf around the neck with soft falling snowflakes and crisp frosty winter wonderland lighting.",
-  locket: "Surround the person with a mystical golden starlight aura, floating warm sparkles, and magical twilight glow.",
+  frosty: "Wrap a cozy knit wool winter scarf around the neck with softly falling snowflakes and cool overcast winter daylight.",
+  locket: "Surround the person with warm golden sunset bokeh and gentle floating light dust, keeping natural candid camera realism.",
   hom_nay_an_gi: "Float playful appetizing miniature icons of Vietnamese street food like pho bowls, banh mi, and iced milk tea in a halo around the background.",
 
   // 27 New Vietnamese Meme, Trend, Shipper, Luxury & Beauty AI filters
   ai_cong_chua_phong_tro:
-    "Keep the person's exact face, identity, and expression, dress them in an extravagant sparkling pastel pink fairytale princess gown with a crystal tiara while standing inside a cozy humble Vietnamese rented dorm room with tiled floor and electric fan.",
+    "Dress the person in a matte pastel pink layered tulle princess dress with a delicate tiara while standing inside a realistic lived-in Vietnamese rented dorm room with tiled floor and electric fan under natural indoor lighting.",
   ai_hoang_tu_ktx:
-    "Keep the person's exact face and pose, dress them in an ornate royal white-and-gold European prince uniform jacket with ceremonial sash inside a lively Vietnamese university dorm room.",
+    "Dress the person in a realistic tailored off-white and gold ceremonial prince uniform jacket with fabric sash inside a real lived-in Vietnamese university dorm room with natural indoor lighting.",
   ai_lop_truong:
-    "Keep the person's exact face, expression, clothing, pose, and background, and humorously place a large realistic heavy black rubber car tire slung around their neck and shoulders like a collar (funny 'lốp dự phòng' spare-tire meme) with natural shadows.",
+    "Keep clothing, pose, and background completely unchanged, and humorously place a realistic heavy matte black rubber car tire slung around their neck and shoulders like a collar (funny 'lốp dự phòng' meme) with natural shadows.",
   ai_di_phu_ho:
-    "Keep the person's exact face and identity, dress them in realistic dusty construction worker clothes with a bright yellow safety hard hat, reflective vest, and a trowel at a sunny building site.",
+    "Dress the person in realistic slightly dusty construction worker clothes with a matte yellow safety hard hat, reflective vest, and a trowel at a real sunlit outdoor building site with authentic candid lighting.",
   ai_ve_que_nuoi_ca:
-    "Keep the person's exact face and smile, dress them in traditional rustic Vietnamese brown Ba Ba country attire wearing a conical leaf hat Non La beside a peaceful green countryside fish pond and banana trees.",
+    "Dress the person in traditional matte brown Vietnamese Ba Ba country cotton attire wearing a natural bamboo conical leaf hat Non La beside a peaceful countryside fish pond and banana trees in soft outdoor daylight.",
   ai_figure_1_7:
-    "Keep the person's exact face and outfit likeness, transform them into a glossy collectible 1/7 scale PVC anime figure standing on a sleek round acrylic display base on an artist desk with warm studio rim lighting.",
+    "Keep the person's exact face and outfit likeness, transform them into a collectible 1/7 scale PVC anime figure standing on a round acrylic display base on an artist desk with warm studio rim lighting.",
   ai_action_figure_box:
     "Keep the person's exact likeness and outfit, render them as a collectible boxed plastic action figure inside a transparent blister retail packaging box with printed title card and tiny accessories.",
   ai_lego_figure:
-    "Keep the person's hair, outfit colors, and vibe recognizable, transform the person and surroundings into glossy yellow LEGO minifigure style with blocky plastic LEGO bricks.",
+    "Keep the person's hair, outfit colors, and vibe recognizable, transform the person and surroundings into yellow LEGO minifigure style with blocky plastic LEGO bricks.",
   ai_cartoon_3d:
-    "Keep the person's exact facial features, hair, and outfit recognizable, restyle them cleanly as a charming Pixar/Disney-style high-detail 3D animated movie character with expressive soft studio lighting.",
+    "Keep the person's exact facial features, hair, and outfit recognizable, restyle them cleanly as a charming Pixar/Disney-style high-detail 3D animated movie character with expressive soft lighting.",
   ai_polaroid_string:
-    "Frame the person's photo cleanly inside a charming physical instant Polaroid photograph hanging from natural twine string with a tiny wooden clothespin over warm fairy-light bokeh.",
+    "Frame the person's untouched real photo cleanly inside a realistic printed instant Polaroid photograph hanging from natural twine string with a tiny wooden clothespin over warm ambient room bokeh.",
   ai_shipper_giao_hang:
-    "Keep the person's exact face, expression, and background, dress them in an authentic bright red-and-orange express delivery courier jacket with matching delivery helmet and parcel bag.",
+    "Dress the person in an authentic matte red-and-orange express delivery courier jacket with matching delivery helmet and parcel bag in natural street daylight.",
   ai_grab_driver:
-    "Keep the person's exact face, expression, and background, dress them in an authentic emerald green GrabBike rider jacket and matching green Grab motorcycle helmet with crisp natural folds.",
+    "Dress the person in an authentic matte emerald green GrabBike rider jacket and matching green Grab motorcycle helmet with crisp natural fabric folds in outdoor daylight.",
   ai_xanh_sm:
-    "Keep the person's exact face, expression, and background, dress them in an authentic bright cyan-turquoise Xanh SM electric taxi/bike rider jacket with matching cyan helmet.",
+    "Dress the person in an authentic matte cyan-turquoise Xanh SM electric taxi/bike rider jacket with matching cyan helmet in outdoor daylight.",
   ai_bac_si:
-    "Keep the person's exact face and expression, dress them in a crisp clean white doctor lab coat with a realistic medical stethoscope draped naturally around the neck in a bright modern clinic.",
+    "Dress the person in a crisp matte white cotton doctor lab coat with a realistic medical stethoscope draped naturally around the neck inside a real bright clinic room with natural indoor light.",
   ai_tong_tai:
-    "Keep the person's exact face and identity, dress them in a razor-sharp tailored charcoal black billionaire CEO three-piece suit and silk tie standing inside a sleek glass penthouse office overlooking the city skyline.",
+    "Dress the person in a tailored matte charcoal black wool suit and understated silk tie standing naturally inside a real high-rise office with soft overcast city window daylight behind them, candid smartphone camera realism.",
   ai_phu_ba:
-    "Keep the person's exact face and identity, dress them in glamorous wealthy heiress luxury pearl jewelry, designer silk blazer, and sunglasses in an upscale sunlit luxury boutique setting.",
+    "Dress the person in tasteful real-life luxury pearl earrings and a tailored matte cream tweed jacket inside an upscale sunlit cafe/boutique with soft natural window daylight, keeping real skin texture.",
   ai_thieu_gia:
-    "Keep the person's exact face and identity, style them in a sharp luxury young heir cashmere coat and designer watch leaning casually near a sleek glossy sports car at golden hour.",
+    "Style the person in a matte charcoal cashmere overcoat and understated wristwatch standing casually outdoors by a sleek car at late afternoon golden hour, candid smartphone camera look.",
   ai_du_thuyen:
-    "Keep the person's exact face and identity, dress them in crisp white linen summer resort wear sitting aboard a luxury white yacht deck overlooking sparkling turquoise ocean waves.",
+    "Dress the person in crisp matte white linen summer shirt sitting casually aboard a real sailboat/yacht deck overlooking blue ocean waves in realistic bright outdoor daylight.",
   ai_old_money:
-    "Keep the person's exact face and identity, style them in timeless old-money ivory cable-knit sweater draped over the shoulders and beige tailored polo shirt with warm film aesthetic.",
+    "Style the person in timeless matte ivory cable-knit cotton sweater draped naturally over the shoulders and beige tailored polo shirt with warm vintage 35mm film color and natural ambient light.",
   ai_makeup_idol:
-    "Keep the person's exact facial structure and identity, apply clean luminous K-pop idol glass-skin makeup with soft shimmer eyelids, peach gradient lips, and flattering softbox beauty light.",
+    "Keep real skin texture and pores clearly visible; apply only subtle natural K-pop peach lip tint and light natural everyday makeup in soft daylight, zero airbrushing.",
   ai_trang_diem_duyen:
-    "Keep the person's exact facial features and identity, apply trendy Douyin Chinese beauty makeup with wispy doll eyelashes, sparkly lower-lash shimmer, rosy blush, and glossy berry lips.",
+    "Keep real skin texture and natural features untouched; apply subtle soft rosy cheek blush, natural wispy lashes, and natural berry lip tint in soft window daylight.",
   ai_doi_kieu_toc:
-    "Keep the person's exact face, clothing, and background completely identical, restyle ONLY their hair into voluminous trendy layered salon hair with wispy curtain bangs and glossy natural texture.",
+    "Keep clothing and background completely identical; restyle ONLY their hair into textured layered salon hair with soft wispy curtain bangs and realistic natural strands.",
   ai_doi_mau_toc:
-    "Keep the person's exact face, clothing, and background completely identical, dye ONLY their hair into a fashionable smoky ash-silver lavender balayage tone with natural roots and shine.",
+    "Keep clothing and background completely identical; dye ONLY their hair into a natural-textured smoky ash-silver lavender balayage tone with dark natural roots.",
   ai_cosplay_wibu:
-    "Keep the person's exact face and pose, dress them in a highly detailed realistic Japanese anime academy cosplay uniform with vibrant stylized wig and dramatic studio backlight.",
+    "Dress the person in a realistic fabric Japanese anime academy cosplay uniform jacket with natural matte hair styling inside a real outdoor campus setting.",
   ai_hau_gai:
-    "Keep the person's exact face and sweet expression, dress them in a cute classic black-and-white frilly Victorian cafe maid outfit with neat white lace headband inside a warm aesthetic cafe.",
+    "Dress the person in a realistic matte cotton black-and-white Victorian cafe maid apron dress with simple white lace headband inside a warm sunlit cafe.",
   ai_hoang_thuong:
-    "Keep the person's exact face and proud expression, dress them in an ornate imperial golden dragon embroidered ancient royal emperor robe and gilded crown inside a grand palace hall.",
+    "Dress the person in a richly woven matte silk golden-yellow embroidered ancient royal emperor robe and traditional crown inside a dimly lit historic palace courtyard with natural ambient light.",
   ai_idol_kpop:
-    "Keep the person's exact face and charisma, dress them in a flashy sparkling K-pop concert stage outfit with wireless ear-mic under dramatic magenta-and-blue arena spotlights and lightsticks.",
+    "Dress the person in a realistic tailored K-pop stage performance jacket with subtle ear-mic under natural warm concert stage spotlights and crowd bokeh, keeping realistic camera grain.",
   nm_mona_lisa:
     "Seamlessly paint the person's exact face, likeness, and expression into Leonardo da Vinci's famous Mona Lisa oil painting, replacing Mona Lisa's face while preserving the iconic dark veil, flowing Renaissance hair, crossed hands, dark Florentine dress, misty mountain landscape background, warm aged oil-painting brushstrokes, and sfumato lighting so it looks like an authentic museum masterpiece.",
   nm_faker:
-    "Seamlessly place the person's exact face, likeness, and expression into the iconic League of Legends T1 Faker 'shhh' esports photo, wearing the official black-and-red T1 esports pro jersey with glasses, holding one index finger gently against their lips in the iconic quiet 'shhh' pose under dramatic red-and-gold Worlds championship arena stage lighting, ultra-photorealistic.",
+    "Place the person naturally into the iconic League of Legends T1 Faker 'shhh' esports photo, wearing the official matte black-and-red T1 esports jersey with glasses, holding one index finger gently against their lips in real esports arena lighting with authentic handheld camera grain.",
   ai_mua_xuan:
-    "Keep the person's exact face, identity, and smile, place them under blooming pink cherry blossom branches in soft warm spring morning sunlight wearing a fresh pastel spring outfit, ultra-photorealistic.",
+    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a natural candid spring park path with real pale pink cherry blossom trees, soft overcast morning daylight, a few blurred petals in the air, and realistic natural depth of field.",
   ai_mua_he:
-    "Keep the person's exact face and identity, place them on a bright sunny tropical summer beach with turquoise ocean sky and warm golden sunbeams wearing relaxed breezy summer clothes, ultra-photorealistic.",
+    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a natural sunlit summer coastal boardwalk and calm blue sea horizon under realistic afternoon sunlight and soft natural lens blur, no oversaturated colors.",
   ai_mua_thu:
-    "Keep the person's exact face and identity, place them in a romantic autumn park filled with golden and crimson maple leaves wearing a cozy knit sweater under warm golden sunset light, ultra-photorealistic.",
+    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a quiet natural autumn tree-lined street with muted amber and brown maple leaves and soft late-afternoon natural daylight, realistic handheld camera depth of field.",
   ai_mua_dong:
-    "Keep the person's exact face and identity, place them on a charming snowy winter street with softly falling snowflakes wearing a cozy warm winter coat and scarf, crisp cinematic winter lighting, ultra-photorealistic.",
+    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a quiet overcast winter city street with gentle light falling snow and muted cool winter daylight, authentic candid camera depth of field.",
   ai_masterchef:
-    "Keep the person's exact face and confident expression, dress them in a crisp clean white MasterChef chef coat and tall white chef toque hat standing inside a glossy modern stainless-steel culinary kitchen studio.",
+    "Dress the person in a real matte white cotton chef coat and chef toque hat standing naturally inside an authentic stainless-steel restaurant kitchen with realistic fluorescent/ambient indoor light and natural smartphone camera texture.",
   ai_csgt:
-    "Keep the person's exact face and expression, dress them in an authentic golden-tan Vietnamese traffic police (CSGT) uniform jacket with neat badges and matching peaked cap on a sunlit city boulevard.",
+    "Dress the person in an authentic matte golden-tan Vietnamese traffic police (CSGT) uniform jacket with neat badges and matching peaked cap on a real sunlit tree-lined city street in candid daylight.",
 };
 
 const MEMORY_IMAGES = new Map();
@@ -1487,7 +1526,7 @@ async function translateCustomLookPromptToEn(env, rawText) {
   const clean = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 500);
   if (!clean) return "";
   const sys =
-    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete, vivid, photorealistic English image-editing prompt (35-65 words). Rules: 1) Always start with: 'Keep the exact same person, facial features, skin tone, and identity from the input photo.' 2) Describe exact realistic clothing, costume, cape, accessories, hairstyle, makeup, props, or background requested, worn naturally with realistic fabric folds, lighting, and proportions (do NOT cover the face with a mask/helmet unless explicitly requested). 3) NEVER use trademarked/copyrighted character or brand names (such as Superman, Spider-Man, Batman, Iron Man, Pikachu, Doraemon) because they trigger output filters — instead describe their iconic outfit/colors generically without emblems (e.g. 'a heroic royal-blue superhero suit with a flowing crimson cape and gold belt'). 4) Keep the original background and pose unless asked to change them. Output ONLY the English prompt.";
+    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete English image-editing prompt (35-65 words) for an authentic candid smartphone photo. Rules: 1) Always start with: 'Keep the exact same person, face shape, eyes, nose, lips, skin tone, natural skin texture, and expression from input_image_0 completely untouched.' 2) Describe exact clothing, costume, accessories, hairstyle, makeup, props, or background requested using matte realistic fabrics, natural ambient lighting, and natural camera realism (NEVER use plastic, airbrushed, CGI, glossy, or 'ultra-photorealistic' buzzwords; do NOT cover the face with a mask/helmet unless explicitly requested). 3) NEVER use trademarked/copyrighted character or brand names (such as Superman, Spider-Man, Batman, Iron Man, Pikachu, Doraemon) because they trigger output filters — instead describe their iconic outfit/colors generically without emblems (e.g. 'a royal-blue suit with a crimson cloth cape and gold belt'). 4) Keep the original background and pose unless asked to change them. Output ONLY the English prompt.";
   for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
     try {
       const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
@@ -1565,24 +1604,31 @@ function detectAiRequest(dataNode, rawBodyText) {
     }
   }
 
+  const faceLockForId = (fid) =>
+    STYLIZED_AI_IDS.has(fid)
+      ? FACE_LOCK_STYLIZED
+      : SWAP_BG_AI_IDS.has(fid)
+      ? FACE_LOCK_SWAP_BG
+      : FACE_LOCK_KEEP_BG;
+
   if (rawFilterId && AI_FILTER_PROMPTS[rawFilterId]) {
-    return { filterId: rawFilterId, prompt: FACE_LOCK + AI_FILTER_PROMPTS[rawFilterId], source: "catalog" };
+    return { filterId: rawFilterId, prompt: faceLockForId(rawFilterId) + AI_FILTER_PROMPTS[rawFilterId], source: "catalog" };
   }
   if (rawUserPrompt && AI_FILTER_PROMPTS[rawUserPrompt]) {
-    return { filterId: rawUserPrompt, prompt: FACE_LOCK + AI_FILTER_PROMPTS[rawUserPrompt], source: "catalog_prompt_id" };
+    return { filterId: rawUserPrompt, prompt: faceLockForId(rawUserPrompt) + AI_FILTER_PROMPTS[rawUserPrompt], source: "catalog_prompt_id" };
   }
   if (rawUserPrompt) {
     return {
       filterId: rawFilterId || "custom_prompt",
       rawUserPrompt: rawUserPrompt.slice(0, 500),
-      prompt: FACE_LOCK + "Apply this natural photorealistic edit: " + rawUserPrompt.slice(0, 500),
+      prompt: FACE_LOCK_KEEP_BG + "Apply this natural candid camera edit: " + rawUserPrompt.slice(0, 500),
       source: "custom_prompt",
     };
   }
   if (rawFilterId) {
     return {
       filterId: rawFilterId,
-      prompt: FACE_LOCK + 'Apply a natural photorealistic "' + rawFilterId.replace(/[_-]+/g, " ") + '" camera filter effect.',
+      prompt: FACE_LOCK_KEEP_BG + 'Apply a natural candid "' + rawFilterId.replace(/[_-]+/g, " ") + '" camera filter effect.',
       source: "dynamic_filter_id",
     };
   }
@@ -2174,11 +2220,75 @@ function getVietnamWeekdayIndex() {
   return new Date(Date.now() + 7 * 3600 * 1000).getUTCDay();
 }
 
-function buildSmoothedForegroundMask(maskRgb) {
+function buildSmoothedForegroundMask(maskRgb, fillHoles = true) {
   const total = SIZE * SIZE;
   const lum = new Uint8Array(total);
   for (let p = 0, i3 = 0; p < total; p++, i3 += 3) {
     lum[p] = ((maskRgb[i3] * 77 + maskRgb[i3 + 1] * 150 + maskRgb[i3 + 2] * 29) >> 8) & 0xff;
+  }
+  if (fillHoles) {
+    // Separable dilation barrier (r=4) so hairline cracks cannot leak exterior background inside
+    const radB = 4;
+    const tmpB = new Uint8Array(total);
+    const barrier = new Uint8Array(total);
+    for (let y = 0; y < SIZE; y++) {
+      const row = y * SIZE;
+      for (let x = 0; x < SIZE; x++) {
+        const x0 = x > radB ? x - radB : 0;
+        const x1 = x + radB < SIZE ? x + radB : SIZE - 1;
+        let mx = 0;
+        for (let xx = x0; xx <= x1; xx++) {
+          const v = lum[row + xx];
+          if (v > mx) mx = v;
+        }
+        tmpB[row + x] = mx;
+      }
+    }
+    for (let y = 0; y < SIZE; y++) {
+      const y0 = y > radB ? y - radB : 0;
+      const y1 = y + radB < SIZE ? y + radB : SIZE - 1;
+      for (let x = 0; x < SIZE; x++) {
+        let mx = 0;
+        for (let yy = y0; yy <= y1; yy++) {
+          const v = tmpB[yy * SIZE + x];
+          if (v > mx) mx = v;
+        }
+        barrier[y * SIZE + x] = mx;
+      }
+    }
+    // Exterior-border BFS flood-fill: fill enclosed holes inside foreground (e.g. face/eyes/bangs) to 255
+    const visited = new Uint8Array(total);
+    const queue = new Int32Array(total);
+    let head = 0;
+    let tail = 0;
+    const pushIfBg = (idx) => {
+      if (!visited[idx] && barrier[idx] < 115) {
+        visited[idx] = 1;
+        queue[tail++] = idx;
+      }
+    };
+    for (let x = 0; x < SIZE; x++) pushIfBg(x);
+    for (let y = 0; y < SIZE; y++) {
+      pushIfBg(y * SIZE);
+      pushIfBg(y * SIZE + (SIZE - 1));
+    }
+    const cornerW = Math.floor(SIZE * 0.12);
+    const lastRow = (SIZE - 1) * SIZE;
+    for (let x = 0; x < cornerW; x++) pushIfBg(lastRow + x);
+    for (let x = SIZE - cornerW; x < SIZE; x++) pushIfBg(lastRow + x);
+
+    while (head < tail) {
+      const idx = queue[head++];
+      const x = idx % SIZE;
+      const y = (idx / SIZE) | 0;
+      if (x > 0) pushIfBg(idx - 1);
+      if (x < SIZE - 1) pushIfBg(idx + 1);
+      if (y > 0) pushIfBg(idx - SIZE);
+      if (y < SIZE - 1) pushIfBg(idx + SIZE);
+    }
+    for (let p = 0; p < total; p++) {
+      if (!visited[p]) lum[p] = 255;
+    }
   }
   const alpha = new Uint8Array(total);
   let fgPixels = 0;
@@ -2206,6 +2316,87 @@ function buildSmoothedForegroundMask(maskRgb) {
     }
   }
   return { alpha, fgRatio: fgPixels / total };
+}
+
+function compositeForegroundWithAlpha(fgRgb, bgCanvasRgb, maskAlpha, maskSize = SIZE, dstSize = WD_SIZE, soften = false) {
+  let srcAlpha = maskAlpha;
+  if (soften) {
+    const soft = new Uint8Array(maskSize * maskSize);
+    for (let y = 0; y < maskSize; y++) {
+      const y0 = y > 0 ? y - 1 : 0;
+      const y1 = y < maskSize - 1 ? y + 1 : maskSize - 1;
+      for (let x = 0; x < maskSize; x++) {
+        const x0 = x > 0 ? x - 1 : 0;
+        const x1 = x < maskSize - 1 ? x + 1 : maskSize - 1;
+        let sum = 0;
+        let cnt = 0;
+        for (let yy = y0; yy <= y1; yy++) {
+          const row = yy * maskSize;
+          for (let xx = x0; xx <= x1; xx++) {
+            sum += maskAlpha[row + xx];
+            cnt++;
+          }
+        }
+        soft[y * maskSize + x] = (sum / cnt) | 0;
+      }
+    }
+    srcAlpha = soft;
+  }
+  const scaleM = (maskSize - 1) / (dstSize - 1);
+  for (let y = 0; y < dstSize; y++) {
+    const myF = y * scaleM;
+    const my0 = myF | 0;
+    const my1 = my0 < maskSize - 1 ? my0 + 1 : maskSize - 1;
+    const fy = myF - my0;
+    const row0 = my0 * maskSize;
+    const row1 = my1 * maskSize;
+    for (let x = 0; x < dstSize; x++) {
+      const mxF = x * scaleM;
+      const mx0 = mxF | 0;
+      const mx1 = mx0 < maskSize - 1 ? mx0 + 1 : maskSize - 1;
+      const fx = mxF - mx0;
+      const a00 = srcAlpha[row0 + mx0];
+      const a10 = srcAlpha[row0 + mx1];
+      const a01 = srcAlpha[row1 + mx0];
+      const a11 = srcAlpha[row1 + mx1];
+      const a = ((a00 * (1 - fx) + a10 * fx) * (1 - fy) + (a01 * (1 - fx) + a11 * fx) * fy + 0.5) | 0;
+      if (a === 0) continue;
+      const i3 = (y * dstSize + x) * 3;
+      if (a >= 255) {
+        bgCanvasRgb[i3] = fgRgb[i3];
+        bgCanvasRgb[i3 + 1] = fgRgb[i3 + 1];
+        bgCanvasRgb[i3 + 2] = fgRgb[i3 + 2];
+      } else {
+        const invA = 255 - a;
+        bgCanvasRgb[i3] = (fgRgb[i3] * a + bgCanvasRgb[i3] * invA + 128) >> 8;
+        bgCanvasRgb[i3 + 1] = (fgRgb[i3 + 1] * a + bgCanvasRgb[i3 + 1] * invA + 128) >> 8;
+        bgCanvasRgb[i3 + 2] = (fgRgb[i3 + 2] * a + bgCanvasRgb[i3 + 2] * invA + 128) >> 8;
+      }
+    }
+  }
+}
+
+async function runForegroundSegMask(env, preparedMaskInput, origin, tempId) {
+  if (!preparedMaskInput || !preparedMaskInput.bytes) return null;
+  let maskOut = null;
+  let segModelUsed = null;
+  if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
+    try {
+      const seg = await runFluxPooled(env, FOREGROUND_SEG_PROMPT, preparedMaskInput, null, null, SIZE);
+      if (seg && seg.bytes) { maskOut = seg; segModelUsed = seg.via; }
+    } catch (_) {}
+  }
+  if (!maskOut || !maskOut.bytes) {
+    const fb = await fallbackEditImage(env, FOREGROUND_SEG_PROMPT, preparedMaskInput.bytes, preparedMaskInput.mimeType);
+    if (fb && fb.bytes) { maskOut = fb; segModelUsed = fb.model; }
+  }
+  if (!maskOut || !maskOut.bytes) return { segModelUsed, alpha: null, fgRatio: 0 };
+  const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, origin, `msk_${tempId}`, SIZE);
+  if (decodedMask?.rgb && decodedMask.w === SIZE && decodedMask.h === SIZE) {
+    const { alpha, fgRatio } = buildSmoothedForegroundMask(decodedMask.rgb, true);
+    return { segModelUsed, alpha, fgRatio: Number(fgRatio.toFixed(3)) };
+  }
+  return { segModelUsed, alpha: null, fgRatio: 0 };
 }
 
 function uint8ToBase64(bytes) {
@@ -4537,63 +4728,13 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       let maskApplied = false;
       let fgRatio = 0;
       let segModelUsed = null;
-      if (preparedMaskInput && preparedMaskInput.bytes) {
-        const segPrompt =
-          "Create a pure black-and-white binary foreground segmentation matte of this exact image. Fill the entire main foreground subject (person, face, hair, hands, clothing, bag, food dish/bowl, pet, or prominent foreground object/tower) in solid pure white (#FFFFFF) and fill the entire background behind it in solid pure black (#000000). Keep exact pixel alignment with zero cropping or shifting. Pure white subject on pure black background only.";
-        let maskOut = null;
-        // FLUX tách nền: binding account chính -> xoay vòng ~N tài khoản Cloudflare phụ (REST) khi 4006.
-        if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
-          try {
-            const seg = await runFluxPooled(env, segPrompt, preparedMaskInput, null, null, SIZE);
-            if (seg && seg.bytes) { maskOut = seg; segModelUsed = seg.via; }
-          } catch (_) {}
-        }
-        // Fallback cuối: provider ảnh ngoài (NVIDIA img2img / Gemini) nếu mọi account Cloudflare đều hết.
-        if (!maskOut || !maskOut.bytes) {
-          const fb = await fallbackEditImage(env, segPrompt, preparedMaskInput.bytes, preparedMaskInput.mimeType);
-          if (fb && fb.bytes) { maskOut = fb; segModelUsed = fb.model; }
-        }
-        if (maskOut && maskOut.bytes) {
-          const decodedMask = await decodeInputToRgb512(maskOut.bytes, null, url.origin, `msk_${tempId}`, SIZE);
-          if (decodedMask?.rgb && decodedMask.w === SIZE && decodedMask.h === SIZE) {
-            const { alpha, fgRatio: ratio } = buildSmoothedForegroundMask(decodedMask.rgb);
-            fgRatio = Number(ratio.toFixed(3));
-            if (ratio > 0.02 && ratio < 0.94) {
-              const scaleM = (SIZE - 1) / (WD_SIZE - 1);
-              for (let y = 0; y < WD_SIZE; y++) {
-                const myF = y * scaleM;
-                const my0 = myF | 0;
-                const my1 = my0 < SIZE - 1 ? my0 + 1 : SIZE - 1;
-                const fy = myF - my0;
-                const row0 = my0 * SIZE;
-                const row1 = my1 * SIZE;
-                for (let x = 0; x < WD_SIZE; x++) {
-                  const mxF = x * scaleM;
-                  const mx0 = mxF | 0;
-                  const mx1 = mx0 < SIZE - 1 ? mx0 + 1 : SIZE - 1;
-                  const fx = mxF - mx0;
-                  const a00 = alpha[row0 + mx0];
-                  const a10 = alpha[row0 + mx1];
-                  const a01 = alpha[row1 + mx0];
-                  const a11 = alpha[row1 + mx1];
-                  const a = ((a00 * (1 - fx) + a10 * fx) * (1 - fy) + (a01 * (1 - fx) + a11 * fx) * fy + 0.5) | 0;
-                  if (a === 0) continue;
-                  const i3 = (y * WD_SIZE + x) * 3;
-                  if (a >= 255) {
-                    canvasRgb[i3] = baseRgb[i3];
-                    canvasRgb[i3 + 1] = baseRgb[i3 + 1];
-                    canvasRgb[i3 + 2] = baseRgb[i3 + 2];
-                  } else {
-                    const invA = 255 - a;
-                    canvasRgb[i3] = (baseRgb[i3] * a + canvasRgb[i3] * invA + 128) >> 8;
-                    canvasRgb[i3 + 1] = (baseRgb[i3 + 1] * a + canvasRgb[i3 + 1] * invA + 128) >> 8;
-                    canvasRgb[i3 + 2] = (baseRgb[i3 + 2] * a + canvasRgb[i3 + 2] * invA + 128) >> 8;
-                  }
-                }
-              }
-              maskApplied = true;
-            }
-          }
+      const segRes = await runForegroundSegMask(env, preparedMaskInput, url.origin, tempId);
+      if (segRes) {
+        segModelUsed = segRes.segModelUsed;
+        fgRatio = segRes.fgRatio;
+        if (segRes.alpha && segRes.fgRatio > 0.02 && segRes.fgRatio < 0.94) {
+          compositeForegroundWithAlpha(baseRgb, canvasRgb, segRes.alpha, SIZE, WD_SIZE, false);
+          maskApplied = true;
         }
       }
 
@@ -4902,10 +5043,74 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         let aiOut = null;
         let usedModel = null;
         let cfErr = null;
+        const bgPreserveHarmony = BG_PRESERVE_HARMONY[aiReq.filterId] || null;
+        if (bgPreserveHarmony && preparedInput && preparedInput.bytes) {
+          const ai3dModel = (env && env.AI_3D_MODEL) || null;
+          const ai3dOpts = (env && (env.AI_3D_STEPS || env.AI_3D_STRENGTH))
+            ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
+                strength: env.AI_3D_STRENGTH ? parseFloat(env.AI_3D_STRENGTH) : undefined }
+            : null;
+          const runBgAi = async () => {
+            if (env.AI || env.CF_AI_ACCOUNTS) {
+              try {
+                const res = await runFluxPooled(env, effectivePrompt, preparedInput, null, ai3dModel, WD_SIZE, ai3dOpts);
+                if (res && res.bytes) return res;
+              } catch (err) {
+                cfErr = (cfErr ? cfErr + " | " : "") + String(err?.message || err);
+              }
+            }
+            const fb = await fallbackEditImage(env, effectivePrompt, preparedInput.bytes, preparedInput.mimeType);
+            return fb && fb.bytes ? fb : null;
+          };
+          const [decodedUser, bgAiOut, segRes] = await Promise.all([
+            decodeInputToRgb512(imgBytes, sourceUrl, url.origin, tempId, WD_SIZE, authHeader),
+            runBgAi(),
+            runForegroundSegMask(env, preparedInput, url.origin, tempId),
+          ]);
+          if (bgAiOut && bgAiOut.bytes) {
+            aiOut = bgAiOut;
+            usedModel = (bgAiOut.via && bgAiOut.via !== "binding" ? bgAiOut.via + " " : "") + (bgAiOut.aiModel || bgAiOut.model || "flux");
+            if (decodedUser?.rgb && segRes?.alpha && segRes.fgRatio > 0.04 && segRes.fgRatio < 0.90) {
+              const decodedAi = await decodeInputToRgb512(bgAiOut.bytes, null, url.origin, `sbg_${tempId}`, WD_SIZE);
+              if (decodedAi?.rgb) {
+                const origRgb = new Uint8Array(WD_SIZE * WD_SIZE * 3);
+                drawCoverRgb(origRgb, decodedUser.rgb, decodedUser.w, decodedUser.h, [0, 0, WD_SIZE, WD_SIZE], WD_SIZE);
+                applyLutToRgb(origRgb, WD_SIZE, WD_SIZE, bgPreserveHarmony);
+
+                const canvasRgb = new Uint8Array(WD_SIZE * WD_SIZE * 3);
+                drawCoverRgb(canvasRgb, decodedAi.rgb, decodedAi.w, decodedAi.h, [0, 0, WD_SIZE, WD_SIZE], WD_SIZE);
+                compositeForegroundWithAlpha(origRgb, canvasRgb, segRes.alpha, SIZE, WD_SIZE, true);
+
+                const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, WD_SIZE);
+                const outId = `tommm_ai_${tempId}.${encoded.ext}`;
+                await putImage(outId, encoded.bytes, encoded.mimeType);
+                LAST_DEBUG = {
+                  mode: "ai_bg_preserve_face_lock",
+                  aiModel: usedModel,
+                  segModelUsed: segRes.segModelUsed,
+                  maskApplied: true,
+                  fgRatio: segRes.fgRatio,
+                  filterId: aiReq.filterId,
+                  source: aiReq.source,
+                  promptPreview: effectivePrompt.slice(0, 220),
+                  got_input: !!imgBytes,
+                  input_bytes: preparedInput?.bytes?.length || 0,
+                  out_mime: encoded.mimeType,
+                  out_bytes: encoded.bytes.length,
+                  ms: Date.now() - t0,
+                  error: null,
+                  ts: new Date().toISOString(),
+                };
+                return buildLocketFilterResponse(`${url.origin}/ai-filters/${outId}`);
+              }
+            }
+          }
+        }
+
         // FLUX với POOL: Tạo diện mạo (custom_prompt) chạy FLUX.2-klein-4B KHÔNG ép strength — cấu hình
         // GIỮ MẶT/GÓC tốt (đã xác nhận chạy ổn). 9B mạnh hơn nhưng vẽ lại cả MẶT -> lệch mặt, nên bỏ.
         // Muốn thử model/strength khác: đặt env AI_3D_MODEL / AI_3D_STRENGTH / AI_3D_STEPS.
-        if (env.AI || env.CF_AI_ACCOUNTS) {
+        if (!aiOut && (env.AI || env.CF_AI_ACCOUNTS)) {
           const ai3dModel = (env && env.AI_3D_MODEL) || null;
           const ai3dOpts = (env && (env.AI_3D_STEPS || env.AI_3D_STRENGTH))
             ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
