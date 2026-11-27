@@ -1386,7 +1386,7 @@ for (var cl = 0; cl < CUSTOM_LUT_SPECS.length; cl++) {
 for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
     var sp = CUSTOM_FRAME_SPECS[cf];
     var is4 = sp[4] === 1;
-    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=5") : (FBASE + sp[0] + ".png");
+    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=6") : (FBASE + sp[0] + ".png");
     pushCustomFilter(sp[0], sp[1], sp[2], sp[3], cfIconUrl, is4 ? "square.grid.2x2" : "photo.on.rectangle", is4 ? "📸" : "🖼️");
 }
 for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
