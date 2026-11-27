@@ -532,7 +532,7 @@
           </summary>
           <div class="detail-body">
             Bấm nút <b>Cài Hồ Sơ DNS Giữ Gold</b> ở trên bằng Safari → chọn <b>Cho phép</b> → vào <b>Cài đặt → Đã tải về hồ sơ → Cài đặt</b>.<br>
-            Từ giờ khi không dùng Filter/AI hay app VIP khác, bạn có thể tắt VPN mà vẫn giữ được Locket Gold. <b>Lưu ý:</b> lúc cần tải filter/caption mới thì đổi DNS về Tự động trước rồi bật VPN lại.
+            Từ bản <b>v59</b>, cấu hình <code>Locket_Tommm_Cloud.conf</code> đã tích hợp sẵn <code>dns-server = 1.1.1.1, 8.8.8.8</code> + giữ cache 30 ngày cho 360+ Caption &amp; Filter AI. Khi tắt VPN, iOS giữ Locket Gold &amp; kho caption/filter đã nạp; khi bật VPN Shadowrocket lại thì Shadowrocket tự vượt qua lớp chặn DNS mà <b>không cần đổi DNS iPhone hay xóa app tải lại</b> (chỉ cần vuốt tắt mở lại Locket). <i>(Nếu bạn dùng Module Only trên Config gốc khác, nhớ thêm <code>dns-server = 1.1.1.1, 8.8.8.8</code> vào mục <code>[General]</code> của Config đó hoặc chỉnh DNS iPhone về Tự động khi cần tải lại.)</i>
           </div>
         </details>
       </div>
@@ -540,7 +540,7 @@
       <div class="section-title">Cập nhật bản mới sau này</div>
       <div class="info-box">
         • <b>Khi chỉ thêm Filter / Tarot / Giao diện mới:</b> Không cần cài lại Config — chỉ cần bật VPN Shadowrocket, vuốt tắt hẳn app Locket rồi mở lại là tự nhận.<br>
-        • <b>Khi có rule mới (như YouTube tự động):</b> Đổi DNS về Tự động → bấm nút <b>Cài / Update Module Only</b> (hoặc vuốt sang trái chọn Update trên config cũ trong Shadowrocket) → bật lại VPN.
+        • <b>Khi có rule mới (như YouTube tự động hoặc DNS v59):</b> Dùng Config gốc có <code>dns-server = 1.1.1.1, 8.8.8.8</code> (hoặc đổi DNS iPhone về Tự động) → bấm nút <b>Cài / Update Module Only</b> (hoặc vuốt sang trái chọn Update trên config cũ trong Shadowrocket) → bật lại VPN.
       </div>
     </section>
 
@@ -567,7 +567,7 @@
       <div class="info-box" style="margin-bottom:18px;border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.07)">
         <strong style="color:#f87171">⚠️ Giới hạn thực tế (Chưa dùng được trên bản này):</strong><br>
         • <b>Không bật được huy hiệu / logo Gold kế bên tên</b> (<code>Bạn</code> / <code>You</code>): Phần huy hiệu bên cạnh tên do server kiểm tra nên không thể kích hoạt trên bản Shadowrocket + DNS này.<br>
-        • <b>Không có nút Hẹn giờ &amp; nút đổi ống kính 0.5x / 2x</b>: Giao diện camera hiện chỉ có nút <b>Micro</b> và zoom mặc định <code>1x</code>.<br>
+        • <b>Giao diện camera mới (nút Hẹn giờ &amp; thanh .5x / 1x / 2x):</b> Locket tự phân nhóm A/B ngẫu nhiên theo từng lượt cài qua các cờ mã hóa nội bộ (<code>flag_*</code>) nên không ép bật qua Shadowrocket được. Với máy đang hiện giao diện 4 góc (<code>1x</code>), bạn bấm trực tiếp nút <code>1x</code> hoặc chụm 2 ngón tay để đổi zoom, và có thể dùng filter <b>Mắt Cá 0.5x</b> cho góc rộng.<br>
         • <b>Không chồng nhiều Filter cùng lúc</b>: Mỗi lần chụp chỉ chọn được 1 filter hoặc 1 khung.<br>
         • <b>Tắt VPN chỉ giữ Gold cơ bản &amp; caption đã cache</b>: Tất cả Filter, Photobooth, Tarot, LUT màu, AI và tự động đồng bộ nhạc YouTube đều bắt buộc bật VPN Shadowrocket khi chụp.
       </div>

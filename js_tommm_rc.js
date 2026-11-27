@@ -1,14 +1,11 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "58";
+var RC_VER = "59";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
     rcFinished = true;
     try { $done(res || {}); } catch (_) {}
-}
-function readRcStore(k) {
-    try { return (typeof $persistentStore !== "undefined" ? $persistentStore.read(k) : "") || ""; } catch (_) { return ""; }
 }
 function writeRcStore(v, k) {
     try { if (typeof $persistentStore !== "undefined") $persistentStore.write(String(v), k); } catch (_) {}
@@ -26,26 +23,6 @@ if (!hasLiveEntries || rawState === "NO_CHANGE") {
 }
 obj.state = "UPDATE";
 obj.entries = obj.entries || {};
-
-// Zero-PII diagnostic snapshot of all non-PII short live RC keys + feature_gates + camera (sent once per RC_VER)
-var camDiagSnapshot = null;
-try {
-    if (readRcStore("tommm_rc_cam_diag") !== RC_VER) {
-        camDiagSnapshot = {};
-        var rawKeys = Object.keys(obj.entries);
-        for (var dki = 0; dki < rawKeys.length; dki++) {
-            var dkName = rawKeys[dki];
-            if (dkName === "overlay_items" || dkName === "camera_filter_config" || dkName === "feature_discovery_popup_config") continue;
-            if (/token|url|email|phone|uid|secret|link|sentry|nimbus|history_ad|cdn|bucket/i.test(dkName)) continue;
-            var rawVal = String(obj.entries[dkName] || "");
-            if (dkName === "feature_gates") {
-                camDiagSnapshot[dkName] = rawVal.slice(0, 500);
-            } else if (dkName === "camera" || dkName === "camera_roll" || rawVal.length <= 160) {
-                camDiagSnapshot[dkName] = rawVal;
-            }
-        }
-    }
-} catch (_) { camDiagSnapshot = null; }
 
 // 1. Lưu lại overlay_items và camera_filter_config CHÍNH CHỦ mới nhất từ server Locket (không ghi cache thừa vào $persistentStore)
 var liveOverlayItems = [];
@@ -99,7 +76,7 @@ for (var dk in TOMMM_DEFAULTS) {
     }
 }
 
-var TOMMM_ENTRIES = {"upsell_features":"{\"app_icon_picker\":true,\"camera_roll\":true,\"camera_theme\":true,\"locket_views\":true,\"remove_ads\":true,\"custom_widget_frames\":true}","paywall_presentation_config":"{\"uid\":\"paywall_testflight\",\"onboarding\":false,\"after_sent_moment\":false,\"on_foreground\":false,\"interval\":2592000,\"profile_banner\":true}","android_subscribe_gold_button_enabled":"false","profile_badge_visible":"true","lunar_new_year_app_icon_enabled":"true","star_sign_caption_image_url":"https://storage.googleapis.com/locket-public/overlays/star_signs","history_ads_mode":"off","history_ads_prefetch_count":"0","history_ads_prefetch_immediate":"false","history_ads_prefetch_reroute":"false","history_ads_dynamic_insertion":"false","history_ads_refresh_prefetch_on_foreground":"false","history_ads_floor_price":"0","history_ads_floor_price_att":"0","history_ad_log_displayed_on_background":"false","history_ads_debug_menu":"false","history_ads_nimbus_interceptors":"[]","history_ads_nimbus_formats":"[]","sentry_sample_rate":"0","sentry_network_tracing":"false","sentry_performance_tracking":"false","sentry_trace_sample_rate":"0","sentry_profiles_sample_rate":"0","max_friends_count":"999999999","friend_limit_mode":"0","soft_friend_limit_threshold_count":"999999999","show_friend_limit_on_cam":"false","signup_max_friends_count":"999999999","celebrity_inbox_limit":"999999999","celebrity_inbox_enabled":"true","celebrity_vip_qr_redemption_enabled":"true","moment_views_enabled":"true","moment_views_v2":"true","record_moment_views":"true","notify_moment_views":"true","captions_enabled":"true","music_caption_enabled":"true","music_caption_song_preview_enabled":"true","link_caption_link_enabled":"true","rollcall_enabled":"true","rollcall_profile_button":"true","camera_filter_fetch_cache_max_age_seconds":"0","beta_features_enabled":"true","zoom_enabled":"true","camera_microphone_enabled":"true","video_sound_enabled":"true","audio_session_deactivation_enabled":"true","fetch_users_from_cloud_function":"true","user_cache_max_age_sec":"0","friends_cache_max_age_sec":"0","refresh_interval":"0","longer_camera_roll_videos_enabled":"true","camera_roll_preview_enabled":"true","camera_roll_video_enabled":"true","camera_roll_video_upload_enabled":"true","internal_camera_roll_video_upload_enabled":"true","can_record_long_video":"true","camera_roll_video_max_duration":"45","camera_roll_max_duration":"45","camera_roll_duration":"45","video_max_duration":"45","max_video_duration":"45","video_duration":"45","video_length_seconds":"45","max_video_length":"45","max_video_length_seconds":"45","longer_video_max_duration":"45","trim_max_duration":"45","video_trim_max_duration":"45","gold_max_duration":"45","quality_mbps":"0.42","qualityMbps":"0.42","camera_quality_mbps":"0.5","camera_roll_quality_mbps":"0.42","video_quality_mbps":"0.42","video_bitrate":"420000","bitrate":"420000","upload_main_image_quality":"0.6","upload_thumbnail_image_quality":"0.8","rollcall_share_templates":"{\"templates\":[\"bold\",\"pop_off\",\"stacking\",\"full_screen\",\"shadow_box\",\"collage\",\"pop_collage\"],\"random_order\":false}","time_travel_rewind_v2_share_templates":"{\"templates\":[\"rounded_square\",\"grid_collage\",\"cutout_collage\",\"rounded_square_bold\",\"wall_calendar\"],\"random_order\":false}","feature_discovery_popup_config":"{\"tag\":\"LOCKET GOLD\",\"tag_gradient\":true,\"tag_style\":\"gold_gradient\",\"title\":\"✨Tommm✨\",\"feature_set\":[{\"title\":\"Trải nghiệm Locket Gold nào! 💛\",\"body\":\"Đã mở khoá thành công Locket Gold! Hãy lưu giữ khoảnh khắc đáng nhớ và tận hưởng các tính năng cao cấp nhé!\",\"imageURL\":\"https://tommm1207.github.io/locket-tommm-studio/assets/welcome_icon.png\"}],\"primary_button_title\":\"Bắt đầu ngay\",\"campaign\":\"locket_gold_welcome_by_tommm_v15\",\"start_at\":\"2020-01-01T00:00:00\",\"end_at\":\"2099-12-31T23:59:59\",\"use_local_time_zone\":true}","overlay_dynamic_captions":"[\"standard\",\"poll\",\"color_palette\",\"review\",\"quote\",\"breaking_news\",\"music\",\"location\",\"weather\",\"time\",\"streak\",\"star_sign\",\"party_time\",\"locket_count\",\"good_morning\",\"goodnight\",\"ootd\",\"miss_you\",\"custom\",\"halloween_2026\"]","show_filter_button":"true","camera_filters_enabled":"true","ai_filters_enabled":"true","camera_filter_button_enabled":"true","allows_custom_filters":"true"};
+var TOMMM_ENTRIES = {"upsell_features":"{\"app_icon_picker\":true,\"camera_roll\":true,\"camera_theme\":true,\"locket_views\":true,\"remove_ads\":true,\"custom_widget_frames\":true}","paywall_presentation_config":"{\"uid\":\"paywall_testflight\",\"onboarding\":false,\"after_sent_moment\":false,\"on_foreground\":false,\"interval\":2592000,\"profile_banner\":true}","android_subscribe_gold_button_enabled":"false","profile_badge_visible":"true","lunar_new_year_app_icon_enabled":"true","star_sign_caption_image_url":"https://storage.googleapis.com/locket-public/overlays/star_signs","history_ads_mode":"off","history_ads_prefetch_count":"0","history_ads_prefetch_immediate":"false","history_ads_prefetch_reroute":"false","history_ads_dynamic_insertion":"false","history_ads_refresh_prefetch_on_foreground":"false","history_ads_floor_price":"0","history_ads_floor_price_att":"0","history_ad_log_displayed_on_background":"false","history_ads_debug_menu":"false","history_ads_nimbus_interceptors":"[]","history_ads_nimbus_formats":"[]","sentry_sample_rate":"0","sentry_network_tracing":"false","sentry_performance_tracking":"false","sentry_trace_sample_rate":"0","sentry_profiles_sample_rate":"0","max_friends_count":"999999999","friend_limit_mode":"0","soft_friend_limit_threshold_count":"999999999","show_friend_limit_on_cam":"false","signup_max_friends_count":"999999999","celebrity_inbox_limit":"999999999","celebrity_inbox_enabled":"true","celebrity_vip_qr_redemption_enabled":"true","moment_views_enabled":"true","moment_views_v2":"true","record_moment_views":"true","notify_moment_views":"true","captions_enabled":"true","music_caption_enabled":"true","music_caption_song_preview_enabled":"true","link_caption_link_enabled":"true","rollcall_enabled":"true","rollcall_profile_button":"true","camera_filter_fetch_cache_max_age_seconds":"2592000","beta_features_enabled":"true","zoom_enabled":"true","camera_microphone_enabled":"true","microphone_enabled":"true","overlay_navigator_enabled":"true","overlays_v2_config":"{\"suggestions_enabled\":true,\"logging_enabled\":false,\"remember_suggestions\":false,\"fetch_from_server\":false}","video_sound_enabled":"true","audio_session_deactivation_enabled":"true","fetch_users_from_cloud_function":"true","user_cache_max_age_sec":"172800","friends_cache_max_age_sec":"2592000","refresh_interval":"0","longer_camera_roll_videos_enabled":"true","camera_roll_preview_enabled":"true","camera_roll_video_enabled":"true","camera_roll_video_upload_enabled":"true","internal_camera_roll_video_upload_enabled":"true","can_record_long_video":"true","camera_roll_video_max_duration":"45","camera_roll_max_duration":"45","camera_roll_duration":"45","video_max_duration":"45","max_video_duration":"45","video_duration":"45","video_length_seconds":"45","max_video_length":"45","max_video_length_seconds":"45","longer_video_max_duration":"45","trim_max_duration":"45","video_trim_max_duration":"45","gold_max_duration":"45","quality_mbps":"0.42","qualityMbps":"0.42","camera_quality_mbps":"0.5","camera_roll_quality_mbps":"0.42","video_quality_mbps":"0.42","video_bitrate":"420000","bitrate":"420000","upload_main_image_quality":"0.6","upload_thumbnail_image_quality":"0.8","rollcall_share_templates":"{\"templates\":[\"bold\",\"pop_off\",\"stacking\",\"full_screen\",\"shadow_box\",\"collage\",\"pop_collage\"],\"random_order\":false}","time_travel_rewind_v2_share_templates":"{\"templates\":[\"rounded_square\",\"grid_collage\",\"cutout_collage\",\"rounded_square_bold\",\"wall_calendar\"],\"random_order\":false}","feature_discovery_popup_config":"{\"tag\":\"LOCKET GOLD\",\"tag_gradient\":true,\"tag_style\":\"gold_gradient\",\"title\":\"✨Tommm✨\",\"feature_set\":[{\"title\":\"Trải nghiệm Locket Gold nào! 💛\",\"body\":\"Đã mở khoá thành công Locket Gold! Hãy lưu giữ khoảnh khắc đáng nhớ và tận hưởng các tính năng cao cấp nhé!\",\"imageURL\":\"https://tommm1207.github.io/locket-tommm-studio/assets/welcome_icon.png\"}],\"primary_button_title\":\"Bắt đầu ngay\",\"campaign\":\"locket_gold_welcome_by_tommm_v15\",\"start_at\":\"2020-01-01T00:00:00\",\"end_at\":\"2099-12-31T23:59:59\",\"use_local_time_zone\":true}","overlay_dynamic_captions":"[\"standard\",\"poll\",\"color_palette\",\"review\",\"quote\",\"breaking_news\",\"music\",\"location\",\"weather\",\"time\",\"streak\",\"star_sign\",\"party_time\",\"locket_count\",\"good_morning\",\"goodnight\",\"ootd\",\"miss_you\",\"custom\",\"halloween_2026\"]","show_filter_button":"true","camera_filters_enabled":"true","ai_filters_enabled":"true","camera_filter_button_enabled":"true","allows_custom_filters":"true"};
 Object.assign(obj.entries, TOMMM_ENTRIES);
 
 // JSON-merge camera (chỉ giữ các key Codable đã kiểm chứng trên Locket để iOS không từ chối giải mã camera JSON)
@@ -477,23 +454,5 @@ activeFilterCfg.remote_filters = mergedRemote;
 obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 
 writeRcStore(RC_VER, "tommm_rc_applied_ver");
-var outBody = JSON.stringify(obj);
-if (camDiagSnapshot && typeof $httpClient !== "undefined") {
-    writeRcStore(RC_VER, "tommm_rc_cam_diag");
-    var diagDoneTimer = typeof setTimeout !== "undefined" ? setTimeout(function() { finishOnce({ body: outBody }); }, 700) : null;
-    try {
-        $httpClient.post({
-            url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/rc-camera-debug",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ver: RC_VER, keys: camDiagSnapshot })
-        }, function() {
-            if (diagDoneTimer && typeof clearTimeout !== "undefined") clearTimeout(diagDoneTimer);
-            finishOnce({ body: outBody });
-        });
-        return;
-    } catch (_) {
-        if (diagDoneTimer && typeof clearTimeout !== "undefined") clearTimeout(diagDoneTimer);
-    }
-}
-finishOnce({ body: outBody });
+finishOnce({ body: JSON.stringify(obj) });
 })();
