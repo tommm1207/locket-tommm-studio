@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "53";
+var RC_VER = "55";
 function writeRcStore(v, k) {
     try { if (typeof $persistentStore !== "undefined") $persistentStore.write(String(v), k); } catch (_) {}
 }
@@ -241,9 +241,11 @@ if (restoredItems.length > 0) {
 for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
     var secObj = EXTRA_SECTIONS[i];
     var rawItems = secObj.items || [];
-    if (secObj.section && secObj.section.indexOf("Phát Nhạc") !== -1) {
-        var ytLabel = "YouTube • Mở nhạc để tự nhận";
+    var isMusicSec = !!(secObj.section && secObj.section.indexOf("Phát Nhạc") !== -1);
+    if (isMusicSec) {
+        var ytLabel = "YouTube • Tự gắn bài đang nghe";
         var ytColors = ["#991B1B", "#DC2626"];
+        var ytIcon = { type: "sf_symbol", data: "music.note" };
         try {
             if (typeof $persistentStore !== "undefined") {
                 var rawYt = $persistentStore.read("tommm_yt_now_playing");
@@ -253,6 +255,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                         ytLabel = yt.artist ? (yt.title + " - " + yt.artist) : yt.title;
                         if (ytLabel.length > 36) ytLabel = ytLabel.slice(0, 35) + "…";
                         if (Array.isArray(yt.colors) && yt.colors.length >= 2) ytColors = yt.colors.slice(0, 2);
+                        if (yt.artworkUrl) ytIcon = { type: "image", data: yt.artworkUrl, source: "url" };
                     }
                 }
             }
@@ -265,7 +268,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                 text: ytLabel,
                 max_lines: 1,
                 text_color: "#FFFFFF",
-                icon: { type: "sf_symbol", data: "music.note" },
+                icon: ytIcon,
                 background: { colors: ytColors }
             }
         }].concat(rawItems);
@@ -279,7 +282,11 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         }
     }
     if (cleanItems.length > 0) {
-        mergedOverlays.push({ section: secObj.section, items: cleanItems });
+        if (isMusicSec && mergedOverlays.length >= 1) {
+            mergedOverlays.splice(1, 0, { section: secObj.section, items: cleanItems });
+        } else {
+            mergedOverlays.push({ section: secObj.section, items: cleanItems });
+        }
     }
 }
 obj.entries["overlay_items"] = JSON.stringify(mergedOverlays);
