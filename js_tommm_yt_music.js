@@ -4,7 +4,14 @@
     if (!req || !req.url) { $done({}); return; }
     var u = String(req.url);
     var WORKER_BASE = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev";
+    var VINYL_ICON_URL = "https://tommm1207.github.io/locket-tommm-studio/assets/captions_anim/vinyl_disc_icon.gif";
     var finished = false;
+
+    function vinylBgUrl(cols) {
+        var c0 = String((cols && cols[0]) || "#1E1B4B").replace(/[^0-9a-fA-F]/g, "") || "1E1B4B";
+        var c1 = String((cols && cols[1]) || "#4C1D95").replace(/[^0-9a-fA-F]/g, "") || "4C1D95";
+        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&v=1";
+    }
 
     function finishOnce(res) {
         if (finished) return;
@@ -136,13 +143,16 @@
                         finishOnce({});
                     });
                 }
-                if ((ov.overlay_id === "caption:yt_now_playing" || (ov.overlay_id && ov.overlay_id.indexOf("yt_now_playing") !== -1)) && typeof $persistentStore !== "undefined") {
+                var isYtOv = (ov.overlay_id === "caption:yt_now_playing" || ov.overlay_id === "caption:yt_vinyl_spin" || (ov.overlay_id && ov.overlay_id.indexOf("yt_now_playing") !== -1));
+                if (isYtOv && typeof $persistentStore !== "undefined") {
+                    var isVinylIconMode = ov.overlay_id === "caption:yt_vinyl_spin";
                     var rawYt = $persistentStore.read("tommm_yt_now_playing");
                     if (rawYt) {
                         var track = JSON.parse(rawYt);
                         if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
                             var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
                             var displayTxt = track.artist ? (track.title + " - " + track.artist) : track.title;
+                            var chosenIcon = isVinylIconMode ? VINYL_ICON_URL : (track.artworkUrl || VINYL_ICON_URL);
                             var musicData = {
                                 song_title: track.title,
                                 artist: track.artist || "YouTube Music",
@@ -162,8 +172,11 @@
                                     text: displayTxt,
                                     text_color: "#FFFFFF",
                                     max_lines: 1,
-                                    background: { colors: bgCols },
-                                    icon: { type: "image", data: track.artworkUrl || "", source: "url" },
+                                    background: {
+                                        colors: bgCols,
+                                        image: { type: "image", data: vinylBgUrl(bgCols), source: "url" }
+                                    },
+                                    icon: { type: "image", data: chosenIcon, source: "url" },
                                     payload: musicData,
                                     music: musicData
                                 }

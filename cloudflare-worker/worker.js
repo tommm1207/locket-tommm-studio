@@ -254,6 +254,8 @@ let LAST_CAPTION_DEBUG = null;
 const YT_TRACK_CACHE = new Map();
 let LAST_YT_TRACK = null;
 let LAST_MUSIC_SCHEMA = null;
+let LAST_RC_CAMERA_DEBUG = null;
+const VINYL_GIF_CACHE = new Map();
 let CAPTION_MODE_OVERRIDE = null;
 let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
@@ -3465,6 +3467,227 @@ async function resolveYoutubeTrack(videoId) {
   return track;
 }
 
+function parseHexRgb(hexStr, fallback) {
+  const clean = String(hexStr || "").replace(/[^0-9a-fA-F]/g, "");
+  if (clean.length !== 6) return fallback;
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
+  ];
+}
+
+function mixRgb(a, b, t) {
+  return [
+    Math.max(0, Math.min(255, Math.round(a[0] * (1 - t) + b[0] * t))),
+    Math.max(0, Math.min(255, Math.round(a[1] * (1 - t) + b[1] * t))),
+    Math.max(0, Math.min(255, Math.round(a[2] * (1 - t) + b[2] * t))),
+  ];
+}
+
+function renderDynamicVinylGif(hex0, hex1) {
+  const c0Hex = /^[0-9a-fA-F]{6}$/.test(String(hex0 || "")) ? String(hex0).toUpperCase() : "1E1B4B";
+  const c1Hex = /^[0-9a-fA-F]{6}$/.test(String(hex1 || "")) ? String(hex1).toUpperCase() : "4C1D95";
+  const cacheKey = `${c0Hex}_${c1Hex}`;
+  if (VINYL_GIF_CACHE.has(cacheKey)) return VINYL_GIF_CACHE.get(cacheKey);
+
+  const rawC0 = parseHexRgb(c0Hex, [30, 27, 75]);
+  const rawC1 = parseHexRgb(c1Hex, [76, 29, 149]);
+  // Slightly deepen background so white caption text & spinning vinyl contrast cleanly
+  const bgA = mixRgb(rawC0, [10, 10, 14], 0.32);
+  const bgB = mixRgb(rawC1, [16, 16, 22], 0.25);
+
+  const palette = [];
+  // 0..11: 12 smooth gradient shades
+  for (let i = 0; i < 12; i++) palette.push(mixRgb(bgA, bgB, i / 11));
+  // 12..21: 10 glossy vinyl LP disc shades
+  palette.push(
+    [9, 9, 11],
+    [16, 16, 20],
+    [25, 25, 31],
+    [38, 38, 47],
+    [60, 62, 74],
+    [92, 96, 110],
+    [132, 136, 150],
+    [176, 180, 192],
+    [216, 220, 228],
+    [244, 245, 247]
+  );
+  // 22..27: 6 vivid center-label & rotating-notch shades derived from song colors + gold + white
+  const lblLight = mixRgb(rawC1, [255, 240, 200], 0.42);
+  palette.push(
+    rawC0,
+    mixRgb(rawC0, rawC1, 0.5),
+    rawC1,
+    lblLight,
+    [250, 204, 21],
+    [255, 255, 255]
+  );
+  // 28..31: 4 micro equalizer bar tints
+  const eqBase = mixRgb(rawC1, [255, 255, 255], 0.45);
+  palette.push(
+    mixRgb(bgB, eqBase, 0.45),
+    mixRgb(bgB, eqBase, 0.65),
+    mixRgb(bgB, eqBase, 0.85),
+    mixRgb(eqBase, [255, 255, 255], 0.35)
+  );
+
+  const W = 200;
+  const H = 48;
+  const FRAMES = 12;
+  const CX = 176;
+  const CY = 24;
+  const R_DISC = 17.5;
+  const out = [];
+
+  const pushU16 = (v) => { out.push(v & 0xff, (v >> 8) & 0xff); };
+  const pushStr = (s) => { for (let i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); };
+
+  // GIF89a Header + Logical Screen Descriptor (32 colors => packed=0xF4, size bits = 4)
+  pushStr("GIF89a");
+  pushU16(W);
+  pushU16(H);
+  out.push(0xF4, 0x00, 0x00);
+  for (let i = 0; i < 32; i++) {
+    const c = palette[i];
+    out.push(c[0], c[1], c[2]);
+  }
+  // Netscape 2.0 infinite loop extension
+  out.push(0x21, 0xFF, 0x0B);
+  pushStr("NETSCAPE2.0");
+  out.push(0x03, 0x01, 0x00, 0x00, 0x00);
+
+  function encodeLzw(indices) {
+    const minCodeSize = 5;
+    const clearCode = 32;
+    const eoiCode = 33;
+    let codeSize = 6;
+    let nextCode = 34;
+    let dict = new Map();
+    const bytes = [];
+    let bitBuf = 0;
+    let bitCount = 0;
+
+    const emit = (code, bits) => {
+      bitBuf |= (code & ((1 << bits) - 1)) << bitCount;
+      bitCount += bits;
+      while (bitCount >= 8) {
+        bytes.push(bitBuf & 0xff);
+        bitBuf >>= 8;
+        bitCount -= 8;
+      }
+    };
+
+    emit(clearCode, codeSize);
+    let prefix = indices[0];
+    for (let i = 1; i < indices.length; i++) {
+      const k = indices[i];
+      const key = (prefix << 6) | k;
+      const hit = dict.get(key);
+      if (hit !== undefined) {
+        prefix = hit;
+      } else {
+        emit(prefix, codeSize);
+        if (nextCode < 4096) {
+          dict.set(key, nextCode++);
+          if (nextCode > (1 << codeSize) && codeSize < 12) codeSize++;
+        } else {
+          emit(clearCode, codeSize);
+          dict = new Map();
+          nextCode = 34;
+          codeSize = 6;
+        }
+        prefix = k;
+      }
+    }
+    emit(prefix, codeSize);
+    emit(eoiCode, codeSize);
+    if (bitCount > 0) bytes.push(bitBuf & 0xff);
+
+    out.push(minCodeSize);
+    for (let i = 0; i < bytes.length; i += 255) {
+      const chunkLen = Math.min(255, bytes.length - i);
+      out.push(chunkLen);
+      for (let j = 0; j < chunkLen; j++) out.push(bytes[i + j]);
+    }
+    out.push(0x00);
+  }
+
+  const pixels = new Uint8Array(W * H);
+  for (let f = 0; f < FRAMES; f++) {
+    const theta = (2 * Math.PI * f) / FRAMES;
+    // Graphic Control Extension (80ms = delay 8 * 10ms)
+    out.push(0x21, 0xF9, 0x04, 0x04);
+    pushU16(8);
+    out.push(0x00, 0x00);
+    // Image Descriptor
+    out.push(0x2C);
+    pushU16(0);
+    pushU16(0);
+    pushU16(W);
+    pushU16(H);
+    out.push(0x00);
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        // Base gradient index
+        const gx = Math.min(11, Math.max(0, Math.round((x / (W - 1)) * 9 + (y / (H - 1)) * 2)));
+        let idx = gx;
+
+        // Micro equalizer shimmer along bottom-left (x < 142, bottom 7px)
+        if (x >= 8 && x < 142 && y >= H - 8 && y < H - 2) {
+          const mod = (x - 8) % 6;
+          if (mod < 3) {
+            const barId = Math.floor((x - 8) / 6);
+            const wave = 0.5 + 0.5 * Math.sin(theta + barId * 0.58);
+            const barH = 2 + Math.round(wave * 4.5);
+            if (y >= H - 2 - barH) {
+              idx = 28 + Math.min(3, Math.floor(wave * 3.9));
+            }
+          }
+        }
+
+        // Spinning glossy LP vinyl disc on the right side
+        const dx = x - CX;
+        const dy = y - CY;
+        const r = Math.hypot(dx, dy);
+        if (r <= R_DISC) {
+          const angle = Math.atan2(dy, dx);
+          if (r <= 2.1) {
+            idx = 12;
+          } else if (r <= 6.8) {
+            const rotNotch = Math.cos(angle - theta);
+            const tLbl = 0.5 + 0.5 * Math.sin(angle - theta);
+            if (rotNotch > 0.68 && r > 3.2) {
+              idx = rotNotch > 0.88 ? 27 : 26;
+            } else {
+              idx = 22 + Math.min(3, Math.floor(tLbl * 3.99));
+            }
+          } else {
+            const groove = 0.5 + 0.5 * Math.sin(r * 1.85);
+            const c = Math.max(0, Math.cos(2 * (angle - theta + 0.55)));
+            const sheen = c * c * c * c;
+            let tone = 0.08 * groove + 0.88 * sheen;
+            if (r > R_DISC - 1.2) tone = Math.max(tone, 0.38);
+            idx = 12 + Math.min(9, Math.max(0, Math.floor(tone * 9.99)));
+          }
+        }
+        pixels[y * W + x] = idx;
+      }
+    }
+    encodeLzw(pixels);
+  }
+  out.push(0x3B);
+
+  const buf = new Uint8Array(out);
+  if (VINYL_GIF_CACHE.size >= 30) {
+    const first = VINYL_GIF_CACHE.keys().next().value;
+    if (first) VINYL_GIF_CACHE.delete(first);
+  }
+  VINYL_GIF_CACHE.set(cacheKey, buf);
+  return buf;
+}
+
   // 2.35 YouTube / YT Music -> Locket Music Caption Auto Sync + Schema Inspector
   if (url.pathname === "/studio/yt-now-playing") {
     if (request.method === "GET") {
@@ -3490,6 +3713,19 @@ async function resolveYoutubeTrack(videoId) {
     }
   }
 
+  if (url.pathname === "/studio/vinyl-bg.gif" && request.method === "GET") {
+    const c0 = url.searchParams.get("c0") || "1E1B4B";
+    const c1 = url.searchParams.get("c1") || "4C1D95";
+    const gifBytes = renderDynamicVinylGif(c0, c1);
+    return new Response(gifBytes, {
+      status: 200,
+      headers: corsHeaders({
+        "Content-Type": "image/gif",
+        "Cache-Control": "public, max-age=86400",
+      }),
+    });
+  }
+
   if (url.pathname === "/studio/music-schema-log") {
     if (request.method === "GET") {
       return new Response(JSON.stringify({ ok: true, schema: LAST_MUSIC_SCHEMA }), {
@@ -3500,6 +3736,23 @@ async function resolveYoutubeTrack(videoId) {
     if (request.method === "POST") {
       const b = await request.json().catch(() => ({}));
       LAST_MUSIC_SCHEMA = { schema: b, ts: new Date().toISOString() };
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
+  }
+
+  if (url.pathname === "/studio/rc-camera-debug") {
+    if (request.method === "GET") {
+      return new Response(JSON.stringify({ ok: true, debug: LAST_RC_CAMERA_DEBUG }), {
+        status: 200,
+        headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
+      });
+    }
+    if (request.method === "POST") {
+      const b = await request.json().catch(() => ({}));
+      LAST_RC_CAMERA_DEBUG = { snapshot: b, ts: new Date().toISOString() };
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
