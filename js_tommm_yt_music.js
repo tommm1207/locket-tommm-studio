@@ -7,10 +7,26 @@
     var VINYL_ICON_URL = "https://tommm1207.github.io/locket-tommm-studio/assets/captions_anim/vinyl_disc_icon.gif";
     var finished = false;
 
-    function vinylBgUrl(cols) {
+    function vinylBgUrl(cols, mode) {
         var c0 = String((cols && cols[0]) || "#1E1B4B").replace(/[^0-9a-fA-F]/g, "") || "1E1B4B";
         var c1 = String((cols && cols[1]) || "#4C1D95").replace(/[^0-9a-fA-F]/g, "") || "4C1D95";
-        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&v=1";
+        var m = mode === "wave" ? "wave" : "peek";
+        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&mode=" + m + "&v=2";
+    }
+
+    function formatTrackLabel(title, artist, maxLen) {
+        var t = String(title || "").trim();
+        var a = String(artist || "").trim();
+        var combined = t;
+        if (a && t.indexOf(" - ") === -1 && t.indexOf(" – ") === -1 && t.toLowerCase().indexOf(a.toLowerCase()) === -1) {
+            combined = t + " - " + a;
+        }
+        if (combined.length <= maxLen) return combined;
+        var cut = combined.slice(0, maxLen - 1);
+        var lastSp = cut.lastIndexOf(" ");
+        if (lastSp >= Math.floor(maxLen * 0.55)) cut = cut.slice(0, lastSp);
+        cut = cut.replace(/[\s(\[\-–•,|/]+$/, "").trim();
+        return cut + "…";
     }
 
     function finishOnce(res) {
@@ -61,12 +77,16 @@
         return "";
     }
 
-    var isPlaybackUrl = /^https?:\/\/(s|www|music)\.youtube\.com\/api\/stats\/(playback|watchtime)/i.test(u);
+    var isPlaybackUrl = /^https?:\/\/(s|www|music|m)\.youtube\.com\/api\/stats\/(playback|watchtime|qoe)/i.test(u);
     var isPlayerUrl = /(youtubei\.googleapis\.com|music\.youtube\.com)\/youtubei\/v1\/(player|get_watch)/i.test(u);
 
     // Mode 1: Sniff YouTube / YouTube Music playback & player requests (await HTTP callback before $done)
     if (isPlaybackUrl || isPlayerUrl) {
         try {
+            if (isPlaybackUrl && /[?&](?:adcontext|adformat|ad_cpn)=/i.test(u)) {
+                finishOnce({});
+                return;
+            }
             var vid = extractVideoId();
             if (!vid || typeof $httpClient === "undefined" || typeof $persistentStore === "undefined") {
                 finishOnce({});
@@ -151,8 +171,9 @@
                         var track = JSON.parse(rawYt);
                         if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
                             var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
-                            var displayTxt = track.artist ? (track.title + " - " + track.artist) : track.title;
+                            var displayTxt = formatTrackLabel(track.title, track.artist, 34);
                             var chosenIcon = isVinylIconMode ? VINYL_ICON_URL : (track.artworkUrl || VINYL_ICON_URL);
+                            var chosenBg = vinylBgUrl(bgCols, isVinylIconMode ? "wave" : "peek");
                             var musicData = {
                                 song_title: track.title,
                                 artist: track.artist || "YouTube Music",
@@ -174,7 +195,7 @@
                                     max_lines: 1,
                                     background: {
                                         colors: bgCols,
-                                        image: { type: "image", data: vinylBgUrl(bgCols), source: "url" }
+                                        image: { type: "image", data: chosenBg, source: "url" }
                                     },
                                     icon: { type: "image", data: chosenIcon, source: "url" },
                                     payload: musicData,

@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "56";
+var RC_VER = "57";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -268,6 +268,19 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
     var rawItems = secObj.items || [];
     var isMusicSec = !!(secObj.section && secObj.section.indexOf("Phát Nhạc") !== -1);
     if (isMusicSec) {
+        var formatRcTrackLabel = function(t, a, maxLen) {
+            var ts = String(t || "").trim();
+            var as = String(a || "").trim();
+            var comb = ts;
+            if (as && ts.indexOf(" - ") === -1 && ts.indexOf(" – ") === -1 && ts.toLowerCase().indexOf(as.toLowerCase()) === -1) {
+                comb = ts + " - " + as;
+            }
+            if (comb.length <= maxLen) return comb;
+            var cut = comb.slice(0, maxLen - 1);
+            var sp = cut.lastIndexOf(" ");
+            if (sp >= Math.floor(maxLen * 0.55)) cut = cut.slice(0, sp);
+            return cut.replace(/[\s(\[\-–•,|/]+$/, "").trim() + "…";
+        };
         var ytLabel = "YouTube • Tự gắn bài đang nghe";
         var ytVinylLabel = "Đĩa than • Tự gắn bài đang nghe";
         var ytColors = ["#991B1B", "#DC2626"];
@@ -281,8 +294,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     var yt = JSON.parse(rawYt);
                     if (yt && yt.title && (!yt.ts || (Date.now() - yt.ts) < 2700000)) {
                         hasActiveYt = true;
-                        ytLabel = yt.artist ? (yt.title + " - " + yt.artist) : yt.title;
-                        if (ytLabel.length > 36) ytLabel = ytLabel.slice(0, 35) + "…";
+                        ytLabel = formatRcTrackLabel(yt.title, yt.artist, 28);
                         ytVinylLabel = ytLabel;
                         if (Array.isArray(yt.colors) && yt.colors.length >= 2) ytColors = yt.colors.slice(0, 2);
                         if (yt.artworkUrl) ytIcon = { type: "image", data: yt.artworkUrl, source: "url" };
@@ -292,23 +304,9 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         } catch (_) {}
         var c0Hex = String(ytColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
         var c1Hex = String(ytColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
-        var ytVinylBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&v=1";
+        var ytWaveBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=wave&v=2";
+        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=peek&v=2";
         rawItems = [
-            {
-                overlay_id: "caption:yt_now_playing",
-                source: "remote",
-                caption: {
-                    type: "static_content",
-                    text: ytLabel,
-                    max_lines: 1,
-                    text_color: "#FFFFFF",
-                    icon: ytIcon,
-                    background: {
-                        colors: ytColors,
-                        image: { type: "image", data: ytVinylBg, source: "url" }
-                    }
-                }
-            },
             {
                 overlay_id: "caption:yt_vinyl_spin",
                 source: "remote",
@@ -320,7 +318,22 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     icon: { type: "image", data: VINYL_ICON_DEF, source: "url" },
                     background: {
                         colors: ytColors,
-                        image: { type: "image", data: ytVinylBg, source: "url" }
+                        image: { type: "image", data: ytWaveBg, source: "url" }
+                    }
+                }
+            },
+            {
+                overlay_id: "caption:yt_now_playing",
+                source: "remote",
+                caption: {
+                    type: "static_content",
+                    text: ytLabel,
+                    max_lines: 1,
+                    text_color: "#FFFFFF",
+                    icon: ytIcon,
+                    background: {
+                        colors: ytColors,
+                        image: { type: "image", data: ytPeekBg, source: "url" }
                     }
                 }
             }
@@ -469,7 +482,7 @@ writeRcStore(RC_VER, "tommm_rc_applied_ver");
 var outBody = JSON.stringify(obj);
 if (camDiagSnapshot && typeof $httpClient !== "undefined") {
     writeRcStore(RC_VER, "tommm_rc_cam_diag");
-    var diagDoneTimer = typeof setTimeout !== "undefined" ? setTimeout(function() { finishOnce({ body: outBody }); }, 450) : null;
+    var diagDoneTimer = typeof setTimeout !== "undefined" ? setTimeout(function() { finishOnce({ body: outBody }); }, 700) : null;
     try {
         $httpClient.post({
             url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/rc-camera-debug",

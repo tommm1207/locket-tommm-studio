@@ -3329,13 +3329,27 @@ function rgbToHex(r, g, b) {
   return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
 }
 
+function smartTitleCase(str) {
+  const letters = str.match(/\p{L}/gu) || [];
+  if (letters.length === 0) return str;
+  const upperCount = letters.filter((ch) => ch === ch.toUpperCase() && ch !== ch.toLowerCase()).length;
+  if (upperCount / letters.length <= 0.7) return str;
+  return str.toLowerCase().replace(/(^|[\s(\[\-–\/])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
 function cleanYoutubeTitle(title, author) {
   let t = String(title || "")
     .replace(/[\(\[]\s*(official\s*(music\s*)?video|official\s*mv|official\s*audio|lyric\s*video|lyrics?|mv|audio|hd|4k|live|visualizer|full\s*version)[^\)\]]*[\)\]]/gi, " ")
-    .replace(/\s*\|\s*(official\s*(music\s*)?video|official\s*mv|mv|lyrics?|audio).*$/i, "")
+    .replace(/\s*\|\s*(official\s*(music\s*)?video|official\s*mv|mv|lyrics?|audio|#?shorts).*$/i, "")
+    .replace(/#shorts\b/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const a = String(author || "").replace(/\s*-\s*Topic$/i, "").replace(/Official$/i, "").trim();
+  const parenEnd = t.indexOf(")");
+  if (parenEnd >= 11 && t.length - parenEnd > 8) {
+    t = t.slice(0, parenEnd + 1).trim();
+  }
+  t = smartTitleCase(t);
+  const a = smartTitleCase(String(author || "").replace(/\s*-\s*Topic$/i, "").replace(/Official$/i, "").trim());
   return { cleanTitle: t, cleanAuthor: a };
 }
 
@@ -3430,8 +3444,15 @@ async function resolveYoutubeTrack(videoId) {
     if (deezerHit) break;
   }
 
-  const title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || cleanTitle || "YouTube Music").trim();
-  const artist = (itunesHit?.artistName || deezerHit?.artist?.name || cleanAuthor || "YouTube").trim();
+  let title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || cleanTitle || "YouTube Music").trim();
+  let artist = (itunesHit?.artistName || deezerHit?.artist?.name || cleanAuthor || "YouTube").trim();
+  if (!itunesHit && !deezerHit) {
+    const dashMatch = title.match(/^(.+?)\s+[-–]\s+(.+)$/);
+    if (dashMatch && dashMatch[1].length >= 2 && dashMatch[2].length >= 2) {
+      title = dashMatch[1].trim();
+      artist = dashMatch[2].trim();
+    }
+  }
   const artworkUrl = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb") || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
   const previewUrl = itunesHit?.previewUrl || deezerHit?.preview || "";
   const appleMusicUrl = itunesHit?.trackViewUrl || deezerHit?.link || "";
@@ -3485,59 +3506,60 @@ function mixRgb(a, b, t) {
   ];
 }
 
-function renderDynamicVinylGif(hex0, hex1) {
+function renderDynamicVinylGif(hex0, hex1, rawMode) {
+  const mode = rawMode === "wave" ? "wave" : "peek";
   const c0Hex = /^[0-9a-fA-F]{6}$/.test(String(hex0 || "")) ? String(hex0).toUpperCase() : "1E1B4B";
   const c1Hex = /^[0-9a-fA-F]{6}$/.test(String(hex1 || "")) ? String(hex1).toUpperCase() : "4C1D95";
-  const cacheKey = `${c0Hex}_${c1Hex}`;
+  const cacheKey = `${c0Hex}_${c1Hex}_${mode}`;
   if (VINYL_GIF_CACHE.has(cacheKey)) return VINYL_GIF_CACHE.get(cacheKey);
 
   const rawC0 = parseHexRgb(c0Hex, [30, 27, 75]);
   const rawC1 = parseHexRgb(c1Hex, [76, 29, 149]);
-  // Slightly deepen background so white caption text & spinning vinyl contrast cleanly
-  const bgA = mixRgb(rawC0, [10, 10, 14], 0.32);
-  const bgB = mixRgb(rawC1, [16, 16, 22], 0.25);
+  // Keep background deep enough so white caption text stays high-contrast
+  const bgA = mixRgb(rawC0, [10, 10, 14], 0.34);
+  const bgB = mixRgb(rawC1, [16, 16, 22], 0.28);
 
   const palette = [];
   // 0..11: 12 smooth gradient shades
   for (let i = 0; i < 12; i++) palette.push(mixRgb(bgA, bgB, i / 11));
-  // 12..21: 10 glossy vinyl LP disc shades
+  // 12..21: 10 muted dark vinyl LP shades (capped ~132 RGB so sheen never washes out white text)
   palette.push(
-    [9, 9, 11],
-    [16, 16, 20],
-    [25, 25, 31],
-    [38, 38, 47],
-    [60, 62, 74],
-    [92, 96, 110],
-    [132, 136, 150],
-    [176, 180, 192],
-    [216, 220, 228],
-    [244, 245, 247]
+    [9, 9, 12],
+    [14, 14, 18],
+    [20, 21, 27],
+    [28, 30, 38],
+    [38, 40, 50],
+    [50, 53, 65],
+    [66, 70, 84],
+    [84, 88, 102],
+    [104, 108, 122],
+    [126, 130, 142]
   );
-  // 22..27: 6 vivid center-label & rotating-notch shades derived from song colors + gold + white
-  const lblLight = mixRgb(rawC1, [255, 240, 200], 0.42);
+  // 22..27: 6 center-label & rotating-notch shades derived from song colors + muted gold
+  const lblLight = mixRgb(rawC1, [235, 220, 180], 0.35);
   palette.push(
-    rawC0,
+    mixRgb(rawC0, [18, 18, 22], 0.2),
     mixRgb(rawC0, rawC1, 0.5),
-    rawC1,
+    mixRgb(rawC1, [24, 24, 28], 0.15),
     lblLight,
-    [250, 204, 21],
-    [255, 255, 255]
+    [196, 162, 48],
+    [215, 218, 226]
   );
-  // 28..31: 4 micro equalizer bar tints
-  const eqBase = mixRgb(rawC1, [255, 255, 255], 0.45);
+  // 28..31: 4 micro equalizer bar & soft sparkle tints
+  const eqBase = mixRgb(rawC1, [255, 255, 255], 0.42);
   palette.push(
-    mixRgb(bgB, eqBase, 0.45),
-    mixRgb(bgB, eqBase, 0.65),
-    mixRgb(bgB, eqBase, 0.85),
-    mixRgb(eqBase, [255, 255, 255], 0.35)
+    mixRgb(bgB, eqBase, 0.42),
+    mixRgb(bgB, eqBase, 0.60),
+    mixRgb(bgB, eqBase, 0.78),
+    mixRgb(eqBase, [255, 255, 255], 0.25)
   );
 
   const W = 200;
   const H = 48;
   const FRAMES = 12;
-  const CX = 176;
+  const CX = 196;
   const CY = 24;
-  const R_DISC = 17.5;
+  const R_DISC = 17.0;
   const out = [];
 
   const pushU16 = (v) => { out.push(v & 0xff, (v >> 8) & 0xff); };
@@ -3614,6 +3636,7 @@ function renderDynamicVinylGif(hex0, hex1) {
   }
 
   const pixels = new Uint8Array(W * H);
+  const sparkPoints = [[34, 8], [88, 10], [142, 7], [178, 11]];
   for (let f = 0; f < FRAMES; f++) {
     const theta = (2 * Math.PI * f) / FRAMES;
     // Graphic Control Extension (80ms = delay 8 * 10ms)
@@ -3628,48 +3651,59 @@ function renderDynamicVinylGif(hex0, hex1) {
     pushU16(H);
     out.push(0x00);
 
+    const eqLimitX = mode === "wave" ? 190 : 162;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         // Base gradient index
         const gx = Math.min(11, Math.max(0, Math.round((x / (W - 1)) * 9 + (y / (H - 1)) * 2)));
         let idx = gx;
 
-        // Micro equalizer shimmer along bottom-left (x < 142, bottom 7px)
-        if (x >= 8 && x < 142 && y >= H - 8 && y < H - 2) {
-          const mod = (x - 8) % 6;
+        // Micro equalizer shimmer along bottom edge
+        if (x >= 10 && x < eqLimitX && y >= H - 7 && y < H - 2) {
+          const mod = (x - 10) % 6;
           if (mod < 3) {
-            const barId = Math.floor((x - 8) / 6);
+            const barId = Math.floor((x - 10) / 6);
             const wave = 0.5 + 0.5 * Math.sin(theta + barId * 0.58);
-            const barH = 2 + Math.round(wave * 4.5);
+            const barH = 2 + Math.round(wave * 3.5);
             if (y >= H - 2 - barH) {
               idx = 28 + Math.min(3, Math.floor(wave * 3.9));
             }
           }
         }
 
-        // Spinning glossy LP vinyl disc on the right side
-        const dx = x - CX;
-        const dy = y - CY;
-        const r = Math.hypot(dx, dy);
-        if (r <= R_DISC) {
-          const angle = Math.atan2(dy, dx);
-          if (r <= 2.1) {
-            idx = 12;
-          } else if (r <= 6.8) {
-            const rotNotch = Math.cos(angle - theta);
-            const tLbl = 0.5 + 0.5 * Math.sin(angle - theta);
-            if (rotNotch > 0.68 && r > 3.2) {
-              idx = rotNotch > 0.88 ? 27 : 26;
-            } else {
-              idx = 22 + Math.min(3, Math.floor(tLbl * 3.99));
+        if (mode === "wave") {
+          for (let sp = 0; sp < sparkPoints.length; sp++) {
+            const sy = sparkPoints[sp][1] + Math.round(Math.sin(theta + sp * 1.3));
+            if (x === sparkPoints[sp][0] && y === sy) {
+              const pulse = 0.5 + 0.5 * Math.cos(theta + sp * 1.5);
+              idx = pulse > 0.5 ? 30 : 29;
             }
-          } else {
-            const groove = 0.5 + 0.5 * Math.sin(r * 1.85);
-            const c = Math.max(0, Math.cos(2 * (angle - theta + 0.55)));
-            const sheen = c * c * c * c;
-            let tone = 0.08 * groove + 0.88 * sheen;
-            if (r > R_DISC - 1.2) tone = Math.max(tone, 0.38);
-            idx = 12 + Math.min(9, Math.max(0, Math.floor(tone * 9.99)));
+          }
+        } else {
+          // Subtle dark-tinted vinyl disc peeking gently from the far-right edge
+          const dx = x - CX;
+          const dy = y - CY;
+          const r = Math.hypot(dx, dy);
+          if (r <= R_DISC) {
+            const angle = Math.atan2(dy, dx);
+            if (r <= 2.0) {
+              idx = 12;
+            } else if (r <= 6.5) {
+              const rotNotch = Math.cos(angle - theta);
+              const tLbl = 0.5 + 0.5 * Math.sin(angle - theta);
+              if (rotNotch > 0.65 && r > 3.0) {
+                idx = rotNotch > 0.85 ? 27 : 26;
+              } else {
+                idx = 22 + Math.min(3, Math.floor(tLbl * 3.99));
+              }
+            } else {
+              const groove = 0.5 + 0.5 * Math.sin(r * 1.85);
+              const c = Math.max(0, Math.cos(2 * (angle - theta + 0.55)));
+              const sheen = c * c * c * c;
+              let tone = 0.10 * groove + 0.78 * sheen;
+              if (r > R_DISC - 1.1) tone = Math.max(tone, 0.34);
+              idx = 12 + Math.min(9, Math.max(0, Math.floor(tone * 9.99)));
+            }
           }
         }
         pixels[y * W + x] = idx;
@@ -3716,7 +3750,8 @@ function renderDynamicVinylGif(hex0, hex1) {
   if (url.pathname === "/studio/vinyl-bg.gif" && request.method === "GET") {
     const c0 = url.searchParams.get("c0") || "1E1B4B";
     const c1 = url.searchParams.get("c1") || "4C1D95";
-    const gifBytes = renderDynamicVinylGif(c0, c1);
+    const mode = url.searchParams.get("mode") || "peek";
+    const gifBytes = renderDynamicVinylGif(c0, c1, mode);
     return new Response(gifBytes, {
       status: 200,
       headers: corsHeaders({
