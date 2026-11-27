@@ -859,6 +859,50 @@ function applyLutToRgb(srcRgb, w, h, lut) {
   }
 }
 
+// Áp LUT cho MỘT VÙNG con (rx,ry,rw,rh) trong canvas rộng canvasW — dùng cho photobooth 4 ô
+// (mỗi ô 1 tông màu). Vignette tính theo tâm của vùng đó.
+function applyLutToRgbRegion(canvasRgb, canvasW, canvasH, rx, ry, rw, rh, lut) {
+  const rMul = lut.rMul ?? 1, gMul = lut.gMul ?? 1, bMul = lut.bMul ?? 1;
+  const contrast = lut.contrast ?? 1, brightness = lut.brightness ?? 0;
+  const sat = lut.sat ?? 1, fade = lut.fade ?? 0, vig = lut.vig ?? 0, grain = lut.grain ?? 0;
+  const isBw = !!lut.bw;
+  const halfW = rw * 0.5, halfH = rh * 0.5;
+  const invMaxR2 = 1 / (halfW * halfW + halfH * halfH);
+  const fadeScale = fade > 0 ? (255 - fade) / 255 : 1;
+  let rng = 0x9e3779b9;
+  const x0 = Math.max(0, rx | 0), y0 = Math.max(0, ry | 0);
+  const x1 = Math.min(canvasW, (rx + rw) | 0), y1 = Math.min(canvasH, (ry + rh) | 0);
+  for (let y = y0; y < y1; y++) {
+    const dy = y - (ry + halfH);
+    const dy2 = dy * dy;
+    for (let x = x0; x < x1; x++) {
+      const i = (y * canvasW + x) * 3;
+      let r = canvasRgb[i], g = canvasRgb[i + 1], b = canvasRgb[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (isBw) { r = g = b = lum; }
+      else if (sat !== 1) { r = lum + (r - lum) * sat; g = lum + (g - lum) * sat; b = lum + (b - lum) * sat; }
+      r = (r * rMul - 128) * contrast + 128 + brightness;
+      g = (g * gMul - 128) * contrast + 128 + brightness;
+      b = (b * bMul - 128) * contrast + 128 + brightness;
+      if (fade > 0) { r = fade + r * fadeScale; g = fade + g * fadeScale; b = fade + b * fadeScale; }
+      if (vig > 0) {
+        const dx = x - (rx + halfW);
+        const vFactor = 1 - vig * (dx * dx + dy2) * invMaxR2;
+        r *= vFactor; g *= vFactor; b *= vFactor;
+      }
+      if (grain > 0) {
+        rng = (rng ^ (rng << 13)) >>> 0; rng = (rng ^ (rng >>> 17)) >>> 0; rng = (rng ^ (rng << 5)) >>> 0;
+        if (rng === 0) rng = 0x9e3779b9;
+        const n = ((rng & 0xff) / 127.5 - 1) * grain;
+        r += n; g += n; b += n;
+      }
+      canvasRgb[i] = r < 0 ? 0 : r > 255 ? 255 : r | 0;
+      canvasRgb[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g | 0;
+      canvasRgb[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b | 0;
+    }
+  }
+}
+
 const FONT_5X7 = {
   "0": [0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e],
   "1": [0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e],
@@ -3998,24 +4042,21 @@ async function handleStudioRequest(request, env) {
       let pbDebug = null;
 
       if (manifest.is4Cut) {
-        const userToken = authHeader.slice(-24) || dataNode?.userId || request.headers.get("CF-Connecting-IP") || "anon";
-        const sessKey = `${userToken}_${filterId}`;
-        let sess = PHOTOBOOTH_SESSIONS.get(sessKey);
-        const hadSess = !!sess;
-        const prevCount = sess ? sess.photos.length : 0;
-        if (!sess || Date.now() - sess.ts > 180000 || sess.photos.length >= 4) {
-          sess = { photos: [], ts: Date.now() };
-        }
-        sess.photos.push({ rgb: srcRgb, w: srcW, h: srcH });
-        sess.ts = Date.now();
-        PHOTOBOOTH_SESSIONS.set(sessKey, sess);
-
+        // Locket chụp 1 PHÁT ra kết quả ngay (không chụp tích lũy nhiều lần vào 1 khung), nên 4 ô
+        // trước đây bị LẶP CÙNG 1 ảnh. Giải pháp: từ 1 ảnh, tạo 4 BIẾN THỂ MÀU khác nhau cho 4 ô ->
+        // nhìn như photobooth thật, sinh động, giữ nguyên mặt (LUT chỉ grade màu, không AI).
         const windows = manifest.windows || [];
+        // 4 tông khác biệt rõ: tươi/beauty, đen trắng, vintage ấm (kodak), phim lạnh (fuji).
+        const CUT_LUTS = ["lut_iphone_beauty", "dazz_grd", "lut_kodak_am", "lut_fuji_chrome"];
         for (let idx = 0; idx < windows.length; idx++) {
-          const photo = sess.photos[idx] || sess.photos[sess.photos.length - 1];
-          drawCoverRgb(canvasRgb, photo.rgb, photo.w, photo.h, windows[idx]);
+          const [x1, y1, x2, y2] = windows[idx];
+          const w = x2 - x1, h = y2 - y1;
+          // vẽ ảnh vào ô idx, rồi áp LUT riêng cho VÙNG đó
+          drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, windows[idx]);
+          const lut = LUT_FILTERS[CUT_LUTS[idx % CUT_LUTS.length]];
+          if (lut) applyLutToRgbRegion(canvasRgb, SIZE, SIZE, x1, y1, w, h, lut);
         }
-        pbDebug = { sessKey: sessKey.slice(-16), hadSess, prevCount, nowCount: sess.photos.length, windows: windows.length, totalSessions: PHOTOBOOTH_SESSIONS.size };
+        pbDebug = { cuts: windows.length, variants: CUT_LUTS.slice(0, windows.length) };
       } else {
         const box = (manifest.windows && manifest.windows[0]) || [0, 0, SIZE, SIZE];
         drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box);
