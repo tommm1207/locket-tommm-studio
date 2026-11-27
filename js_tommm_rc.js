@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "70";
+var RC_VER = "71";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -386,12 +386,12 @@ for (var cl = 0; cl < CUSTOM_LUT_SPECS.length; cl++) {
 for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
     var sp = CUSTOM_FRAME_SPECS[cf];
     var is4 = sp[4] === 1;
-    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=15") : (FBASE + sp[0] + ".png");
+    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=16") : (FBASE + sp[0] + ".png");
     pushCustomFilter(sp[0], sp[1], sp[2], sp[3], cfIconUrl, is4 ? "square.grid.2x2" : "photo.on.rectangle", is4 ? "📸" : "🖼️");
 }
 for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
     var vp = CUSTOM_V2_SPECS[cv];
-    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=15", vp[4], vp[5]);
+    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=16", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png?v=4", "calendar", "🇬🇧");
