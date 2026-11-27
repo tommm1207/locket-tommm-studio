@@ -618,9 +618,7 @@ const nmFrameMeta = {
     nm_yeu_giau_chu_co_phai: { name: "Yêu Giấu Chứ Có Phải...", colors: ["#BE123C", "#FDA4AF"], emoji: "💗", sfSymbol: "quote.bubble.fill" },
     nm_me_con_em_don_anh_ve: { name: "Mẹ Con Em Đón Anh Về", colors: ["#B45309", "#FDE047"], emoji: "🚗", sfSymbol: "quote.bubble.fill" },
     nm_meo_meme: { name: "Mèo Meme", colors: ["#B45309", "#FEF08A"], emoji: "🐱", sfSymbol: "face.smiling" },
-    nm_faker: { name: "Faker", colors: ["#111115", "#DC2626"], emoji: "🏆", sfSymbol: "crown.fill" },
-    nm_hai_trai_cay: { name: "Hái Trái Cây", colors: ["#FEF9C3", "#16A34A"], emoji: "🍓", sfSymbol: "leaf.fill" },
-    nm_mona_lisa: { name: "Mona Lisa", colors: ["#926622", "#FACC15"], emoji: "🖼️", sfSymbol: "photo.artframe" }
+    nm_hai_trai_cay: { name: "Hái Trái Cây", colors: ["#FEF9C3", "#16A34A"], emoji: "🍓", sfSymbol: "leaf.fill" }
 };
 const nmFrameIds = Object.keys(nmFrameMeta);
 
@@ -662,6 +660,8 @@ const v2FilterSpecs = [
     ["ai_hau_gai", "Trang Phục Hầu Gái", "#1E293B", "#F43F5E", "heart.fill", "🎀"],
     ["ai_hoang_thuong", "Hoàng Thượng", "#B45309", "#FDE047", "crown.fill", "🐉"],
     ["ai_idol_kpop", "Idol KPOP", "#9333EA", "#F472B6", "music.note", "🎤"],
+    ["nm_faker", "Faker", "#111115", "#DC2626", "crown.fill", "🏆"],
+    ["nm_mona_lisa", "Mona Lisa", "#926622", "#FACC15", "photo.artframe", "🖼️"],
     // Hiệu Ứng Méo Mặt & Hài Hước (0-AI)
     ["warp_big_head", "Đầu To Khổng Lồ", "#2563EB", "#60A5FA", "face.smiling", "🤯"],
     ["warp_tiny_face", "Mặt Nhỏ Tí Hon", "#7C3AED", "#C084FC", "face.smiling", "🤏"],
@@ -706,8 +706,8 @@ const v2FilterSpecs = [
 ];
 
 const customFrameGroups = [
-    { id: "group_locket_tools", title: { en: "✨ Tính Năng Locket Hot", vi: "✨ Tính Năng Locket Hot" }, filter_ids: ["portrait_bokeh", "cctv_camera", "triple_clone", "clock_weekday_overlay"] },
-    { id: "group_weekday_depth", title: { en: "📅 Thứ Ngày & Giờ", vi: "📅 Thứ Ngày & Giờ" }, filter_ids: ["weekday_depth", "weekday_depth_en", "weekday_depth_tw", "weekday_depth_de", "clock_weekday_overlay"] },
+    { id: "group_locket_tools", title: { en: "✨ Tính Năng Locket Hot", vi: "✨ Tính Năng Locket Hot" }, filter_ids: ["portrait_bokeh", "cctv_camera", "triple_clone"] },
+    { id: "group_weekday_depth", title: { en: "📅 Thứ Ngày & Giờ", vi: "📅 Thứ Ngày & Giờ" }, filter_ids: ["clock_weekday_overlay", "weekday_depth", "weekday_depth_en", "weekday_depth_zh", "weekday_depth_tw", "weekday_depth_ja", "weekday_depth_ko", "weekday_depth_es", "weekday_depth_fr", "weekday_depth_de"] },
     { id: "group_hot_ai_3d", title: { en: "Hiệu Ứng AI 3D Hot 🔥", vi: "Hiệu Ứng AI 3D Hot 🔥" }, filter_ids: aiHotIds },
     { id: "group_meme_ai", title: { en: "😂 Meme Giải Trí", vi: "😂 Meme Giải Trí" }, filter_ids: ["ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_lop_truong", "ai_di_phu_ho", "ai_ve_que_nuoi_ca"] },
     { id: "group_trend_ai", title: { en: "🔥 Trend Hot Mạng Xã Hội", vi: "🔥 Trend Hot Mạng Xã Hội" }, filter_ids: ["ai_figure_1_7", "ai_action_figure_box", "ai_lego_figure", "ai_cartoon_3d", "ai_polaroid_string"] },
@@ -731,7 +731,7 @@ const customFrameIds = [
     "nm_son_tung_mtp", "nm_spotify_pc", "nm_polaroid_vintage", "nm_bang_tin_khan",
     "clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone",
     "warp_fisheye", "warp_fisheye_dazz",
-    "weekday_depth", "weekday_depth_en", "weekday_depth_tw", "weekday_depth_de",
+    "weekday_depth", "weekday_depth_en", "weekday_depth_zh", "weekday_depth_tw", "weekday_depth_ja", "weekday_depth_ko", "weekday_depth_es", "weekday_depth_fr", "weekday_depth_de",
     "dazz_cpm35", "lut_iphone_beauty", "warp_big_head", "ai_cong_chua_phong_tro"
 ].concat(aiHotIds.slice(0, 4), photoboothIds.slice(0, 4));
 
@@ -1168,9 +1168,14 @@ for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
     pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=2", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
-pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png", "calendar", "🇬🇧");
-pushCustomFilter("weekday_depth_tw", "星期景深 (TW)", "#7C2D12", "#FB923C", FBASE + "weekday_depth_tw.png", "calendar", "🇹🇼");
-pushCustomFilter("weekday_depth_de", "Wochentag (DE)", "#78350F", "#FBBF24", FBASE + "weekday_depth_de.png", "calendar", "🇩🇪");
+pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png?v=4", "calendar", "🇬🇧");
+pushCustomFilter("weekday_depth_zh", "星期景深 (CN)", "#991B1B", "#F87171", FBASE + "weekday_depth_zh.png?v=4", "calendar", "🇨🇳");
+pushCustomFilter("weekday_depth_tw", "星期景深 (TW)", "#7C2D12", "#FB923C", FBASE + "weekday_depth_tw.png?v=4", "calendar", "🇹🇼");
+pushCustomFilter("weekday_depth_ja", "曜日深度 (JP)", "#9F1239", "#FDA4AF", FBASE + "weekday_depth_ja.png?v=4", "calendar", "🇯🇵");
+pushCustomFilter("weekday_depth_ko", "요일 깊이 (KR)", "#1D4ED8", "#93C5FD", FBASE + "weekday_depth_ko.png?v=4", "calendar", "🇰🇷");
+pushCustomFilter("weekday_depth_es", "Día Depth (ES)", "#B45309", "#FCD34D", FBASE + "weekday_depth_es.png?v=4", "calendar", "🇪🇸");
+pushCustomFilter("weekday_depth_fr", "Jour Depth (FR)", "#1E40AF", "#BFDBFE", FBASE + "weekday_depth_fr.png?v=4", "calendar", "🇫🇷");
+pushCustomFilter("weekday_depth_de", "Wochentag (DE)", "#78350F", "#FBBF24", FBASE + "weekday_depth_de.png?v=4", "calendar", "🇩🇪");
 
 var activeFilterCfg = (liveFilterCfg && typeof liveFilterCfg === "object") ? JSON.parse(JSON.stringify(liveFilterCfg)) : ${JSON.stringify(fallbackFilterCfg)};
 activeFilterCfg.allows_custom_filters = true;

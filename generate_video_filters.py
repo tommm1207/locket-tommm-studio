@@ -15,13 +15,22 @@ MANIFEST_PATH = os.path.join(BASE_DIR, "data", "frames_manifest.json")
 SIZE = 512
 FONT_BOLD = r"C:\Windows\Fonts\segoeuib.ttf"
 FONT_REG = r"C:\Windows\Fonts\segoeui.ttf"
-FONT_SERIF = r"C:\Windows\Fonts\georgiab.ttf"
+FONT_SERIF = r"C:\Windows\Fonts\timesbd.ttf"
 FONT_MONO = r"C:\Windows\Fonts\consolab.ttf"
-FONT_HAND = r"C:\Windows\Fonts\segoeprb.ttf"
+FONT_HAND = r"C:\Windows\Fonts\segoeuiz.ttf"
 
 
 def get_font(path, size):
     return ImageFont.truetype(path, size)
+
+
+def fit_font(draw, font_path, text, max_w, max_size, min_size=11):
+    for sz in range(max_size, min_size - 1, -1):
+        f = get_font(font_path, sz)
+        bbox = draw.textbbox((0, 0), text, font=f)
+        if (bbox[2] - bbox[0]) <= max_w:
+            return f
+    return get_font(font_path, min_size)
 
 
 def new_canvas():
@@ -189,8 +198,8 @@ def make_comment_card(author, verified, comment, likes, handle_color=(254, 44, 8
     draw_avatar_circle(img, portrait, 60, 62, 22, fallback_color=handle_color, fallback_letter=author[:1].upper())
     d = ImageDraw.Draw(img)
 
-    f_auth = get_font(FONT_BOLD, 16)
-    f_cmt = get_font(FONT_BOLD, 19)
+    f_auth = fit_font(d, FONT_BOLD, author, cx2 - 92 - 40, 16, 12)
+    f_cmt = fit_font(d, FONT_BOLD, comment, cx2 - 92 - 18, 19, 12)
     f_sub = get_font(FONT_REG, 13)
     d.text((92, 32), author, font=f_auth, fill=(85, 85, 95, 255))
     if verified:
@@ -409,7 +418,8 @@ def make_bang_tin_khan():
     d.rectangle([0, 396, SIZE, 434], fill=(220, 38, 38, 245))
     d.rectangle([0, 434, SIZE, 492], fill=(250, 204, 21, 245))
     draw_centered_text(d, 256, 415, "BẢNG TIN KHẨN CẤP 24H", get_font(FONT_BOLD, 19), (255, 255, 255, 255))
-    draw_centered_text(d, 256, 462, "Phát hiện một người quá xinh đẹp đang lướt Locket!", get_font(FONT_BOLD, 16), (17, 24, 39, 255))
+    sub_b = "Phát hiện một người quá xinh đẹp đang lướt Locket!"
+    draw_centered_text(d, 256, 462, sub_b, fit_font(d, FONT_BOLD, sub_b, 480, 16, 12), (17, 24, 39, 255))
     return img, [0, 0, SIZE, SIZE]
 
 
@@ -419,8 +429,10 @@ def make_ve_gui_xe():
     d.rounded_rectangle([40, 366, 472, 492], radius=10, fill=(254, 240, 138, 244), outline=(225, 29, 72, 245), width=3)
     draw_centered_text(d, 256, 392, "VÉ TRÔNG GIỮ XE  •  SỐ 0079", get_font(FONT_BOLD, 18), (190, 18, 60, 255))
     d.line([58, 414, 454, 414], fill=(225, 29, 72, 180), width=2)
-    draw_centered_text(d, 256, 438, "Biển số: TRÁI TIM BẠN   |   Giá: 5.000đ", get_font(FONT_BOLD, 15), (30, 41, 59, 255))
-    draw_centered_text(d, 248, 468, "Lưu ý: Mất vé đền bằng nụ cười", get_font(FONT_REG, 14), (88, 28, 135, 255))
+    t_ve = "Biển số: TRÁI TIM BẠN   |   Giá: 5.000đ"
+    t_luu = "Lưu ý: Mất vé đền bằng nụ cười"
+    draw_centered_text(d, 256, 438, t_ve, fit_font(d, FONT_BOLD, t_ve, 400, 15, 11), (30, 41, 59, 255))
+    draw_centered_text(d, 248, 468, t_luu, fit_font(d, FONT_REG, t_luu, 380, 14, 11), (88, 28, 135, 255))
     draw_heart(d, 364, 468, size=14, fill=(225, 29, 72, 255))
     return img, [0, 0, SIZE, SIZE]
 
@@ -433,8 +445,10 @@ def make_vo_hoc_sinh():
     d.line([62, 0, 62, 88], fill=(239, 68, 68, 200), width=2)
     for ly in [28, 56]:
         d.line([0, ly, SIZE, ly], fill=(147, 197, 253, 180), width=1)
-    d.text((76, 12), "VỞ HỌC SINH  •  Tiến Bộ Mỗi Ngày", font=get_font(FONT_BOLD, 17), fill=(30, 58, 138, 255))
-    d.text((76, 40), "Họ & Tên: ..............................   Lớp: 12A1", font=get_font(FONT_HAND, 15), fill=(37, 99, 235, 255))
+    t1 = "VỞ HỌC SINH  •  Tiến Bộ Mỗi Ngày"
+    t2 = "Họ & Tên: ..............................   Lớp: 12A1"
+    d.text((76, 12), t1, font=fit_font(d, FONT_BOLD, t1, 420, 17, 12), fill=(30, 58, 138, 255))
+    d.text((76, 40), t2, font=fit_font(d, FONT_HAND, t2, 420, 15, 11), fill=(37, 99, 235, 255))
     return img, [0, 0, SIZE, SIZE]
 
 
@@ -459,9 +473,11 @@ def make_nhiem_vu_hom_nay():
     d.rectangle([x1, y1 + 20, x2, y1 + 38], fill=(29, 78, 216, 255))
     draw_centered_text(d, 256, y1 + 19, "NHIỆM VỤ HÔM NAY", get_font(FONT_BOLD, 16), (255, 255, 255, 255))
     draw_checkbox(d, 72, y1 + 50, box_sz=18)
-    d.text((100, y1 + 49), "Cười thật tươi (Hoàn thành)", font=get_font(FONT_BOLD, 16), fill=(74, 222, 128, 255))
+    t_n1 = "Cười thật tươi (Hoàn thành)"
+    t_n2 = "Đăng 1 tấm Locket xinh xỉu (+999 EXP)"
+    d.text((100, y1 + 49), t_n1, font=fit_font(d, FONT_BOLD, t_n1, 360, 16, 12), fill=(74, 222, 128, 255))
     draw_checkbox(d, 72, y1 + 82, box_sz=18)
-    d.text((100, y1 + 81), "Đăng 1 tấm Locket xinh xỉu (+999 EXP)", font=get_font(FONT_BOLD, 15), fill=(250, 204, 21, 255))
+    d.text((100, y1 + 81), t_n2, font=fit_font(d, FONT_BOLD, t_n2, 360, 15, 11), fill=(250, 204, 21, 255))
     return img, [0, 0, SIZE, SIZE]
 
 
@@ -470,10 +486,13 @@ def make_hoa_don_di_choi():
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([54, 344, 458, 494], radius=8, fill=(250, 250, 249, 244), outline=(100, 116, 139, 220), width=2)
     draw_centered_text(d, 256, 368, "HÓA ĐƠN ĐI CHƠI", get_font(FONT_MONO, 18), (15, 23, 42, 255))
-    d.text((74, 390), "----------------------------------------", font=get_font(FONT_MONO, 14), fill=(100, 116, 139, 255))
-    d.text((78, 410), "1x Trà Sữa + Nói Xấu Thiên Hạ    FREE", font=get_font(FONT_MONO, 14), fill=(30, 41, 59, 255))
-    d.text((78, 434), "1x Kỷ Niệm Vui Quá Trời        PRICELESS", font=get_font(FONT_MONO, 14), fill=(30, 41, 59, 255))
-    d.text((78, 460), "TỔNG CỘNG: HẾT TIỀN VỀ NHÀ :(", font=get_font(FONT_MONO, 15), fill=(220, 38, 38, 255))
+    d.text((74, 390), "----------------------------------------", font=fit_font(d, FONT_MONO, "----------------------------------------", 364, 14, 10), fill=(100, 116, 139, 255))
+    l1 = "1x Trà Sữa + Nói Xấu Thiên Hạ   FREE"
+    l2 = "1x Kỷ Niệm Vui Quá Trời   PRICELESS"
+    l3 = "TỔNG CỘNG: HẾT TIỀN VỀ NHÀ :("
+    d.text((72, 410), l1, font=fit_font(d, FONT_MONO, l1, 368, 14, 11), fill=(30, 41, 59, 255))
+    d.text((72, 434), l2, font=fit_font(d, FONT_MONO, l2, 368, 14, 11), fill=(30, 41, 59, 255))
+    d.text((72, 460), l3, font=fit_font(d, FONT_MONO, l3, 368, 15, 11), fill=(220, 38, 38, 255))
     return img, [0, 0, SIZE, SIZE]
 
 
@@ -481,8 +500,8 @@ def make_mood_banner(top_text, sub_text, bg_col, border_col):
     img = new_canvas()
     d = ImageDraw.Draw(img)
     d.rounded_rectangle([32, 386, 480, 486], radius=22, fill=bg_col, outline=border_col, width=3)
-    draw_centered_text(d, 256, 422, top_text, get_font(FONT_BOLD, 18), (255, 255, 255, 255))
-    draw_centered_text(d, 256, 458, sub_text, get_font(FONT_REG, 14), (253, 224, 71, 255))
+    draw_centered_text(d, 256, 422, top_text, fit_font(d, FONT_BOLD, top_text, 420, 18, 12), (255, 255, 255, 255))
+    draw_centered_text(d, 256, 458, sub_text, fit_font(d, FONT_REG, sub_text, 424, 14, 11), (253, 224, 71, 255))
     return img, [0, 0, SIZE, SIZE]
 
 
@@ -492,8 +511,10 @@ def make_meo_meme(cat_portrait=None):
     d.rounded_rectangle([36, 390, 476, 486], radius=24, fill=(180, 83, 9, 236), outline=(254, 240, 138, 255), width=3)
     draw_avatar_circle(img, cat_portrait, 84, 438, 32, fallback_color=(217, 119, 6, 255), fallback_letter="M", outline=(254, 240, 138, 255))
     d = ImageDraw.Draw(img)
-    d.text((128, 412), "RẠP XIẾC TRUNG ƯƠNG • MÈO MEME", font=get_font(FONT_BOLD, 16), fill=(255, 255, 255, 255))
-    d.text((128, 444), "Meo meo... nhìn gì mà nhìn dữ vậy?", font=get_font(FONT_HAND, 15), fill=(254, 240, 138, 255))
+    t_cat = "RẠP XIẾC TRUNG ƯƠNG • MÈO MEME"
+    s_cat = "Meo meo... nhìn gì mà nhìn dữ vậy?"
+    d.text((128, 412), t_cat, font=fit_font(d, FONT_BOLD, t_cat, 332, 16, 12), fill=(255, 255, 255, 255))
+    d.text((128, 444), s_cat, font=fit_font(d, FONT_HAND, s_cat, 332, 15, 11), fill=(254, 240, 138, 255))
     return img, [0, 0, SIZE, SIZE]
 
 
@@ -642,10 +663,11 @@ def main():
         "nm_yeu_giau_chu_co_phai": lambda: make_mood_banner("YÊU GIẤU CHỨ CÓ PHẢI GIẤU YÊU ĐÂU", "Thương âm thầm mà sao mặt cứ lộ hết trơn", (190, 18, 60, 232), (253, 164, 175, 255)),
         "nm_me_con_em_don_anh_ve": lambda: make_mood_banner("MẸ CON EM ĐÓN ANH VỀ", "Đi đâu cũng nhớ lối về với mẹ con em nhé!", (180, 83, 9, 236), (253, 224, 71, 255)),
         "nm_meo_meme": lambda: make_meo_meme(portraits["cat"]),
-        "nm_faker": lambda: make_faker(portraits["faker"]),
         "nm_hai_trai_cay": make_hai_trai_cay,
-        "nm_mona_lisa": lambda: make_mona_lisa(portraits["monalisa"]),
     }
+
+    manifest.pop("nm_faker", None)
+    manifest.pop("nm_mona_lisa", None)
 
     for fid, fn in specs.items():
         img, win = fn()
