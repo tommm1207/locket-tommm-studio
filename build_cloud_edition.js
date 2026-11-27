@@ -485,6 +485,8 @@ for (const gk of [
     if (dvRc[gk] !== undefined) baseRcEntries[gk] = dvRc[gk];
 }
 baseRcEntries["profile_badge_visible"] = "true";
+baseRcEntries["music_caption_enabled"] = "true";
+baseRcEntries["music_caption_song_preview_enabled"] = "true";
 baseRcEntries["fetch_users_from_cloud_function"] = "true";
 baseRcEntries["user_cache_max_age_sec"] = "0";
 baseRcEntries["friends_cache_max_age_sec"] = "0";
@@ -706,7 +708,6 @@ const v2FilterSpecs = [
 ];
 
 const customFrameGroups = [
-    { id: "group_locket_tools", title: { en: "✨ Tính Năng Locket Hot", vi: "✨ Tính Năng Locket Hot" }, filter_ids: ["portrait_bokeh", "cctv_camera", "triple_clone"] },
     { id: "group_weekday_depth", title: { en: "📅 Thứ Ngày & Giờ", vi: "📅 Thứ Ngày & Giờ" }, filter_ids: ["clock_weekday_overlay", "weekday_depth", "weekday_depth_en", "weekday_depth_zh", "weekday_depth_tw", "weekday_depth_ja", "weekday_depth_ko", "weekday_depth_es", "weekday_depth_fr", "weekday_depth_de"] },
     { id: "group_hot_ai_3d", title: { en: "Hiệu Ứng AI 3D Hot 🔥", vi: "Hiệu Ứng AI 3D Hot 🔥" }, filter_ids: aiHotIds },
     { id: "group_meme_ai", title: { en: "😂 Meme Giải Trí", vi: "😂 Meme Giải Trí" }, filter_ids: ["ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_lop_truong", "ai_di_phu_ho", "ai_ve_que_nuoi_ca"] },
@@ -714,9 +715,9 @@ const customFrameGroups = [
     { id: "group_job_ai", title: { en: "🛵 Nghề Nghiệp & Shipper", vi: "🛵 Nghề Nghiệp & Shipper" }, filter_ids: ["ai_shipper_giao_hang", "stk_shopee_food", "ai_grab_driver", "ai_xanh_sm", "ai_bac_si"] },
     { id: "group_luxury_ai", title: { en: "👑 Tổng Tài & Phú Bà", vi: "👑 Tổng Tài & Phú Bà" }, filter_ids: ["ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen", "ai_old_money"] },
     { id: "group_beauty_ai", title: { en: "💖 Xinh Lung Linh & Hóa Trang", vi: "💖 Xinh Lung Linh & Hóa Trang" }, filter_ids: ["ai_makeup_idol", "ai_trang_diem_duyen", "ai_doi_kieu_toc", "ai_doi_mau_toc", "ai_cosplay_wibu", "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop"] },
-    { id: "group_warp_fun", title: { en: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá", vi: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá" }, filter_ids: ["warp_fisheye", "warp_fisheye_dazz", "warp_big_head", "warp_tiny_face", "warp_alien_vline", "warp_hamster", "warp_bug_eyes", "warp_wide_mouth", "warp_chubby", "warp_gigachad", "warp_swirl", "warp_melt"] },
-    { id: "group_retro_lut", title: { en: "📷 Máy Ảnh Retro & Màu Film", vi: "📷 Máy Ảnh Retro & Màu Film" }, filter_ids: ["nm_nau_co_dien", "nm_dem_xanh", "nm_film_35mm", "nm_xam_matte", "dazz_cpm35", "dazz_classic_u", "dazz_fqs", "dazz_inst_c", "dazz_grd", "warp_fisheye_dazz", "warp_fisheye", "lut_kodak_portra", "lut_fuji_superia", "lut_kodak_gold", "lut_cinestill_800t", "lut_kodak_am", "lut_fuji_chrome", "lut_vintage"] },
-    { id: "group_beauty_lut", title: { en: "🌸 Làm Đẹp & Tone Da", vi: "🌸 Làm Đẹp & Tone Da" }, filter_ids: ["lut_iphone_beauty", "lut_film_han", "lut_trang_sua", "lut_phim_nhat", "lut_hong_dao", "lut_matcha", "lut_ulzzang_pink", "lut_nang_ban_mai", "lut_tone_lanh", "lut_kem_bo"] },
+    { id: "group_warp_fun", title: { en: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá", vi: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá" }, filter_ids: ["triple_clone", "warp_fisheye", "warp_fisheye_dazz", "warp_big_head", "warp_tiny_face", "warp_alien_vline", "warp_hamster", "warp_bug_eyes", "warp_wide_mouth", "warp_chubby", "warp_gigachad", "warp_swirl", "warp_melt"] },
+    { id: "group_retro_lut", title: { en: "📷 Máy Ảnh Retro & Màu Film", vi: "📷 Máy Ảnh Retro & Màu Film" }, filter_ids: ["cctv_camera", "nm_nau_co_dien", "nm_dem_xanh", "nm_film_35mm", "nm_xam_matte", "dazz_cpm35", "dazz_classic_u", "dazz_fqs", "dazz_inst_c", "dazz_grd", "warp_fisheye_dazz", "warp_fisheye", "lut_kodak_portra", "lut_fuji_superia", "lut_kodak_gold", "lut_cinestill_800t", "lut_kodak_am", "lut_fuji_chrome", "lut_vintage"] },
+    { id: "group_beauty_lut", title: { en: "🌸 Làm Đẹp & Tone Da", vi: "🌸 Làm Đẹp & Tone Da" }, filter_ids: ["portrait_bokeh", "lut_iphone_beauty", "lut_film_han", "lut_trang_sua", "lut_phim_nhat", "lut_hong_dao", "lut_matcha", "lut_ulzzang_pink", "lut_nang_ban_mai", "lut_tone_lanh", "lut_kem_bo"] },
     { id: "group_nm_cdm", title: { en: "💬 Cư Dân Mạng Nói Gì", vi: "💬 Cư Dân Mạng Nói Gì" }, filter_ids: ["nm_son_tung_mtp", "nm_ronaldo_siuuu", "nm_phai_luon_tu_te", "nm_chi_can_mot_vet_xuoc", "nm_trend_tic_toc", "nm_ai_cho_xinh_vay", "nm_tam_cuoi_dang_dang"] },
     { id: "group_nm_khung_hot", title: { en: "🖼️ Khung Viền Hot Trend", vi: "🖼️ Khung Viền Hot Trend" }, filter_ids: ["nm_locket_camera", "nm_spotify_pc", "nm_spotify_hong", "nm_fuji_film", "nm_polaroid_vintage", "nm_soulmate", "nm_love_postcard"] },
     { id: "group_nm_trend_hot", title: { en: "🔥 Trend Hot", vi: "🔥 Trend Hot" }, filter_ids: ["nm_gay_meter", "nm_chua_som", "nm_bang_tin_khan", "nm_ve_gui_xe", "nm_vo_hoc_sinh", "nm_giao_vien_cham_bai", "nm_nhiem_vu_hom_nay", "nm_hoa_don_di_choi"] },
@@ -1160,12 +1161,12 @@ for (var cl = 0; cl < CUSTOM_LUT_SPECS.length; cl++) {
 for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
     var sp = CUSTOM_FRAME_SPECS[cf];
     var is4 = sp[4] === 1;
-    var cfIconUrl = sp[0].indexOf("nm_") === 0 ? (F2BASE + sp[0] + ".png?v=3") : (FBASE + sp[0] + ".png");
+    var cfIconUrl = sp[0].indexOf("nm_") === 0 ? (F2BASE + sp[0] + ".png?v=4") : (FBASE + sp[0] + ".png");
     pushCustomFilter(sp[0], sp[1], sp[2], sp[3], cfIconUrl, is4 ? "square.grid.2x2" : "photo.on.rectangle", is4 ? "📸" : "🖼️");
 }
 for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
     var vp = CUSTOM_V2_SPECS[cv];
-    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=2", vp[4], vp[5]);
+    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=4", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png?v=4", "calendar", "🇬🇧");

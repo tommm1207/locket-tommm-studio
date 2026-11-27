@@ -553,6 +553,19 @@ def make_mona_lisa(mona_portrait=None):
 # =========================================================================
 # 36 Dedicated 128x128 Preview Icons (Realistic UI/Character Icons)
 # =========================================================================
+def apply_rounded_square_mask(im, box, radius):
+    w, h = im.size
+    scale = 4
+    big = Image.new("L", (w * scale, h * scale), 0)
+    bd = ImageDraw.Draw(big)
+    x1, y1, x2, y2 = [v * scale for v in box]
+    bd.rounded_rectangle([x1, y1, x2, y2], radius=radius * scale, fill=255)
+    mask = big.resize((w, h), Image.Resampling.LANCZOS)
+    out = im.copy()
+    out.putalpha(mask)
+    return out
+
+
 def save_v2_icon_card(out_path, bg1, bg2, title, sub="", badge=None, portrait=None, verified=False, extra_fn=None):
     im = Image.new("RGBA", (128, 128), (0, 0, 0, 255))
     d = ImageDraw.Draw(im)
@@ -576,19 +589,20 @@ def save_v2_icon_card(out_path, bg1, bg2, title, sub="", badge=None, portrait=No
 
     if badge:
         d.rounded_rectangle([14, 14, 114, 42], radius=10, fill=(255, 255, 255, 45), outline=(255, 255, 255, 160), width=1)
-        draw_centered_text(d, 64, 28, badge, get_font(FONT_BOLD, 12), (255, 255, 255, 255))
+        draw_centered_text(d, 64, 28, badge, fit_font(d, FONT_BOLD, badge, 88, 12, 9), (255, 255, 255, 255))
 
     # Bottom caption pill
-    d.rounded_rectangle([8, 94, 120, 120], radius=8, fill=(0, 0, 0, 165))
-    draw_centered_text(d, 64, 107, title, get_font(FONT_BOLD, 12), (255, 255, 255, 255))
-    d.rounded_rectangle([2, 2, 126, 126], radius=24, outline=(255, 255, 255, 160), width=3)
+    d.rounded_rectangle([12, 93, 116, 117], radius=9, fill=(0, 0, 0, 175))
+    draw_centered_text(d, 64, 105, title, fit_font(d, FONT_BOLD, title, 94, 12, 9), (255, 255, 255, 255))
+    d.rounded_rectangle([2, 2, 126, 126], radius=24, outline=(255, 255, 255, 185), width=3)
+    im = apply_rounded_square_mask(im, [2, 2, 126, 126], radius=24)
     im.save(out_path, "PNG")
 
 
 def icon_comment_card(out_path, bg1, bg2, title, bubble_text, portrait=None, verified=True):
     def _extra(im, d):
         d.rounded_rectangle([12, 20, 116, 82], radius=14, fill=(255, 255, 255, 240))
-        d.text((20, 56), bubble_text, font=get_font(FONT_BOLD, 12), fill=(25, 25, 30, 255))
+        d.text((20, 56), bubble_text, font=fit_font(d, FONT_BOLD, bubble_text, 88, 12, 9), fill=(25, 25, 30, 255))
     if portrait is not None:
         save_v2_icon_card(out_path, bg1, bg2, title, portrait=portrait, verified=verified)
     else:
@@ -604,9 +618,10 @@ def make_lut_icon(out_path, c1, c2, emoji_text, badge_text):
         g = int(c1[1] * (1 - t) + c2[1] * t)
         b = int(c1[2] * (1 - t) + c2[2] * t)
         d.line([0, y, 128, y], fill=(r, g, b, 255))
-    d.rounded_rectangle([4, 4, 124, 124], radius=28, outline=(255, 255, 255, 190), width=4)
-    draw_centered_text(d, 64, 48, badge_text, get_font(FONT_BOLD, 28), (255, 255, 255, 255))
-    draw_centered_text(d, 64, 92, emoji_text, get_font(FONT_BOLD, 16), (255, 248, 220, 240))
+    draw_centered_text(d, 64, 48, badge_text, fit_font(d, FONT_BOLD, badge_text, 94, 28, 16), (255, 255, 255, 255))
+    draw_centered_text(d, 64, 92, emoji_text, fit_font(d, FONT_BOLD, emoji_text, 96, 16, 11), (255, 248, 220, 240))
+    d.rounded_rectangle([4, 4, 124, 124], radius=28, outline=(255, 255, 255, 195), width=4)
+    im = apply_rounded_square_mask(im, [4, 4, 124, 124], radius=28)
     im.save(out_path, "PNG")
 
 
