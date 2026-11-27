@@ -260,22 +260,73 @@ let CAPTION_MODE_OVERRIDE = null;
 let UPSTREAM_CAPTION_BLOCKED_UNTIL = 0;
 const SKIP_CF_MODELS = new Map(); // modelId -> timestamp until skip (on 404 / unsupported model)
 const SKIP_GEMINI_MODELS = new Map(); // modelId -> timestamp until skip (on 503 high demand / 404 / timeout)
+function rand01() {
+  try {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] / 4294967296;
+  } catch (_) {
+    return Math.random();
+  }
+}
+const QUOTE_HIST_CACHE_URL = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/__quotehist__/v1.json";
 const RECENT_QUOTE_IDS = [];
 function rememberQuoteIds(ids) {
   for (const id of ids) {
     if (!id) continue;
+    const idx = RECENT_QUOTE_IDS.indexOf(id);
+    if (idx !== -1) RECENT_QUOTE_IDS.splice(idx, 1);
     RECENT_QUOTE_IDS.push(id);
   }
-  while (RECENT_QUOTE_IDS.length > 40) RECENT_QUOTE_IDS.shift();
+  while (RECENT_QUOTE_IDS.length > 260) RECENT_QUOTE_IDS.shift();
 }
 const RECENT_LIVE_QUOTES = [];
 function rememberLiveQuoteKey(key) {
   if (!key) return;
-  if (!RECENT_LIVE_QUOTES.includes(key)) RECENT_LIVE_QUOTES.push(key);
-  while (RECENT_LIVE_QUOTES.length > 80) RECENT_LIVE_QUOTES.shift();
+  const idx = RECENT_LIVE_QUOTES.indexOf(key);
+  if (idx !== -1) RECENT_LIVE_QUOTES.splice(idx, 1);
+  RECENT_LIVE_QUOTES.push(key);
+  while (RECENT_LIVE_QUOTES.length > 200) RECENT_LIVE_QUOTES.shift();
+}
+async function loadRecentQuoteHistory() {
+  try {
+    const cache = typeof caches !== "undefined" ? caches.default : null;
+    if (!cache) return;
+    const hit = await cache.match(new Request(QUOTE_HIST_CACHE_URL));
+    if (!hit) return;
+    const j = await hit.json();
+    if (Array.isArray(j?.ids)) rememberQuoteIds(j.ids);
+    if (Array.isArray(j?.liveKeys)) {
+      for (const k of j.liveKeys) rememberLiveQuoteKey(k);
+    }
+  } catch (_) {}
+}
+async function saveRecentQuoteHistory() {
+  try {
+    const cache = typeof caches !== "undefined" ? caches.default : null;
+    if (!cache) return;
+    const payload = JSON.stringify({
+      ids: RECENT_QUOTE_IDS.slice(-260),
+      liveKeys: RECENT_LIVE_QUOTES.slice(-200),
+      ts: Date.now(),
+    });
+    await cache.put(
+      new Request(QUOTE_HIST_CACHE_URL),
+      new Response(payload, {
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "public, max-age=1800",
+        },
+      })
+    );
+  } catch (_) {}
 }
 const LIVE_QUOTE_CACHE = { items: [], fetchedAt: 0, wikiIdx: 0 };
-const VI_WIKIQUOTE_TOPICS = ["Hạnh phúc", "Cuộc sống", "Tình yêu", "Tình bạn", "Thời gian", "Thành công", "Hy vọng", "Tự do"];
+const VI_WIKIQUOTE_TOPICS = [
+  "Hạnh phúc", "Cuộc sống", "Tình yêu", "Tình bạn", "Thời gian", "Thành công", "Hy vọng", "Tự do",
+  "Tuổi trẻ", "Ước mơ", "Nỗi buồn", "Gia đình", "Âm nhạc", "Mùa thu", "Mưa", "Bình yên",
+  "Kiên nhẫn", "Sách", "Học tập", "Tâm hồn", "Cảm xúc", "Nụ cười", "Thiên nhiên", "Trưởng thành",
+];
 // Theo dõi quota Cloudflare Workers AI (lỗi 4006 = hết 10.000 neurons/ngày).
 // Khi đã chạm quota, bỏ qua env.AI trong một khoảng ngắn để fallback thẳng sang Gemini (đỡ tốn thời gian chờ lỗi).
 let CF_AI_QUOTA_HIT_UNTIL = 0;
@@ -2407,20 +2458,28 @@ function buildQuoteBankCatalog(visionDesc = "") {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length >= 3);
+  const halfRecent = RECENT_QUOTE_IDS.slice(Math.floor(RECENT_QUOTE_IDS.length / 2));
   const lines = [];
   for (const [cat, list] of Object.entries(VERIFIED_QUOTE_BANK)) {
-    const fresh = list.filter((q) => !RECENT_QUOTE_IDS.includes(q.id));
-    const pool = shuffleInPlace([...(fresh.length >= 10 ? fresh : list)]);
-    const ranked = pool.map((q) => {
+    let fresh = list.filter((q) => !RECENT_QUOTE_IDS.includes(q.id));
+    if (fresh.length < 25) {
+      const relaxed = list.filter((q) => !halfRecent.includes(q.id));
+      fresh = relaxed.length >= 20 ? relaxed : list;
+    }
+    const pool = shuffleInPlace([...fresh]);
+    const scored = pool.map((q) => {
       const hay = `${q.tags} ${q.attribution}`.toLowerCase();
-      let score = 0;
+      let hits = 0;
       for (const t of tokens) {
-        if (hay.includes(t)) score += 2;
+        if (hay.includes(t)) hits++;
       }
-      return { q, score: score + Math.random() * 2.4 };
+      return { q, score: hits * 1.1 + rand01() * 6.0 };
     });
-    ranked.sort((a, b) => b.score - a.score);
-    const picked = shuffleInPlace(ranked.slice(0, 20)).map((x) => `${x.q.id}(${x.q.tags})`);
+    scored.sort((a, b) => b.score - a.score);
+    const splitAt = Math.max(12, Math.floor(scored.length * 0.4));
+    const topBand = shuffleInPlace(scored.slice(0, splitAt)).slice(0, 12);
+    const restBand = shuffleInPlace(scored.slice(splitAt)).slice(0, 12);
+    const picked = shuffleInPlace([...topBand, ...restBand]).map((x) => `${x.q.id}(${x.q.tags})`);
     lines.push(`${cat}: ${picked.join("; ")}`);
   }
   return lines.join("\n");
@@ -2432,19 +2491,30 @@ function pickVerifiedQuotesFromMap(idMap, seedText = "", catsOverride = null, sk
       ? [...catsOverride]
       : ["pop_music", "greek_philosophy", "famous_modern_figures", "film_and_tv", "athlete"];
   const pairs = [];
+  const usedAttrs = new Set();
+  const recentSet = new Set(RECENT_QUOTE_IDS);
+  const halfRecentSet = new Set(RECENT_QUOTE_IDS.slice(Math.floor(RECENT_QUOTE_IDS.length / 2)));
   let matchedCount = 0;
 
   for (const cat of cats) {
     const list = VERIFIED_QUOTE_BANK[cat] || VERIFIED_QUOTE_BANK.pop_music;
     const reqId = idMap && typeof idMap[cat] === "string" ? idMap[cat].trim() : "";
     let item = list.find((it) => it.id === reqId);
-    if (item) {
+    const attrLow = item ? String(item.attribution || "").toLowerCase().trim() : "";
+    if (item && !recentSet.has(item.id) && !usedAttrs.has(attrLow)) {
       matchedCount++;
     } else {
-      const fresh = list.filter((it) => !RECENT_QUOTE_IDS.includes(it.id));
+      let fresh = list.filter((it) => !recentSet.has(it.id) && !usedAttrs.has(String(it.attribution || "").toLowerCase().trim()));
+      if (fresh.length === 0) {
+        fresh = list.filter((it) => !halfRecentSet.has(it.id) && !usedAttrs.has(String(it.attribution || "").toLowerCase().trim()));
+      }
+      if (fresh.length === 0) {
+        fresh = list.filter((it) => !recentSet.has(it.id));
+      }
       const pool = fresh.length > 0 ? fresh : list;
-      item = pool[Math.floor(Math.random() * pool.length)];
+      item = pool[Math.floor(rand01() * pool.length)];
     }
+    usedAttrs.add(String(item.attribution || "").toLowerCase().trim());
     pairs.push({
       id: item.id,
       entry: {
@@ -2586,7 +2656,7 @@ async function fetchExternalRealQuotesBatch() {
       if (!item || !item.key || seen.has(item.key)) continue;
       seen.add(item.key);
       merged.push(item);
-      if (merged.length >= 160) break;
+      if (merged.length >= 300) break;
     }
     LIVE_QUOTE_CACHE.items = merged;
     LIVE_QUOTE_CACHE.fetchedAt = Date.now();
@@ -2595,7 +2665,7 @@ async function fetchExternalRealQuotesBatch() {
 
 function shuffleInPlace(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand01() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -2692,7 +2762,7 @@ async function fetchAndPickLiveRealQuotes(env, visionDesc) {
 
   // 1) Gemini smart cascade (3 keys)
   for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
-    const g = await geminiGenerateCaption(env, sys, usr, null, null, k, 320, true, 0.3);
+    const g = await geminiGenerateCaption(env, sys, usr, null, null, k, 320, true, 0.75);
     const quotes = parseLivePicks(g.text);
     if (quotes.length >= 1) {
       return { quotes, via: g.model || "gemini" };
@@ -2709,7 +2779,7 @@ async function fetchAndPickLiveRealQuotes(env, visionDesc) {
           { role: "user", content: usr },
         ],
         260,
-        0.3
+        0.75
       );
       const quotes = parseLivePicks(res?.text);
       if (quotes.length >= 1) {
@@ -2781,15 +2851,16 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     try { return JSON.parse(s); } catch (_) { return null; }
   };
 
-  // Nhánh QUOTE: Hybrid Mode = 3 câu từ kho 200 câu thật + 2 câu danh ngôn thật kéo live từ DummyJSON/ZenQuotes/Wikiquote
+  // Nhánh QUOTE: Hybrid Mode = 3 câu từ kho 570+ câu thật + 2 câu danh ngôn thật kéo live từ DummyJSON/ZenQuotes/Wikiquote
   if (schema && schema.properties && schema.properties.quotes) {
+    await loadRecentQuoteHistory();
     const enumCats = schema.properties.quotes.items?.properties?.category?.enum;
     const cats = Array.isArray(enumCats) && enumCats.length > 0 ? enumCats : Object.keys(VERIFIED_QUOTE_BANK);
-    const avoidNote = RECENT_QUOTE_IDS.length > 0 ? `\nAvoid recently used IDs if possible: ${RECENT_QUOTE_IDS.join(",")}` : "";
+    const avoidNote = RECENT_QUOTE_IDS.length > 0 ? `\nNever pick any already-excluded ID.` : "";
     const buildPickPrompt = (descForRank) =>
       "Look closely at this photo (subject, clothing, objects, food, setting, expression, mood). " +
-      "Pick the SINGLE best-matching quote ID for EACH of the 5 categories from the catalog below. " +
-      'Reply with ONLY a valid JSON object mapping each category name to one ID from that category, e.g. {"pop_music":"pm_7","greek_philosophy":"gp_4","famous_modern_figures":"fm_6","film_and_tv":"ft_20","athlete":"at_6"}. No extra text.' +
+      "Pick a FRESH, varied matching quote ID for EACH of the 5 categories from the catalog below. " +
+      'Reply with ONLY a valid JSON object mapping each category name to one ID from that category, e.g. {"pop_music":"<id>","greek_philosophy":"<id>","famous_modern_figures":"<id>","film_and_tv":"<id>","athlete":"<id>"}. No extra text.' +
       avoidNote +
       "\n\n" +
       buildQuoteBankCatalog(descForRank);
@@ -2814,7 +2885,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
           const bodyObj = {
             model,
             messages: [{ role: "user", content: descMsg }],
-            temperature: 0.35,
+            temperature: 0.85,
           };
           if (/gpt-oss/i.test(model)) {
             bodyObj.reasoning_effort = "low";
@@ -2850,7 +2921,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
           k,
           220,
           true,
-          0.3
+          0.85
         );
         const parsedMap = tryParse(g.text);
         if (parsedMap && typeof parsedMap === "object") {
@@ -2863,7 +2934,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
 
       // (c) CF Vision Pool fallback
       if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
-        const res = await runVisionChatPooled(env, [{ role: "user", content: userContentPick }], 200, 0.35);
+        const res = await runVisionChatPooled(env, [{ role: "user", content: userContentPick }], 200, 0.85);
         const parsedMap = tryParse(res.text);
         if (parsedMap && typeof parsedMap === "object") {
           const picked = pickVerifiedQuotesFromMap(parsedMap, tempId, cats, true);
@@ -2881,7 +2952,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
           const r = await fetch(`${base}/chat/completions`, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${k}` },
-            body: JSON.stringify({ model: nvModel, messages: [{ role: "user", content: userContentPick }], max_tokens: 140, temperature: 0.35 }),
+            body: JSON.stringify({ model: nvModel, messages: [{ role: "user", content: userContentPick }], max_tokens: 140, temperature: 0.85 }),
           });
           if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
           const j = await r.json();
@@ -2907,6 +2978,7 @@ async function generateStructuredCaption(env, appPrompt, rawSchema, imgBytes, so
     ]);
 
     const merged = mergeHybridQuotes(bankRes.picked, liveRes, tempId);
+    await saveRecentQuoteHistory();
     const liveSuffix = merged.liveCount > 0 ? `+live_real_${merged.liveCount}${merged.liveVia ? "_" + merged.liveVia : ""}` : "";
     return {
       data: merged.data,
