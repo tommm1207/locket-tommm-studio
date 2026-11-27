@@ -658,7 +658,7 @@ def main():
     fx_specs = [
         ("fx_ca_cute", "Cá Cute", fx_ca_cute, (88, 28, 135, 205)),
         ("fx_mua_roi", "Mưa Rơi", fx_mua_roi, (15, 23, 42, 205)),
-        ("fx_giot_nuoc", "Giọt Nước", fx_giot_nuoc, (3, 105, 161, 205)),
+        # fx_giot_nuoc now uses the real optical wet-glass refraction shader in worker.js (do not overwrite icon)
         ("fx_bong_bong", "Bong Bóng", fx_bong_bong, (76, 29, 149, 205)),
         ("fx_canh_hoa", "Cánh Hoa", fx_canh_hoa, (157, 23, 77, 205)),
         ("fx_tuyet_roi", "Tuyết Rơi", fx_tuyet_roi, (30, 58, 138, 205)),

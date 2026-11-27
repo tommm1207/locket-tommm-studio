@@ -15,7 +15,7 @@ const HD_SIZE = 768;
 const GITHUB_FRAMES_BIN_BASE =
   "https://raw.githubusercontent.com/tommm1207/locket-tommm-studio/main/assets/frames_bin";
 
-const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_polaroid_vintage":{"is4Cut":false,"windows":[[34,34,478,412]]},"nm_giang_sinh_len_am":{"is4Cut":false,"windows":[[32,32,480,480]]},"nm_soulmate":{"is4Cut":false,"windows":[[28,28,484,432]]},"nm_love_postcard":{"is4Cut":false,"windows":[[30,30,482,424]]},"nm_giang_sinh_tuan_loc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giang_sinh_selfie":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ho_ho_ho":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chung_minh_la_ban":{"is4Cut":false,"windows":[[28,28,484,424]]},"nm_son_tung_mtp":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ronaldo_siuuu":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_phai_luon_tu_te":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chi_can_mot_vet_xuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_trend_tic_toc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ai_cho_xinh_vay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_tam_cuoi_dang_dang":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_locket_camera":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_spotify_pc":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_spotify_hong":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_fuji_film":{"is4Cut":false,"windows":[[44,24,468,488]]},"nm_gay_meter":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chua_som":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_bang_tin_khan":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ve_gui_xe":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_vo_hoc_sinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giao_vien_cham_bai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_nhiem_vu_hom_nay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hoa_don_di_choi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_khong_can_ai_duyet":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ban_la_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ong_troi_that_bat_cong":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_yeu_giau_chu_co_phai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_me_con_em_don_anh_ve":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_meo_meme":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hai_trai_cay":{"is4Cut":false,"windows":[[24,24,488,440]]},"fx_ca_cute":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_mua_roi":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_giot_nuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_bong_bong":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_canh_hoa":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_tuyet_roi":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sticker_doodle":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_cau_vong":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_buom_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sao_lap_lanh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_do_hay_den":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_duyen_tinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_nay_nen_an_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_xem_que":{"is4Cut":false,"windows":[[0,0,512,512]]}};
+const FRAMES_MANIFEST = {"frame_berry_days":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"frame_happy_snap":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"frame_sky_diary":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"photobooth_4cut":{"is4Cut":true,"windows":[[56,92,247,247],[265,92,456,247],[56,265,247,420],[265,265,456,420]]},"photobooth_cute":{"is4Cut":false,"windows":[[72,72,440,440]]},"pb_holo_4cut":{"is4Cut":true,"windows":[[26,30,245,246],[264,21,491,245],[31,262,246,495],[266,263,490,473]]},"pb_scrapbook_ripped_4cut":{"is4Cut":true,"windows":[[39,44,240,243],[273,43,475,243],[39,271,241,472],[274,272,475,471]]},"pb_ripped_paper_4cut":{"is4Cut":true,"windows":[[30,23,236,235],[273,23,481,234],[33,263,236,479],[276,261,484,479]]},"pb_denim_ripped_2x2":{"is4Cut":true,"windows":[[32,27,241,236],[271,28,480,235],[32,264,245,477],[274,260,483,481]]},"frame_classic_pb":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_pastel_ngot_ngao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hello_kitty_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_vien_ren":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_hoa_pastel_vien_xanh_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_spiderred":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_khong_gian_xanh_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_ngoi_sao_hong_pastel":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_pastel_so_hai_cau":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_shin_chan":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_anh_hellokitty_v_sao":{"is4Cut":false,"windows":[[0,0,512,512]]},"khung_xanh_tay_sao_vang":{"is4Cut":false,"windows":[[0,0,512,512]]},"sinh_nhat_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_y2k_silver_holo":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_denim_ripped":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_single_film_nostalgia":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_cortis_4cut":{"is4Cut":true,"windows":[[32,41,255,252],[258,41,480,252],[32,256,255,468],[258,256,480,473]]},"pb_cortis_v1":{"is4Cut":true,"windows":[[39,42,252,246],[263,42,474,246],[39,258,252,468],[262,258,474,468]]},"pb_cortis_v2":{"is4Cut":true,"windows":[[49,45,254,232],[258,45,463,233],[49,256,254,446],[258,256,463,446]]},"pb_ech_xanh":{"is4Cut":true,"windows":[[73,94,252,247],[258,94,437,247],[73,256,252,423],[258,256,437,423]]},"pb_galaxy":{"is4Cut":true,"windows":[[34,31,244,243],[269,31,479,243],[34,267,244,474],[269,267,479,475]]},"pb_meo_dang_yeu_4cut":{"is4Cut":true,"windows":[[47,36,254,255],[261,45,465,255],[50,257,251,474],[261,257,466,475]]},"pb_photobooth_hello_kitty":{"is4Cut":true,"windows":[[47,102,255,254],[256,102,464,254],[47,256,255,424],[256,256,464,424]]},"pb_shinchan_4cut":{"is4Cut":true,"windows":[[39,46,250,247],[259,45,471,248],[37,256,252,469],[259,256,473,469]]},"pb_strawberry":{"is4Cut":true,"windows":[[36,39,244,244],[268,39,477,244],[36,262,244,471],[268,262,477,471]]},"pb_supperman_4cut":{"is4Cut":true,"windows":[[39,28,245,248],[268,28,474,248],[39,264,245,478],[267,264,474,478]]},"pb_trung_bac_thao":{"is4Cut":true,"windows":[[70,82,255,256],[263,82,448,256],[70,270,255,450],[263,270,448,450]]},"pb_vien_hello_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"pb_vintage":{"is4Cut":true,"windows":[[31,27,246,240],[267,28,482,240],[31,264,247,478],[267,264,482,478]]},"khung_doraemon_shinchan_kitty":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_polaroid_vintage":{"is4Cut":false,"windows":[[34,34,478,412]]},"nm_giang_sinh_len_am":{"is4Cut":false,"windows":[[32,32,480,480]]},"nm_soulmate":{"is4Cut":false,"windows":[[28,28,484,432]]},"nm_love_postcard":{"is4Cut":false,"windows":[[30,30,482,424]]},"nm_giang_sinh_tuan_loc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giang_sinh_selfie":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ho_ho_ho":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chung_minh_la_ban":{"is4Cut":false,"windows":[[28,28,484,424]]},"nm_son_tung_mtp":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ronaldo_siuuu":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_phai_luon_tu_te":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chi_can_mot_vet_xuoc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_trend_tic_toc":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ai_cho_xinh_vay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_tam_cuoi_dang_dang":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_locket_camera":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_spotify_pc":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_spotify_hong":{"is4Cut":false,"windows":[[46,44,466,368]]},"nm_fuji_film":{"is4Cut":false,"windows":[[44,24,468,488]]},"nm_gay_meter":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_chua_som":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_bang_tin_khan":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ve_gui_xe":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_vo_hoc_sinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_giao_vien_cham_bai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_nhiem_vu_hom_nay":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hoa_don_di_choi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_khong_can_ai_duyet":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ban_la_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_ong_troi_that_bat_cong":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_yeu_giau_chu_co_phai":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_me_con_em_don_anh_ve":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_meo_meme":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_hai_trai_cay":{"is4Cut":false,"windows":[[24,24,488,440]]},"fx_ca_cute":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_mua_roi":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_bong_bong":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_canh_hoa":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_tuyet_roi":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sticker_doodle":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_cau_vong":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_buom_xinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"fx_sao_lap_lanh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_do_hay_den":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_duyen_tinh":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_nay_nen_an_gi":{"is4Cut":false,"windows":[[0,0,512,512]]},"nm_boi_xem_que":{"is4Cut":false,"windows":[[0,0,512,512]]}};
 
 const RANDOM_VARIANT_FRAMES = {
   nm_boi_do_hay_den: 4,
@@ -74,6 +74,7 @@ const SPECIAL_FX_IDS = new Set([
   "portrait_bokeh",
   "cctv_camera",
   "triple_clone",
+  "fx_giot_nuoc",
 ]);
 
 const FACE_LOCK_KEEP_BG =
@@ -1450,58 +1451,66 @@ function applyTripleClone(rgb, w, h) {
   }
 }
 
-function applyPortraitBokeh(rgb, w, h) {
-  // Fast O(1) sliding-window separable 2-pass blur (horizontal -> vertical)
+function boxBlurRgb(srcRgb, w, h, rad, passes = 1) {
+  let cur = new Uint8Array(srcRgb);
   const tmp = new Uint8Array(w * h * 3);
-  const blur = new Uint8Array(w * h * 3);
-  const rad = Math.max(7, Math.round(7 * (w / 512)));
+  const out = new Uint8Array(w * h * 3);
   const win = rad * 2 + 1;
   const maxX = w - 1;
   const maxY = h - 1;
+  const stride = w * 3;
 
-  for (let y = 0; y < h; y++) {
-    const row = y * w * 3;
-    let sr = rgb[row] * (rad + 1), sg = rgb[row + 1] * (rad + 1), sb = rgb[row + 2] * (rad + 1);
-    for (let k = 1; k <= rad; k++) {
-      const si = row + Math.min(maxX, k) * 3;
-      sr += rgb[si]; sg += rgb[si + 1]; sb += rgb[si + 2];
+  for (let pass = 0; pass < passes; pass++) {
+    for (let y = 0; y < h; y++) {
+      const row = y * stride;
+      let sr = cur[row] * (rad + 1), sg = cur[row + 1] * (rad + 1), sb = cur[row + 2] * (rad + 1);
+      for (let k = 1; k <= rad; k++) {
+        const si = row + Math.min(maxX, k) * 3;
+        sr += cur[si]; sg += cur[si + 1]; sb += cur[si + 2];
+      }
+      for (let x = 0; x < w; x++) {
+        const di = row + x * 3;
+        tmp[di] = (sr / win) | 0;
+        tmp[di + 1] = (sg / win) | 0;
+        tmp[di + 2] = (sb / win) | 0;
+        const xAdd = x + rad + 1;
+        const xSub = x - rad;
+        const addIdx = row + (xAdd > maxX ? maxX : xAdd) * 3;
+        const subIdx = row + (xSub < 0 ? 0 : xSub) * 3;
+        sr += cur[addIdx] - cur[subIdx];
+        sg += cur[addIdx + 1] - cur[subIdx + 1];
+        sb += cur[addIdx + 2] - cur[subIdx + 2];
+      }
     }
     for (let x = 0; x < w; x++) {
-      const di = row + x * 3;
-      tmp[di] = (sr / win) | 0;
-      tmp[di + 1] = (sg / win) | 0;
-      tmp[di + 2] = (sb / win) | 0;
-      const xAdd = x + rad + 1;
-      const xSub = x - rad;
-      const addIdx = row + (xAdd > maxX ? maxX : xAdd) * 3;
-      const subIdx = row + (xSub < 0 ? 0 : xSub) * 3;
-      sr += rgb[addIdx] - rgb[subIdx];
-      sg += rgb[addIdx + 1] - rgb[subIdx + 1];
-      sb += rgb[addIdx + 2] - rgb[subIdx + 2];
+      const colOff = x * 3;
+      let sr = tmp[colOff] * (rad + 1), sg = tmp[colOff + 1] * (rad + 1), sb = tmp[colOff + 2] * (rad + 1);
+      for (let k = 1; k <= rad; k++) {
+        const si = (k > maxY ? maxY : k) * stride + colOff;
+        sr += tmp[si]; sg += tmp[si + 1]; sb += tmp[si + 2];
+      }
+      for (let y = 0; y < h; y++) {
+        const di = y * stride + colOff;
+        out[di] = (sr / win) | 0;
+        out[di + 1] = (sg / win) | 0;
+        out[di + 2] = (sb / win) | 0;
+        const yAdd = y + rad + 1;
+        const ySub = y - rad;
+        const addIdx = (yAdd > maxY ? maxY : yAdd) * stride + colOff;
+        const subIdx = (ySub < 0 ? 0 : ySub) * stride + colOff;
+        sr += tmp[addIdx] - tmp[subIdx];
+        sg += tmp[addIdx + 1] - tmp[subIdx + 1];
+        sb += tmp[addIdx + 2] - tmp[subIdx + 2];
+      }
     }
+    if (pass + 1 < passes) cur = new Uint8Array(out);
   }
-  const stride = w * 3;
-  for (let x = 0; x < w; x++) {
-    const colOff = x * 3;
-    let sr = tmp[colOff] * (rad + 1), sg = tmp[colOff + 1] * (rad + 1), sb = tmp[colOff + 2] * (rad + 1);
-    for (let k = 1; k <= rad; k++) {
-      const si = (k > maxY ? maxY : k) * stride + colOff;
-      sr += tmp[si]; sg += tmp[si + 1]; sb += tmp[si + 2];
-    }
-    for (let y = 0; y < h; y++) {
-      const di = y * stride + colOff;
-      blur[di] = (sr / win) | 0;
-      blur[di + 1] = (sg / win) | 0;
-      blur[di + 2] = (sb / win) | 0;
-      const yAdd = y + rad + 1;
-      const ySub = y - rad;
-      const addIdx = (yAdd > maxY ? maxY : yAdd) * stride + colOff;
-      const subIdx = (ySub < 0 ? 0 : ySub) * stride + colOff;
-      sr += tmp[addIdx] - tmp[subIdx];
-      sg += tmp[addIdx + 1] - tmp[subIdx + 1];
-      sb += tmp[addIdx + 2] - tmp[subIdx + 2];
-    }
-  }
+  return out;
+}
+
+function applyPortraitBokeh(rgb, w, h) {
+  const rad = Math.max(7, Math.round(7 * (w / 512)));
+  const blur = boxBlurRgb(rgb, w, h, rad, 1);
   // Smooth feathered vertical portrait ellipse matte
   const invW = 1 / w;
   const invH = 1 / h;
@@ -1518,6 +1527,166 @@ function applyPortraitBokeh(rgb, w, h) {
       rgb[i] = (rgb[i] * sharpRatio + blur[i] * invRatio) | 0;
       rgb[i + 1] = (rgb[i + 1] * sharpRatio + blur[i + 1] * invRatio) | 0;
       rgb[i + 2] = (rgb[i + 2] * sharpRatio + blur[i + 2] * invRatio) | 0;
+    }
+  }
+}
+
+function applyWaterDropletsGlass(rgb, w, h) {
+  const orig = new Uint8Array(rgb);
+  const s = w / 768;
+  const blurRad = Math.max(2, Math.round(4 * s));
+  const blur = boxBlurRgb(orig, w, h, blurRad, 2);
+
+  const total = w * h;
+  const field = new Float32Array(total);
+  let rng = (((Date.now() & 0xffff) ^ 0x9e3779b9) >>> 0) || 0x13579bdf;
+  const rnd = () => {
+    rng = (rng ^ (rng << 13)) >>> 0;
+    rng = (rng ^ (rng >>> 17)) >>> 0;
+    rng = (rng ^ (rng << 5)) >>> 0;
+    if (rng === 0) rng = 0x9e3779b9;
+    return rng / 4294967296;
+  };
+
+  const splatLobe = (cx, cy, rx, ry, gravityBulge) => {
+    const maxR = Math.max(rx, ry * 1.18);
+    const x0 = Math.max(0, Math.floor(cx - maxR - 1));
+    const x1 = Math.min(w - 1, Math.ceil(cx + maxR + 1));
+    const y0 = Math.max(0, Math.floor(cy - ry - 1));
+    const y1 = Math.min(h - 1, Math.ceil(cy + ry + 1));
+    const invRy = 1 / Math.max(0.5, ry);
+    const invRx = 1 / Math.max(0.5, rx);
+    for (let y = y0; y <= y1; y++) {
+      const yn = (y - cy) * invRy;
+      const yn2 = yn * yn;
+      if (yn2 >= 1) continue;
+      const rxScale = gravityBulge > 0 ? 1 + gravityBulge * yn : 1;
+      const effInvRx = invRx / Math.max(0.65, rxScale);
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const xn = (x - cx) * effInvRx;
+        const d2 = xn * xn + yn2;
+        if (d2 < 1) {
+          const val = 1 - d2;
+          field[row + x] += val * val;
+        }
+      }
+    }
+  };
+
+  // Tier 1: ~220 micro mist beads
+  for (let i = 0; i < 220; i++) {
+    const r = (2.2 + rnd() * 3.8) * s;
+    const asp = 1.0 + rnd() * 0.22;
+    splatLobe(rnd() * w, rnd() * h, r, r * asp, 0);
+  }
+  // Tier 2: ~100 medium organic beads (45% fused with an offset satellite lobe)
+  for (let i = 0; i < 100; i++) {
+    const cx = rnd() * w;
+    const cy = rnd() * h;
+    const rx = (6.5 + rnd() * 7.0) * s;
+    const ry = rx * (1.05 + rnd() * 0.34);
+    splatLobe(cx, cy, rx, ry, 0.12);
+    if (rnd() < 0.45) {
+      const ang = rnd() * Math.PI * 2;
+      const dist = rx * (0.42 + rnd() * 0.22);
+      const sr = rx * (0.58 + rnd() * 0.26);
+      splatLobe(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, sr, sr * (1.02 + rnd() * 0.24), 0.08);
+    }
+  }
+  // Tier 3: ~26 hero teardrops & fused glass clusters
+  for (let i = 0; i < 26; i++) {
+    const cx = (0.04 + rnd() * 0.92) * w;
+    const cy = (0.04 + rnd() * 0.92) * h;
+    const rx = (14.0 + rnd() * 10.0) * s;
+    const ry = rx * (1.10 + rnd() * 0.32);
+    splatLobe(cx, cy, rx, ry, 0.18);
+    const lobes = rnd() < 0.45 ? 2 : 1;
+    for (let l = 0; l < lobes; l++) {
+      const ang = (l === 0 ? -1 : 1) * (0.5 + rnd() * 2.1);
+      const dist = rx * (0.45 + rnd() * 0.25);
+      const sr = rx * (0.55 + rnd() * 0.28);
+      splatLobe(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, sr, sr * (1.06 + rnd() * 0.25), 0.14);
+    }
+  }
+
+  const T = 0.20;
+  const gradGain = 5.0;
+  const refractPx = 22.0 * s;
+  const shX = Math.max(1, Math.round(2 * s));
+  const shY = Math.max(2, Math.round(3 * s));
+  const maxW = w - 1.001;
+  const maxH = h - 1.001;
+
+  for (let y = 0; y < h; y++) {
+    const ym = y > 0 ? y - 1 : 0;
+    const yp = y < h - 1 ? y + 1 : h - 1;
+    const ySh = y >= shY ? y - shY : 0;
+    const row = y * w;
+    for (let x = 0; x < w; x++) {
+      const idx = row + x;
+      const f = field[idx];
+      const i3 = idx * 3;
+      if (f <= T) {
+        const xSh = x >= shX ? x - shX : 0;
+        const fSh = field[ySh * w + xSh];
+        const mul = fSh > T ? 0.84 : 1.0;
+        rgb[i3] = (blur[i3] * mul) | 0;
+        rgb[i3 + 1] = (blur[i3 + 1] * mul) | 0;
+        rgb[i3 + 2] = (blur[i3 + 2] * mul) | 0;
+        continue;
+      }
+
+      const xm = x > 0 ? x - 1 : 0;
+      const xp = x < w - 1 ? x + 1 : w - 1;
+      const gx = (field[row + xp] - field[row + xm]) * gradGain;
+      const gy = (field[yp * w + x] - field[ym * w + x]) * gradGain;
+      const invLen = 1 / Math.sqrt(gx * gx + gy * gy + 1.0);
+      const nx = -gx * invLen;
+      const ny = -gy * invLen;
+      const nz = invLen;
+
+      let sx = x - nx * refractPx;
+      let sy = y - ny * refractPx;
+      if (sx < 0) sx = 0;
+      else if (sx > maxW) sx = maxW;
+      if (sy < 0) sy = 0;
+      else if (sy > maxH) sy = maxH;
+
+      const x0 = sx | 0;
+      const y0 = sy | 0;
+      const fx = sx - x0;
+      const fy = sy - y0;
+      const ifx = 1 - fx;
+      const ify = 1 - fy;
+      const i00 = (y0 * w + x0) * 3;
+      const i10 = (y0 * w + x0 + 1) * 3;
+      const i01 = ((y0 + 1) * w + x0) * 3;
+      const i11 = ((y0 + 1) * w + x0 + 1) * 3;
+
+      // Clear water center, crisp dark meniscus strictly on thin outer perimeter
+      const edgeBand = f < T + 0.16 ? 1 - (f - T) / 0.16 : 0;
+      const slopeRim = Math.max(0, 1 - nz);
+      const darkRim = 1 - (0.48 * edgeBand * edgeBand + 0.22 * slopeRim * slopeRim);
+      const caustic = Math.max(0, nx * 0.65 + ny * 0.76) * (0.35 + 0.65 * slopeRim);
+      const h1 = Math.max(0, -nx * 0.62 - ny * 0.68 + nz * 0.42);
+      const spec1 = Math.pow(h1, 20) * 235;
+      const h2 = Math.max(0, nx * 0.55 + ny * 0.65 + nz * 0.55);
+      const spec2 = Math.pow(h2, 26) * 115;
+      const spec = spec1 + spec2;
+
+      const edgeA = f - T < 0.08 ? (f - T) / 0.08 : 1.0;
+      const invA = 1 - edgeA;
+
+      for (let c = 0; c < 3; c++) {
+        let rc = (orig[i00 + c] * ifx + orig[i10 + c] * fx) * ify + (orig[i01 + c] * ifx + orig[i11 + c] * fx) * fy;
+        rc = (rc - 128) * 1.06 + 132;
+        let dc = rc * darkRim + 42 * caustic + spec;
+        if (dc < 0) dc = 0;
+        else if (dc > 255) dc = 255;
+        const mixed = blur[i3 + c] * invA + dc * edgeA;
+        rgb[i3 + c] = mixed > 255 ? 255 : mixed < 0 ? 0 : mixed | 0;
+      }
     }
   }
 }
@@ -4782,6 +4951,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, HD_SIZE, HD_SIZE);
       else if (specialFxId === "triple_clone") applyTripleClone(canvasRgb, HD_SIZE, HD_SIZE);
       else if (specialFxId === "portrait_bokeh") applyPortraitBokeh(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_giot_nuoc") applyWaterDropletsGlass(canvasRgb, HD_SIZE, HD_SIZE);
 
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
       const outId = `tommm_fx_${tempId}.${encoded.ext}`;
