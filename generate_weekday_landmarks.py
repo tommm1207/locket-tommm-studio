@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import sys
 import urllib.parse
 import urllib.request
 import zlib
@@ -33,7 +34,7 @@ LANDMARK_ICONS = [
         "星期一",
         FONT_ZH,
         False,
-        ["wiki:Taipei_101", "Taipei 101 skyscraper blue sky"],
+        ["Taipei 101 tower blue sky closeup", "Taipei 101 vertical blue sky", "Taipei 101 building"],
     ),
     (
         "weekday_depth_de",
@@ -54,14 +55,14 @@ LANDMARK_ICONS = [
         "日曜日",
         FONT_JA,
         False,
-        ["wiki:Tokyo_Tower", "Tokyo Skytree blue sky", "Tokyo Tower blue sky"],
+        ["wiki:Mount_Fuji", "Chureito Pagoda Mount Fuji", "Fujisan morning blue sky"],
     ),
     (
         "weekday_depth_ko",
         "일요일",
         FONT_KO,
         False,
-        ["wiki:N_Seoul_Tower", "wiki:Gyeongbokgung", "N Seoul Tower daytime"],
+        ["Gyeongbokgung Palace Geunjeongjeon blue sky", "wiki:Gyeongbokgung", "Gyeongbokgung Gwanghwamun blue sky"],
     ),
     (
         "weekday_depth_es",
@@ -306,25 +307,29 @@ def main():
     os.makedirs(FRAMES_DIR, exist_ok=True)
     os.makedirs(BINS_DIR, exist_ok=True)
 
+    targets = set(sys.argv[1:]) if len(sys.argv) > 1 else None
     fetched = {}
     for fid, word, font_path, is_latin, queries in LANDMARK_ICONS:
+        if targets is not None and fid not in targets:
+            continue
         im, used_q = fetch_wikimedia_photo(queries)
         if im is None:
             raise RuntimeError(f"Failed to fetch Wikimedia landmark photo for {fid} ({queries})")
         make_landmark_icon(fid, word, font_path, is_latin, im)
         fetched[fid] = f"{im.size} ({used_q})"
 
-    print("Landmark icons fetched & built (8/8):")
+    print(f"Landmark icons fetched & built ({len(fetched)}):")
     for k, v in fetched.items():
         print(f"  {k}: {v}")
 
-    ref_cy = detect_reference_bin_center_y()
-    bin_count = 0
-    for prefix, (font_path, is_latin, words) in NEW_WEEKDAY_BINS.items():
-        for idx, word in enumerate(words):
-            generate_weekday_bin(prefix, idx, word, font_path, is_latin, ref_cy)
-            bin_count += 1
-    print(f"Generated {bin_count} weekday .bin overlays (ref_cy={ref_cy}).")
+    if targets is None:
+        ref_cy = detect_reference_bin_center_y()
+        bin_count = 0
+        for prefix, (font_path, is_latin, words) in NEW_WEEKDAY_BINS.items():
+            for idx, word in enumerate(words):
+                generate_weekday_bin(prefix, idx, word, font_path, is_latin, ref_cy)
+                bin_count += 1
+        print(f"Generated {bin_count} weekday .bin overlays (ref_cy={ref_cy}).")
 
 
 if __name__ == "__main__":

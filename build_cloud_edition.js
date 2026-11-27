@@ -1170,9 +1170,9 @@ for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png?v=4", "calendar", "🇬🇧");
 pushCustomFilter("weekday_depth_zh", "星期景深 (CN)", "#991B1B", "#F87171", FBASE + "weekday_depth_zh.png?v=4", "calendar", "🇨🇳");
-pushCustomFilter("weekday_depth_tw", "星期景深 (TW)", "#7C2D12", "#FB923C", FBASE + "weekday_depth_tw.png?v=4", "calendar", "🇹🇼");
-pushCustomFilter("weekday_depth_ja", "曜日深度 (JP)", "#9F1239", "#FDA4AF", FBASE + "weekday_depth_ja.png?v=4", "calendar", "🇯🇵");
-pushCustomFilter("weekday_depth_ko", "요일 깊이 (KR)", "#1D4ED8", "#93C5FD", FBASE + "weekday_depth_ko.png?v=4", "calendar", "🇰🇷");
+pushCustomFilter("weekday_depth_tw", "星期景深 (TW)", "#7C2D12", "#FB923C", FBASE + "weekday_depth_tw.png?v=5", "calendar", "🇹🇼");
+pushCustomFilter("weekday_depth_ja", "曜日深度 (JP)", "#9F1239", "#FDA4AF", FBASE + "weekday_depth_ja.png?v=5", "calendar", "🇯🇵");
+pushCustomFilter("weekday_depth_ko", "요일 깊이 (KR)", "#1D4ED8", "#93C5FD", FBASE + "weekday_depth_ko.png?v=5", "calendar", "🇰🇷");
 pushCustomFilter("weekday_depth_es", "Día Depth (ES)", "#B45309", "#FCD34D", FBASE + "weekday_depth_es.png?v=4", "calendar", "🇪🇸");
 pushCustomFilter("weekday_depth_fr", "Jour Depth (FR)", "#1E40AF", "#BFDBFE", FBASE + "weekday_depth_fr.png?v=4", "calendar", "🇫🇷");
 pushCustomFilter("weekday_depth_de", "Wochentag (DE)", "#78350F", "#FBBF24", FBASE + "weekday_depth_de.png?v=4", "calendar", "🇩🇪");
