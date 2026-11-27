@@ -67,7 +67,7 @@ const FACE_LOCK =
   "Edit this photo while keeping the person's exact face, eyes, nose, mouth, skin tone, hair, expression, pose, and background completely identical. Only apply the requested edit cleanly: ";
 
 const CUSTOM_LOOK_LOCK =
-  "Keep the exact same person, facial features, skin tone, and identity from the input photo, and realistically apply this edit: ";
+  "CRITICAL: keep the person's exact same face, facial features, eyes, nose, mouth, skin tone, identity, head position, face angle, camera viewpoint and pose EXACTLY as in the input photo — do not move, rotate, retouch or regenerate the face. Only change clothing/costume/accessories/background as requested, realistically applying this edit: ";
 
 const CUSTOM_AI_IDS = new Set([
   "stk_tai_tho", "stk_mu_ngu_khoc", "stk_jollibee", "stk_nak_ve_than",
@@ -1287,7 +1287,7 @@ async function translateCustomLookPromptToEn(env, rawText) {
   const clean = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 500);
   if (!clean) return "";
   const sys =
-    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete, vivid, photorealistic English image-editing prompt (35-65 words). Rules: 1) Always start with: 'Keep the exact same person, facial features, skin tone, and identity from the input photo.' 2) Describe exact realistic clothing, costume, cape, accessories, hairstyle, makeup, props, or background requested, worn naturally with realistic fabric folds, lighting, and proportions (do NOT cover the face with a mask/helmet unless explicitly requested). 3) Keep the original background and pose unless the user asked to change them. 4) Output ONLY the English prompt, no quotes or commentary.";
+    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete, vivid, photorealistic English image-editing prompt (35-65 words). Rules: 1) Always start with: 'Keep the exact same person, facial features, skin tone, and identity from the input photo.' 2) Describe exact realistic clothing, costume, cape, accessories, hairstyle, makeup, props, or background requested, worn naturally with realistic fabric folds, lighting, and proportions (do NOT cover the face with a mask/helmet unless explicitly requested). 3) NEVER use trademarked/copyrighted character or brand names (such as Superman, Spider-Man, Batman, Iron Man, Pikachu, Doraemon) because they trigger output filters — instead describe their iconic outfit/colors generically without emblems (e.g. 'a heroic royal-blue superhero suit with a flowing crimson cape and gold belt'). 4) Keep the original background and pose unless asked to change them. Output ONLY the English prompt.";
   for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
     try {
       const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
@@ -4185,7 +4185,10 @@ async function handleStudioRequest(request, env) {
             : null;
           if (aiReq.source === "custom_prompt" && !ai3dModel) {
             try {
-              const opts9b = Object.assign({}, ai3dOpts || {}, { maxPoolTries: 1 });
+              // Ép strength thấp mặc định (~0.6) để 9B KHÔNG vẽ lại mặt/góc — chỉ thay trang phục/nền.
+              // 9B mạnh nên nếu thả tự do sẽ lệch mặt khi biến hình mạnh (vd siêu nhân). env.AI_3D_STRENGTH ghi đè nếu muốn.
+              const strength9b = (env && env.AI_3D_STRENGTH) ? parseFloat(env.AI_3D_STRENGTH) : 0.6;
+              const opts9b = Object.assign({ strength: strength9b }, ai3dOpts || {}, { maxPoolTries: 1 });
               aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, "@cf/black-forest-labs/flux-2-klein-9b", null, opts9b);
               usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
             } catch (err9b) {
@@ -4230,6 +4233,7 @@ async function handleStudioRequest(request, env) {
         LAST_DEBUG = {
           mode: "ai_error",
           filterId: aiReq.filterId,
+          promptPreview: effectivePrompt.slice(0, 220),
           cfErr,
           error: cfErr || "no_image_from_cf_or_gemini",
           ms: Date.now() - t0,
