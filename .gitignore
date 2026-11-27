@@ -18,6 +18,9 @@ cloudflare-worker/.wrangler/
 # Node modules (jpeg-js cho worker) — wrangler tự cài từ package-lock khi deploy
 node_modules/
 
+# Runtime state của Claude Code (lock phiên làm việc) — không commit
+.claude/
+
 # Không bao giờ commit bất kỳ file key/secret nào
 *.key
 *.pem
