@@ -4176,25 +4176,15 @@ async function handleStudioRequest(request, env) {
         let aiOut = null;
         let usedModel = null;
         let cfErr = null;
-        // FLUX với POOL: cho Tạo diện mạo (custom_prompt) ưu tiên chạy FLUX.2-klein-9B trước để bám yêu cầu chuẩn hơn hẳn, lỗi mới hạ về 4B.
+        // FLUX với POOL: Tạo diện mạo (custom_prompt) chạy FLUX.2-klein-4B KHÔNG ép strength — cấu hình
+        // GIỮ MẶT/GÓC tốt (đã xác nhận chạy ổn). 9B mạnh hơn nhưng vẽ lại cả MẶT -> lệch mặt, nên bỏ.
+        // Muốn thử model/strength khác: đặt env AI_3D_MODEL / AI_3D_STRENGTH / AI_3D_STEPS.
         if (env.AI || env.CF_AI_ACCOUNTS) {
           const ai3dModel = (env && env.AI_3D_MODEL) || null;
           const ai3dOpts = (env && (env.AI_3D_STEPS || env.AI_3D_STRENGTH))
             ? { steps: env.AI_3D_STEPS ? parseInt(env.AI_3D_STEPS, 10) : undefined,
                 strength: env.AI_3D_STRENGTH ? parseFloat(env.AI_3D_STRENGTH) : undefined }
             : null;
-          if (aiReq.source === "custom_prompt" && !ai3dModel) {
-            try {
-              // Ép strength thấp mặc định (~0.6) để 9B KHÔNG vẽ lại mặt/góc — chỉ thay trang phục/nền.
-              // 9B mạnh nên nếu thả tự do sẽ lệch mặt khi biến hình mạnh (vd siêu nhân). env.AI_3D_STRENGTH ghi đè nếu muốn.
-              const strength9b = (env && env.AI_3D_STRENGTH) ? parseFloat(env.AI_3D_STRENGTH) : 0.6;
-              const opts9b = Object.assign({ strength: strength9b }, ai3dOpts || {}, { maxPoolTries: 1 });
-              aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, "@cf/black-forest-labs/flux-2-klein-9b", null, opts9b);
-              usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
-            } catch (err9b) {
-              cfErr = "9b:" + String(err9b?.message || err9b);
-            }
-          }
           if (!aiOut || !aiOut.bytes) {
             try {
               aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
