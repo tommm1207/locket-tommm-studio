@@ -2026,18 +2026,20 @@ function applySoapBubblesOptical(rgb, w, h) {
         // Curved sky-window arc highlight + secondary tiny catchlight + membrane rim glint
         const h1 = Math.max(0, -nx * 0.60 - ny * 0.70 + nz * 0.39);
         const h2 = Math.max(0, nx * 0.52 + ny * 0.64 + nz * 0.56);
-        const rimGlow = Math.exp(-Math.pow((r - 0.955) / 0.032, 2)) * 52;
-        const spec = (Math.pow(h1, 26) * 205 + Math.pow(h2, 34) * 85 + rimGlow) * edgeSoft * (isLargeFG ? 0.82 : 1.0);
+        const rimGlow = Math.exp(-Math.pow((r - 0.955) / 0.032, 2)) * 68;
+        const spec = (Math.pow(h1, 24) * 215 + Math.pow(h2, 32) * 95 + rimGlow) * edgeSoft * (isLargeFG ? 0.86 : 1.0);
 
-        const filmA = (0.012 + 0.34 * fresnel) * edgeSoft * (isLargeFG ? 0.82 : 1.0);
-        const refractMix = 0.52 * edgeSoft;
+        const filmA = (0.015 + 0.44 * fresnel) * edgeSoft * (isLargeFG ? 0.86 : 1.0);
+        // Subtle soap-film edge absorption so glass bubble contours stay visible on bright white walls
+        const rimShade = 1.0 - 0.11 * Math.exp(-Math.pow((r - 0.91) / 0.06, 2)) * edgeSoft;
+        const refractMix = 0.54 * edgeSoft;
         const i3 = (row + x) * 3;
 
         for (let c = 0; c < 3; c++) {
           const rc =
             (orig[i00 + c] * (1 - fx) + orig[i10 + c] * fx) * (1 - fy) +
             (orig[i01 + c] * (1 - fx) + orig[i11 + c] * fx) * fy;
-          const base = rgb[i3 + c] * (1 - refractMix) + rc * refractMix;
+          const base = (rgb[i3 + c] * (1 - refractMix) + rc * refractMix) * rimShade;
           const irCol = c === 0 ? ir : c === 1 ? ig : ib;
           const screened = 255 - ((255 - base) * (255 - Math.min(255, irCol * filmA + spec))) / 255;
           rgb[i3 + c] = screened > 255 ? 255 : screened | 0;
@@ -2113,42 +2115,61 @@ function applyPrismRainbowLeak(rgb, w, h) {
     const row = y * w * 3;
     for (let x = 0; x < w; x++) {
       const nx = x * invW;
-      const u = nx * 0.76 + ny * 0.65;
-      const v = (nx - 0.14) * 0.65 - (ny - 0.10) * 0.76;
-      const beamEnv = Math.exp(-Math.pow((u - 0.25) / 0.14, 2)) * Math.exp(-Math.pow(v / 0.44, 2));
-      const entryBloom = Math.exp(-((nx * nx + ny * ny) / 0.14)) * 0.28;
+      const u = nx * 0.72 + ny * 0.69;
+      const v = (nx - 0.15) * 0.69 - (ny - 0.12) * 0.72;
+      const beamEnv = Math.exp(-Math.pow((u - 0.28) / 0.155, 2)) * Math.exp(-Math.pow(v / 0.52, 2));
+      const entryBloom = Math.exp(-((nx * nx + ny * ny) / 0.16)) * 0.34;
 
       // Faint secondary warm optical lens-flare bokeh orb diagonally along sun axis
-      const odx = nx - 0.36;
-      const ody = ny - 0.25;
-      const orbR = Math.sqrt(odx * odx + ody * ody) / 0.068;
-      const orbGlow = orbR < 1.25 ? Math.exp(-orbR * orbR * 2.2) * (0.045 + 0.035 * Math.exp(-Math.pow((orbR - 0.85) / 0.15, 2))) : 0;
+      const odx = nx - 0.38;
+      const ody = ny - 0.27;
+      const orbR = Math.sqrt(odx * odx + ody * ody) / 0.072;
+      const orbGlow = orbR < 1.25 ? Math.exp(-orbR * orbR * 2.2) * (0.055 + 0.04 * Math.exp(-Math.pow((orbR - 0.85) / 0.15, 2))) : 0;
 
       if (beamEnv < 0.01 && entryBloom < 0.008 && orbGlow < 0.005) continue;
 
       // Pastel spectral bands (coral-rose -> warm peach -> pale mint -> airy sky-blue -> soft lavender)
-      const g1 = Math.exp(-Math.pow((u - 0.145) / 0.054, 2));
-      const g2 = Math.exp(-Math.pow((u - 0.200) / 0.054, 2));
-      const g3 = Math.exp(-Math.pow((u - 0.255) / 0.052, 2));
-      const g4 = Math.exp(-Math.pow((u - 0.310) / 0.054, 2));
-      const g5 = Math.exp(-Math.pow((u - 0.362) / 0.052, 2));
+      const g1 = Math.exp(-Math.pow((u - 0.165) / 0.056, 2));
+      const g2 = Math.exp(-Math.pow((u - 0.222) / 0.056, 2));
+      const g3 = Math.exp(-Math.pow((u - 0.280) / 0.054, 2));
+      const g4 = Math.exp(-Math.pow((u - 0.338) / 0.056, 2));
+      const g5 = Math.exp(-Math.pow((u - 0.394) / 0.054, 2));
 
       const rBand = g1 * 1.00 + g2 * 1.00 + g3 * 0.68 + g4 * 0.56 + g5 * 0.78 + 0.18;
-      const gBand = g1 * 0.52 + g2 * 0.82 + g3 * 0.96 + g4 * 0.84 + g5 * 0.64 + 0.16;
-      const bBand = g1 * 0.58 + g2 * 0.48 + g3 * 0.88 + g4 * 1.00 + g5 * 1.00 + 0.15;
+      const gBand = g1 * 0.50 + g2 * 0.80 + g3 * 0.96 + g4 * 0.84 + g5 * 0.62 + 0.16;
+      const bBand = g1 * 0.56 + g2 * 0.46 + g3 * 0.88 + g4 * 1.00 + g5 * 1.00 + 0.15;
 
-      const strength = 0.27 * beamEnv;
+      const strength = 0.42 * beamEnv;
       const lr = 255 * Math.min(1, rBand * strength + entryBloom * 1.00 + orbGlow * 1.00);
       const lg = 255 * Math.min(1, gBand * strength + entryBloom * 0.85 + orbGlow * 0.82);
       const lb = 255 * Math.min(1, bBand * strength + entryBloom * 0.66 + orbGlow * 0.68);
-      screenPixel(rgb, row + x * 3, lr, lg, lb);
+      const idx = row + x * 3;
+      // Subtle headroom only inside intense prism band so pastel colors still glow on bright cream walls
+      if (beamEnv > 0.05) {
+        const hm = 1.0 - 0.13 * beamEnv;
+        rgb[idx] = (rgb[idx] * hm) | 0;
+        rgb[idx + 1] = (rgb[idx + 1] * hm) | 0;
+        rgb[idx + 2] = (rgb[idx + 2] * hm) | 0;
+      }
+      screenPixel(rgb, idx, lr, lg, lb);
     }
   }
 }
 
 function applyKiraSparkleLens(rgb, w, h) {
-  // Razor-thin KiraKira+ diffraction needle filter preserving 100% original photo exposure
+  // Razor-thin KiraKira+ diffraction needle filter preserving skin & shadow brightness
   const s = w / 768;
+  const total = w * h;
+  // Softly roll off ONLY very bright background highlights (>205) so crisp star needles remain visible on bright walls
+  for (let p = 0, i = 0; p < total; p++, i += 3) {
+    const r = rgb[i], g = rgb[i + 1], b = rgb[i + 2];
+    if (r > 205 || g > 205 || b > 205) {
+      if (r > 205) rgb[i] = (205 + (r - 205) * 0.56) | 0;
+      if (g > 205) rgb[i + 1] = (205 + (g - 205) * 0.56) | 0;
+      if (b > 205) rgb[i + 2] = (205 + (b - 205) * 0.56) | 0;
+    }
+  }
+
   const cells = 16;
   const cw = w / cells;
   const ch = h / cells;
@@ -2169,7 +2190,7 @@ function applyKiraSparkleLens(rgb, w, h) {
         for (let x = sx0; x < sx1; x += 3) {
           const i = row + x * 3;
           const lum = 0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2];
-          if (lum < 118) continue;
+          if (lum < 110) continue;
           const iR = row + (x + step) * 3;
           const iL = row + (x - step) * 3;
           const iU = rowU + x * 3;
@@ -2187,7 +2208,7 @@ function applyKiraSparkleLens(rgb, w, h) {
           if (score > bestScore) { bestScore = score; bestLum = lum; bestX = x; bestY = y; }
         }
       }
-      if (bestScore > 11 && bestLum > 122) {
+      if (bestScore > 10 && bestLum > 115) {
         candidates.push({ x: bestX, y: bestY, lum: bestLum, score: bestScore });
       }
     }
@@ -2197,8 +2218,8 @@ function applyKiraSparkleLens(rgb, w, h) {
   const rnd = makeFxRng(0x9a1c1e55);
   const glints = [];
   if (candidates.length >= 4) {
-    // Normal lit photo: up to 4 hero glints (well spaced) + up to 10 delicate micro-twinkles
-    const heroDist2 = (92 * s) * (92 * s);
+    // Normal lit photo: up to 4 hero diamond glints (well spaced) + up to 12 crisp micro-twinkles
+    const heroDist2 = (86 * s) * (86 * s);
     for (const c of candidates) {
       let ok = true;
       for (const p of glints) {
@@ -2206,11 +2227,11 @@ function applyKiraSparkleLens(rgb, w, h) {
         if (dx * dx + dy * dy < heroDist2) { ok = false; break; }
       }
       if (ok) {
-        glints.push({ x: c.x, y: c.y, inten: Math.min(1.0, 0.72 + (c.lum - 120) / 320), hero: true });
+        glints.push({ x: c.x, y: c.y, inten: Math.min(1.0, 0.80 + (c.lum - 115) / 280), hero: true });
         if (glints.length >= 4) break;
       }
     }
-    const minDist2 = (55 * s) * (55 * s);
+    const minDist2 = (52 * s) * (52 * s);
     for (const c of candidates) {
       let ok = true;
       for (const p of glints) {
@@ -2218,19 +2239,20 @@ function applyKiraSparkleLens(rgb, w, h) {
         if (dx * dx + dy * dy < minDist2) { ok = false; break; }
       }
       if (ok) {
-        glints.push({ x: c.x, y: c.y, inten: Math.min(0.85, 0.48 + (c.lum - 120) / 400), hero: false });
-        if (glints.length >= 14) break;
+        glints.push({ x: c.x, y: c.y, inten: Math.min(0.95, 0.65 + (c.lum - 115) / 340), hero: false });
+        if (glints.length >= 16) break;
       }
     }
   } else {
-    // Dark/black frame fallback: delicate varied starry micro-twinkles + 2 subtle refined glints
-    glints.push({ x: 0.16 * w, y: 0.18 * h, inten: 0.80, hero: true });
-    glints.push({ x: 0.84 * w, y: 0.24 * h, inten: 0.74, hero: true });
+    // Dark/black frame fallback: delicate starry micro-twinkles + 3 refined diamond glints
+    glints.push({ x: 0.16 * w, y: 0.20 * h, inten: 0.88, hero: true });
+    glints.push({ x: 0.84 * w, y: 0.22 * h, inten: 0.82, hero: true });
+    glints.push({ x: 0.76 * w, y: 0.78 * h, inten: 0.78, hero: true });
     for (let k = 0; k < 14; k++) {
       glints.push({
         x: (0.08 + rnd() * 0.84) * w,
         y: (0.08 + rnd() * 0.84) * h,
-        inten: 0.42 + rnd() * 0.36,
+        inten: 0.55 + rnd() * 0.38,
         hero: false,
       });
     }
@@ -2241,7 +2263,7 @@ function applyKiraSparkleLens(rgb, w, h) {
     const cx = g.x;
     const cy = g.y;
     const isHero = g.hero;
-    const armLen = (isHero ? (26 + (idx % 2) * 8) : (7 + rnd() * 9)) * s * g.inten;
+    const armLen = (isHero ? (38 + (idx % 2) * 10) : (12 + rnd() * 10)) * s * g.inten;
     const ang0 = isHero ? (idx % 2 === 0 ? 0.7854 : 0.0) : (rnd() * 1.57);
     const cA = Math.cos(ang0), sA = Math.sin(ang0);
     const cB = Math.cos(ang0 + 0.7854), sB = Math.sin(ang0 + 0.7854);
@@ -2250,9 +2272,9 @@ function applyKiraSparkleLens(rgb, w, h) {
     const x1 = Math.min(w - 1, Math.ceil(cx + box));
     const y0 = Math.max(0, Math.floor(cy - box));
     const y1 = Math.min(h - 1, Math.ceil(cy + box));
-    const thick = (isHero ? 0.64 : 0.44) * s;
-    const coreR = (isHero ? 2.5 : 1.7) * s;
-    const haloR = (isHero ? 12.0 : 6.0) * s;
+    const thick = (isHero ? 0.96 : 0.70) * s;
+    const coreR = (isHero ? 3.8 : 2.3) * s;
+    const haloR = (isHero ? 15.0 : 8.0) * s;
 
     for (let y = y0; y <= y1; y++) {
       const dy = y - cy;
@@ -2263,27 +2285,27 @@ function applyKiraSparkleLens(rgb, w, h) {
         if (r > armLen) continue;
         const u = Math.abs(dx * cA + dy * sA);
         const v = Math.abs(-dx * sA + dy * cA);
-        const ray1 = Math.exp(-v / thick) * Math.pow(Math.max(0, 1 - u / armLen), 2.3);
-        const ray2 = Math.exp(-u / thick) * Math.pow(Math.max(0, 1 - v / armLen), 2.3);
+        const ray1 = Math.exp(-v / thick) * Math.pow(Math.max(0, 1 - u / armLen), 1.65);
+        const ray2 = Math.exp(-u / thick) * Math.pow(Math.max(0, 1 - v / armLen), 1.65);
 
         let sec = 0;
         if (isHero) {
           const u2 = Math.abs(dx * cB + dy * sB);
           const v2 = Math.abs(-dx * sB + dy * cB);
-          const subLen = armLen * 0.46;
-          sec = (Math.exp(-v2 / (thick * 0.85)) * Math.pow(Math.max(0, 1 - u2 / subLen), 2.5)
-               + Math.exp(-u2 / (thick * 0.85)) * Math.pow(Math.max(0, 1 - v2 / subLen), 2.5)) * 0.24;
+          const subLen = armLen * 0.48;
+          sec = (Math.exp(-v2 / (thick * 0.85)) * Math.pow(Math.max(0, 1 - u2 / subLen), 2.1)
+               + Math.exp(-u2 / (thick * 0.85)) * Math.pow(Math.max(0, 1 - v2 / subLen), 2.1)) * 0.28;
         }
 
         const core = Math.exp(-(r * r) / (coreR * coreR));
-        const halo = Math.exp(-(r * r) / (haloR * haloR)) * (isHero ? 0.16 : 0.11);
-        const pow = g.inten * Math.min(1, core * 0.96 + (ray1 + ray2) * 0.92 + sec + halo);
+        const halo = Math.exp(-(r * r) / (haloR * haloR)) * (isHero ? 0.22 : 0.14);
+        const pow = g.inten * Math.min(1, core * 0.98 + (ray1 + ray2) * 0.96 + sec + halo);
         if (pow < 0.012) continue;
 
         const tip = Math.min(1, r / armLen);
         const sr = 255 * pow;
         const sg = 250 * pow * (1.0 - 0.04 * tip);
-        const sb = 238 * pow * (1.0 - 0.06 * tip + 0.12 * Math.sin(r * 0.25));
+        const sb = 236 * pow * (1.0 - 0.06 * tip + 0.12 * Math.sin(r * 0.25));
         screenPixel(rgb, (row + x) * 3, sr, sg, sb);
       }
     }
