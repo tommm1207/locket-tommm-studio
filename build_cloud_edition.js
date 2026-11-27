@@ -582,7 +582,47 @@ const photoboothIds = [
     "pb_supperman_4cut", "pb_trung_bac_thao", "pb_vien_hello_kitty", "pb_vintage"
 ].filter(id => framesManifest[id]);
 
-const singleFrameIds = Object.keys(framesManifest).filter(id => !photoboothIds.includes(id));
+const singleFrameIds = Object.keys(framesManifest).filter(id => !photoboothIds.includes(id) && !id.startsWith("nm_"));
+
+const nmFrameMeta = {
+    nm_polaroid_vintage: { name: "Polaroid Vintage", colors: ["#F5ECD8", "#9A7B56"], emoji: "📸", sfSymbol: "photo.on.rectangle" },
+    nm_giang_sinh_len_am: { name: "Giáng Sinh Len Ấm", colors: ["#A81C24", "#F8ECD2"], emoji: "🧶", sfSymbol: "snowflake" },
+    nm_soulmate: { name: "Soulmate", colors: ["#1C121A", "#F472B6"], emoji: "💞", sfSymbol: "heart.fill" },
+    nm_love_postcard: { name: "Love Postcard", colors: ["#DC3044", "#2563EB"], emoji: "💌", sfSymbol: "envelope.fill" },
+    nm_giang_sinh_tuan_loc: { name: "Giáng Sinh Tuần Lộc", colors: ["#882C18", "#FBBF24"], emoji: "🦌", sfSymbol: "sparkles" },
+    nm_giang_sinh_selfie: { name: "Giáng Sinh Selfie", colors: ["#B91C1C", "#22C55E"], emoji: "🎄", sfSymbol: "camera.fill" },
+    nm_ho_ho_ho: { name: "Ho Ho Ho!", colors: ["#DC2626", "#15803D"], emoji: "🎅", sfSymbol: "gift.fill" },
+    nm_chung_minh_la_ban: { name: "Chúng Mình Là Bạn", colors: ["#F43F5E", "#FFF1F2"], emoji: "🤝", sfSymbol: "person.2.fill" },
+    nm_son_tung_mtp: { name: "Sơn Tùng MTP", colors: ["#FE2C55", "#20D5EC"], emoji: "💬", sfSymbol: "text.bubble.fill" },
+    nm_ronaldo_siuuu: { name: "Ronaldo SIUUU", colors: ["#DC2626", "#F59E0B"], emoji: "⚽", sfSymbol: "text.bubble.fill" },
+    nm_phai_luon_tu_te: { name: "Phải Luôn Tử Tế", colors: ["#10B981", "#A7F3D0"], emoji: "🌿", sfSymbol: "text.bubble.fill" },
+    nm_chi_can_mot_vet_xuoc: { name: "Chỉ Cần Một Vết Xước", colors: ["#F59E0B", "#1F2937"], emoji: "⚡", sfSymbol: "text.bubble.fill" },
+    nm_trend_tic_toc: { name: "Trend Tíc Tóc", colors: ["#0EA5E9", "#FE2C55"], emoji: "🎵", sfSymbol: "text.bubble.fill" },
+    nm_ai_cho_xinh_vay: { name: "Ai Cho Xinh Vậy", colors: ["#EC4899", "#FBCFE8"], emoji: "💖", sfSymbol: "text.bubble.fill" },
+    nm_tam_cuoi_dang_dang: { name: "Tấm Cuối Đáng Đăng", colors: ["#7C3AED", "#C4B5FD"], emoji: "✨", sfSymbol: "text.bubble.fill" },
+    nm_locket_camera: { name: "Locket Camera", colors: ["#111827", "#EF4444"], emoji: "📷", sfSymbol: "viewfinder" },
+    nm_spotify_pc: { name: "Spotify PC", colors: ["#121212", "#1ED760"], emoji: "🎧", sfSymbol: "music.note" },
+    nm_spotify_hong: { name: "Spotify Hồng", colors: ["#FDE2EE", "#EC4899"], emoji: "💗", sfSymbol: "music.note" },
+    nm_fuji_film: { name: "Fuji Film", colors: ["#101212", "#22C55E"], emoji: "🎞️", sfSymbol: "film" },
+    nm_gay_meter: { name: "Gay Meter Random", colors: ["#EC4899", "#3B82F6"], emoji: "🌈", sfSymbol: "sparkles" },
+    nm_chua_som: { name: "Chưa Sớm", colors: ["#0F172A", "#6366F1"], emoji: "🌙", sfSymbol: "moon.stars.fill" },
+    nm_bang_tin_khan: { name: "Bảng Tin Khẩn", colors: ["#DC2626", "#FACC15"], emoji: "🚨", sfSymbol: "tv.fill" },
+    nm_ve_gui_xe: { name: "Vé Gửi Xe", colors: ["#FEF08A", "#E11D48"], emoji: "🎫", sfSymbol: "ticket.fill" },
+    nm_vo_hoc_sinh: { name: "Vở Học Sinh", colors: ["#FEFCE8", "#1E3A8A"], emoji: "📒", sfSymbol: "book.fill" },
+    nm_giao_vien_cham_bai: { name: "Giáo Viên Chấm Bài", colors: ["#FFFFFF", "#DC2626"], emoji: "✍️", sfSymbol: "pencil" },
+    nm_nhiem_vu_hom_nay: { name: "Nhiệm Vụ Hôm Nay", colors: ["#1D4ED8", "#38BDF8"], emoji: "⚔️", sfSymbol: "checkmark.seal.fill" },
+    nm_hoa_don_di_choi: { name: "Hóa Đơn Đi Chơi", colors: ["#F8FAFC", "#DC2626"], emoji: "🧾", sfSymbol: "doc.text.fill" },
+    nm_khong_can_ai_duyet: { name: "Không Cần Ai Duyệt", colors: ["#1E293B", "#38BDF8"], emoji: "😎", sfSymbol: "quote.bubble.fill" },
+    nm_ban_la_gi: { name: "Bạn Là Gì?", colors: ["#9D174D", "#F9A8D4"], emoji: "✨", sfSymbol: "quote.bubble.fill" },
+    nm_ong_troi_that_bat_cong: { name: "Ông Trời Thật Bất Công", colors: ["#581C87", "#C084FC"], emoji: "🌩️", sfSymbol: "quote.bubble.fill" },
+    nm_yeu_giau_chu_co_phai: { name: "Yêu Giấu Chứ Có Phải...", colors: ["#BE123C", "#FDA4AF"], emoji: "💗", sfSymbol: "quote.bubble.fill" },
+    nm_me_con_em_don_anh_ve: { name: "Mẹ Con Em Đón Anh Về", colors: ["#B45309", "#FDE047"], emoji: "🚗", sfSymbol: "quote.bubble.fill" },
+    nm_meo_meme: { name: "Mèo Meme", colors: ["#B45309", "#FEF08A"], emoji: "🐱", sfSymbol: "face.smiling" },
+    nm_faker: { name: "Faker", colors: ["#111115", "#DC2626"], emoji: "🏆", sfSymbol: "crown.fill" },
+    nm_hai_trai_cay: { name: "Hái Trái Cây", colors: ["#FEF9C3", "#16A34A"], emoji: "🍓", sfSymbol: "leaf.fill" },
+    nm_mona_lisa: { name: "Mona Lisa", colors: ["#926622", "#FACC15"], emoji: "🖼️", sfSymbol: "photo.artframe" }
+};
+const nmFrameIds = Object.keys(nmFrameMeta);
 
 const v2FilterSpecs = [
     // Tính Năng Locket (Special FX)
@@ -648,6 +688,10 @@ const v2FilterSpecs = [
     ["lut_kodak_am", "Kodak Ấm Áp", "#9A3412", "#FDBA74", "camera.filters", "🌅"],
     ["lut_fuji_chrome", "Fuji Chrome", "#0F766E", "#99F6E4", "camera.filters", "🏞️"],
     ["lut_vintage", "Vintage Cổ Điển", "#78350F", "#D6D3D1", "camera.filters", "🕰️"],
+    ["nm_nau_co_dien", "Nâu Cổ Điển", "#78441E", "#D69E5C", "camera.filters", "🤎"],
+    ["nm_dem_xanh", "Đêm Xanh", "#0F172A", "#2563EB", "moon.stars.fill", "🌃"],
+    ["nm_film_35mm", "Film 35mm", "#B45309", "#FBBF24", "film", "🎞️"],
+    ["nm_xam_matte", "Xám Matte", "#334155", "#94A3B8", "camera.filters", "🖤"],
     // Làm Đẹp & Tone Da (0-AI LUT)
     ["lut_iphone_beauty", "Sáng Mịn Tự Nhiên", "#0284C7", "#BAE6FD", "sparkles", "✨"],
     ["lut_film_han", "Film Hàn Quốc", "#BE185D", "#FBCFE8", "sparkles", "🎀"],
@@ -671,13 +715,20 @@ const customFrameGroups = [
     { id: "group_luxury_ai", title: { en: "👑 Tổng Tài & Phú Bà", vi: "👑 Tổng Tài & Phú Bà" }, filter_ids: ["ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen", "ai_old_money"] },
     { id: "group_beauty_ai", title: { en: "💖 Xinh Lung Linh & Hóa Trang", vi: "💖 Xinh Lung Linh & Hóa Trang" }, filter_ids: ["ai_makeup_idol", "ai_trang_diem_duyen", "ai_doi_kieu_toc", "ai_doi_mau_toc", "ai_cosplay_wibu", "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop"] },
     { id: "group_warp_fun", title: { en: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá", vi: "🤪 Hiệu Ứng Méo Mặt & Mắt Cá" }, filter_ids: ["warp_fisheye", "warp_fisheye_dazz", "warp_big_head", "warp_tiny_face", "warp_alien_vline", "warp_hamster", "warp_bug_eyes", "warp_wide_mouth", "warp_chubby", "warp_gigachad", "warp_swirl", "warp_melt"] },
-    { id: "group_retro_lut", title: { en: "📷 Máy Ảnh Retro & Màu Film", vi: "📷 Máy Ảnh Retro & Màu Film" }, filter_ids: ["dazz_cpm35", "dazz_classic_u", "dazz_fqs", "dazz_inst_c", "dazz_grd", "warp_fisheye_dazz", "warp_fisheye", "lut_kodak_portra", "lut_fuji_superia", "lut_kodak_gold", "lut_cinestill_800t", "lut_kodak_am", "lut_fuji_chrome", "lut_vintage"] },
+    { id: "group_retro_lut", title: { en: "📷 Máy Ảnh Retro & Màu Film", vi: "📷 Máy Ảnh Retro & Màu Film" }, filter_ids: ["nm_nau_co_dien", "nm_dem_xanh", "nm_film_35mm", "nm_xam_matte", "dazz_cpm35", "dazz_classic_u", "dazz_fqs", "dazz_inst_c", "dazz_grd", "warp_fisheye_dazz", "warp_fisheye", "lut_kodak_portra", "lut_fuji_superia", "lut_kodak_gold", "lut_cinestill_800t", "lut_kodak_am", "lut_fuji_chrome", "lut_vintage"] },
     { id: "group_beauty_lut", title: { en: "🌸 Làm Đẹp & Tone Da", vi: "🌸 Làm Đẹp & Tone Da" }, filter_ids: ["lut_iphone_beauty", "lut_film_han", "lut_trang_sua", "lut_phim_nhat", "lut_hong_dao", "lut_matcha", "lut_ulzzang_pink", "lut_nang_ban_mai", "lut_tone_lanh", "lut_kem_bo"] },
+    { id: "group_nm_cdm", title: { en: "💬 Cư Dân Mạng Nói Gì", vi: "💬 Cư Dân Mạng Nói Gì" }, filter_ids: ["nm_son_tung_mtp", "nm_ronaldo_siuuu", "nm_phai_luon_tu_te", "nm_chi_can_mot_vet_xuoc", "nm_trend_tic_toc", "nm_ai_cho_xinh_vay", "nm_tam_cuoi_dang_dang"] },
+    { id: "group_nm_khung_hot", title: { en: "🖼️ Khung Viền Hot Trend", vi: "🖼️ Khung Viền Hot Trend" }, filter_ids: ["nm_locket_camera", "nm_spotify_pc", "nm_spotify_hong", "nm_fuji_film", "nm_polaroid_vintage", "nm_soulmate", "nm_love_postcard"] },
+    { id: "group_nm_trend_hot", title: { en: "🔥 Trend Hot", vi: "🔥 Trend Hot" }, filter_ids: ["nm_gay_meter", "nm_chua_som", "nm_bang_tin_khan", "nm_ve_gui_xe", "nm_vo_hoc_sinh", "nm_giao_vien_cham_bai", "nm_nhiem_vu_hom_nay", "nm_hoa_don_di_choi"] },
+    { id: "group_nm_tam_trang", title: { en: "😏 Tâm Trạng & Cà Khịa", vi: "😏 Tâm Trạng & Cà Khịa" }, filter_ids: ["nm_khong_can_ai_duyet", "nm_ban_la_gi", "nm_ong_troi_that_bat_cong", "nm_yeu_giau_chu_co_phai", "nm_me_con_em_don_anh_ve"] },
+    { id: "group_nm_rap_xiec", title: { en: "🤡 Rạp Xiếc Trung Ương", vi: "🤡 Rạp Xiếc Trung Ương" }, filter_ids: ["nm_meo_meme", "nm_faker", "nm_hai_trai_cay", "nm_mona_lisa"] },
+    { id: "group_nm_boba", title: { en: "🎄 Giáng Sinh & Bộ Ba Bá Đạo", vi: "🎄 Giáng Sinh & Bộ Ba Bá Đạo" }, filter_ids: ["nm_giang_sinh_len_am", "nm_giang_sinh_tuan_loc", "nm_giang_sinh_selfie", "nm_ho_ho_ho", "nm_chung_minh_la_ban"] },
     { id: "group_photobooth", title: { en: "Khung & Photobooth 📸", vi: "Khung & Photobooth 📸" }, filter_ids: photoboothIds },
     { id: "group_frames", title: { en: "Khung Viền & Hot Trend 🖼️", vi: "Khung Viền & Hot Trend 🖼️" }, filter_ids: singleFrameIds }
 ];
-const frameOnlyIds = photoboothIds.concat(singleFrameIds);
+const frameOnlyIds = photoboothIds.concat(singleFrameIds, nmFrameIds);
 const customFrameIds = [
+    "nm_son_tung_mtp", "nm_spotify_pc", "nm_polaroid_vintage", "nm_bang_tin_khan",
     "clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone",
     "warp_fisheye", "warp_fisheye_dazz",
     "weekday_depth", "weekday_depth_en", "weekday_depth_tw", "weekday_depth_de",
@@ -685,7 +736,7 @@ const customFrameIds = [
 ].concat(aiHotIds.slice(0, 4), photoboothIds.slice(0, 4));
 
 const customRemoteFilters = frameOnlyIds.map(id => {
-    const src = filterMetaById.get(id) || {};
+    const src = filterMetaById.get(id) || nmFrameMeta[id] || {};
     const cloudUrl = `${ghRawBase}/assets/frames/${id}.png`;
     const is4Cut = !!(framesManifest[id] && framesManifest[id].is4Cut);
     return {
@@ -769,6 +820,10 @@ const TOMMM_FORCE_GATES = [
     "photo_library_video", "can_upload_30s_video", "can_record_30s_video",
     "video", "video_30s", "video_60s", "longer_video", "longer_video_30s", "extended_video_30s",
     "camera_timer", "self_timer", "timer", "countdown_timer",
+    "cameras", "camera_picker", "camera_switcher", "camera_selector", "camera_effects", "camera_fx",
+    "vintage_cameras", "digital_cameras", "instant_cameras", "special_cameras", "locket_cameras", "retro_cam",
+    "capture_modes", "capture_styles", "live_camera_filters",
+    "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie",
     "digicam", "retro_camera", "retro_cameras", "film_camera", "film_cameras",
     "camera_lenses", "lenses", "camera_modes", "dazz_cam", "vintage_camera",
     "camera_presets", "presets", "camera_luts", "luts", "lut", "camera_styles",
@@ -797,7 +852,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "51";
+var RC_VER = "52";
 function writeRcStore(v, k) {
     try { if (typeof $persistentStore !== "undefined") $persistentStore.write(String(v), k); } catch (_) {}
 }
@@ -841,7 +896,7 @@ var liveGates = {};
 try { liveGates = JSON.parse(obj.entries["feature_gates"] || "{}"); } catch (_) { liveGates = {}; }
 if (!liveGates || typeof liveGates !== "object") liveGates = {};
 for (var gk in liveGates) {
-    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && !/disable|legacy|hide|kill|block|deprecat|suppress/i.test(gk) && /timer|dazz|digi|retro|film|lens|camera_mode|camera_roll|video|zoom|countdown|preset|lut|color_filter|live_filter|camera_v2|camera_ui/i.test(gk)) {
+    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(gk) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|shader|point_and_shoot|daydream|bubblegum|lofi|noir/i.test(gk)) {
         var gv = liveGates[gk];
         if (gv === "disabled" || gv === "off" || gv === false) liveGates[gk] = "enabled";
     }
@@ -851,9 +906,9 @@ for (var fgi = 0; fgi < TOMMM_FORCE_GATES.length; fgi++) {
 }
 obj.entries["feature_gates"] = JSON.stringify(liveGates);
 
-// Tự động bật các key dương tính top-level nếu server trả false/disabled cho timer/zoom/preset/lut/dazz/retro/lens
+// Tự động bật các key dương tính top-level nếu server trả false/disabled cho camera/timer/zoom/preset/lut/dazz/retro/lens
 for (var ek in obj.entries) {
-    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && !/disable|legacy|hide|kill|block|deprecat|suppress/i.test(ek) && /timer|dazz|digi|retro|film|lens|camera_mode|countdown|preset|lut|color_filter|live_filter|zoom/i.test(ek)) {
+    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(ek) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|shader|point_and_shoot|daydream|bubblegum|lofi|noir/i.test(ek)) {
         if (obj.entries[ek] === "false") obj.entries[ek] = "true";
         else if (obj.entries[ek] === "disabled") obj.entries[ek] = "enabled";
     }
@@ -1229,13 +1284,13 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=51, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=51, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=51, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=51, timeout=60
-tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=51, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=51, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=51, requires-body=true, max-size=1048576, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=52, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=52, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=52, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=52, timeout=60
+tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=52, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=52, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=52, requires-body=true, max-size=1048576, timeout=60
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -1308,13 +1363,13 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/initplayback.+&oad 'data-type=text data="" status-code=200'
 
 [Script]
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=51, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=51, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/(firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+), script-path=${ghRawBase}/js_tommm_rc.js?v=51, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=51, timeout=60
-tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=51, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=51, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=51, requires-body=true, max-size=1048576, timeout=60
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=52, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=52, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/(firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+), script-path=${ghRawBase}/js_tommm_rc.js?v=52, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=52, timeout=60
+tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=52, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=52, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=52, requires-body=true, max-size=1048576, timeout=60
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com
