@@ -40,7 +40,7 @@ function resolveMyUid() {
             var m = String(auth).match(/(?:Bearer\s+)?([^.\s]+)\.([^.\s]+)\.([^.\s]+)/i);
             if (m && m[2]) {
                 var jwt = JSON.parse(decodeBase64Url(m[2]));
-                var jwtUid = jwt.user_id || jwt.sub || "";
+                var jwtUid = jwt.user_id || jwt.sub || jwt.uid || "";
                 if (jwtUid) {
                     uid = String(jwtUid);
                     writeStore(uid, "tommm_my_locket_uid");
@@ -53,7 +53,7 @@ function resolveMyUid() {
 
 function isUserLikeNode(node) {
     if (!node || typeof node !== "object" || Array.isArray(node)) return false;
-    return !!(node.uid || node.user_id || node.username || node.first_name || typeof node.badge !== "undefined" || node.profile_picture_url);
+    return !!(node.uid || node.user_id || node.user_uid || node.username || node.first_name || typeof node.badge !== "undefined" || node.profile_picture_url);
 }
 
 function hasPrivateSelfFields(node) {
@@ -69,7 +69,7 @@ function stampBadgesRecursive(node, myUid, isTurnedOff, isChangeProfile, state, 
         return;
     }
     if (isUserLikeNode(node)) {
-        var nodeUid = node.uid || node.user_id || node.id || "";
+        var nodeUid = node.uid || node.user_id || node.user_uid || node.id || "";
         var isMine = false;
         if (isChangeProfile && (node.username || node.first_name || nodeUid || typeof node.badge !== "undefined")) {
             isMine = true;
@@ -120,9 +120,9 @@ if (typeof $response === "undefined") {
         if (rawBody.indexOf("badge") === -1) {
             $done({});
         } else {
-            var isTurningOff = /"badge"\s*:\s*(null|false|"")/i.test(rawBody);
-            var isTurningOn = !isTurningOff && (rawBody.indexOf("locket_gold") !== -1 || /"badge"\s*:\s*(true|"gold")/i.test(rawBody));
-            writeStore(isTurningOn ? "ON" : "OFF", "tommm_my_badge_state");
+            var isTurningOff = /"(badge|show_badge|badge_enabled|badge_visible)"\s*:\s*(null|false|"")/i.test(rawBody);
+            var isTurningOn = !isTurningOff;
+            writeStore(isTurningOn ? "ON" : "OFF", "tommm_my_badge_state_v2");
             var badgeVal = isTurningOn ? "locket_gold" : null;
             var tierVal = isTurningOn ? "gold" : null;
             var cachedProfile = {};
@@ -154,7 +154,7 @@ if (typeof $response === "undefined") {
         }
     }
 } else if ($response && $response.body) {
-    var badgeState = readStore("tommm_my_badge_state") || "ON";
+    var badgeState = readStore("tommm_my_badge_state_v2") || "ON";
     var isTurnedOff = badgeState === "OFF";
     try {
         var uObj = JSON.parse($response.body);

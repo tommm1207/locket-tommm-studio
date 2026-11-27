@@ -270,6 +270,31 @@ function corsHeaders(extra = {}) {
 // callback và app tải ảnh KHÔNG bị kẹt vào Durable Object đang bận (nguyên nhân ảnh đen trước đây).
 // Cache API key PHẢI là URL http(s) hợp lệ cùng kiểu origin thật, nếu không put/match âm thầm fail.
 const CACHE_IMG_PREFIX = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/__imgcache__/";
+const CUSTOM_LOOK_PROMPTS = new Map();
+async function putCustomLookPrompt(id, promptText) {
+  if (!id || !promptText) return;
+  CUSTOM_LOOK_PROMPTS.set(id, promptText);
+  try {
+    await caches.default.put(
+      new Request(CACHE_IMG_PREFIX + "prompt_" + encodeURIComponent(id)),
+      new Response(promptText, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=604800" } })
+    );
+  } catch (_) {}
+}
+async function getCustomLookPrompt(id) {
+  if (!id) return "";
+  const ram = CUSTOM_LOOK_PROMPTS.get(id);
+  if (ram) return ram;
+  try {
+    const hit = await caches.default.match(new Request(CACHE_IMG_PREFIX + "prompt_" + encodeURIComponent(id)));
+    if (hit) {
+      const txt = (await hit.text()).trim();
+      if (txt) CUSTOM_LOOK_PROMPTS.set(id, txt);
+      return txt;
+    }
+  } catch (_) {}
+  return "";
+}
 async function putImage(id, bytes, mimeType) {
   MEMORY_IMAGES.set(id, { bytes, mimeType, ts: Date.now() });
   try {
@@ -3697,6 +3722,7 @@ async function handleStudioRequest(request, env) {
         const newId = "custom_" + crypto.randomUUID().slice(0, 8);
         const name = firstNonEmptyString([dataNode?.name, dataNode?.title, ui?.name, ui?.title]) || rawPrompt.slice(0, 28);
         const iconImg = "https://tommm1207.github.io/locket-tommm-studio/assets/filters_v2/ai_cartoon_3d.png?v=2";
+        const styleVal = (typeof dataNode?.style === "string" && dataNode.style) ? dataNode.style : "cutout";
         const filterObj = {
           uid: newId,
           id: newId,
@@ -3706,28 +3732,44 @@ async function handleStudioRequest(request, env) {
           category: "Tạo diện mạo ✨",
           prompt: rawPrompt,
           custom_prompt: rawPrompt,
-          style: dataNode?.style || "cutout",
+          user_input: rawPrompt,
+          style: styleVal,
           type: "normal",
-          filterType: "normal",
+          filter_type: "cutout",
+          filterType: "cutout",
           overlay: true,
+          image_url: iconImg,
           imageUrl: iconImg,
+          icon_url: iconImg,
           iconUrl: iconImg,
+          overlay_image_url: iconImg,
           overlayImageUrl: iconImg,
           overlayImageURL: iconImg,
+          tint_color: "#F59E0B",
           tintColor: "#F59E0B",
+          text_color: "#FFFFFF",
+          textColor: "#FFFFFF",
           colors: ["#F59E0B", "#EC4899"],
+          capture_button_colors: ["#F59E0B", "#EC4899"],
           captureButtonColors: ["#F59E0B", "#EC4899"],
           icon: {
-            url: iconImg,
-            iconUrl: iconImg,
-            remoteImage: iconImg,
+            type: "emoji",
+            data: "✨",
+            emoji: "✨",
+            sf_symbol: "sparkles",
             sfSymbol: "sparkles",
             symbol: "sparkles",
-            emoji: "✨",
+            url: iconImg,
+            icon_url: iconImg,
+            iconUrl: iconImg,
+            remote_image: iconImg,
+            remoteImage: iconImg,
           },
+          output_url: null,
           outputUrl: null,
+          product_url: null,
           productUrl: null,
-          textColor: "#FFFFFF",
+          reference_images: [],
           referenceImages: [],
           requires_gold: false,
           requiresGold: false,
@@ -3742,6 +3784,7 @@ async function handleStudioRequest(request, env) {
           tryButtonEnabled: true,
           try_button_enabled: true,
         };
+        await putCustomLookPrompt(newId, rawPrompt);
         LAST_DEBUG = {
           mode: "create_filter_meta_fallback",
           path: url.pathname,
@@ -3749,15 +3792,16 @@ async function handleStudioRequest(request, env) {
           upErrSnippet,
           reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
           uiKeys: ui && typeof ui === "object" ? Object.keys(ui) : typeof ui,
-          styleType: typeof dataNode?.style,
+          styleVal: String(dataNode?.style || "").slice(0, 40),
           filterId: newId,
           ts: new Date().toISOString(),
         };
+        const wrappedData = Object.assign({}, filterObj, { filter: filterObj });
         return new Response(
           JSON.stringify({
-            data: filterObj,
+            data: wrappedData,
             filter: filterObj,
-            result: { status: 200, success: true, data: filterObj, filter: filterObj },
+            result: { status: 200, success: true, data: wrappedData, filter: filterObj },
           }),
           { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
         );
@@ -4091,6 +4135,13 @@ async function handleStudioRequest(request, env) {
     if (aiReq && env && (env.AI || env.CF_AI_ACCOUNTS || env.NVIDIA_IMAGE_MODEL || env.GEMINI_API_KEY)) {
       const t0 = Date.now();
       try {
+        if (aiReq.source === "dynamic_filter_id" && aiReq.filterId) {
+          const savedPrompt = await getCustomLookPrompt(aiReq.filterId);
+          if (savedPrompt) {
+            aiReq.source = "custom_prompt";
+            aiReq.rawUserPrompt = savedPrompt;
+          }
+        }
         const { bytes: imgBytes, sourceUrl } = await getInputImageBytes(dataNode, authHeader);
         const tempId = crypto.randomUUID().slice(0, 12);
         const [preparedInput, refImg, translatedCustomEn] = await Promise.all([

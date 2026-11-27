@@ -1,4 +1,4 @@
-// Tommm Private - Smart ETag Stripper (Always strip RevenueCat; strip Firebase RC only until v47 live snapshot is applied)
+// Tommm Private - Smart ETag Stripper (Always strip RevenueCat; strip Firebase RC only until v48 live snapshot is applied)
 if (typeof $request === "undefined" || !$request || !$request.headers) {
     $done({});
 } else {
@@ -10,7 +10,7 @@ if (typeof $request === "undefined" || !$request || !$request.headers) {
             appliedVer = $persistentStore.read("tommm_rc_applied_ver") || "";
         }
     } catch (_) {}
-    if (isFirebaseRc && appliedVer === "47") {
+    if (isFirebaseRc && appliedVer === "48") {
         $done({});
     } else {
         const headersToStrip = new Set([
