@@ -87,10 +87,14 @@ function stampBadgesRecursive(node, myUid, isTurnedOff, isChangeProfile, state, 
                 node.badge = null;
                 node.badge_tier = null;
                 node.is_gold = false;
+                node.has_gold = false;
+                node.subscription_tier = null;
             } else {
                 node.badge = "locket_gold";
                 node.badge_tier = "gold";
                 node.is_gold = true;
+                node.has_gold = true;
+                node.subscription_tier = "gold";
             }
             if (node.uid || node.first_name || node.username) {
                 writeStore(JSON.stringify(node), "tommm_my_user_profile");

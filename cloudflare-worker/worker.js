@@ -3720,6 +3720,7 @@ async function handleStudioRequest(request, env) {
         }
 
         const newId = "custom_" + crypto.randomUUID().slice(0, 8);
+        const nowIso = new Date().toISOString();
         const name = firstNonEmptyString([dataNode?.name, dataNode?.title, ui?.name, ui?.title]) || rawPrompt.slice(0, 28);
         const iconImg = "https://tommm1207.github.io/locket-tommm-studio/assets/filters_v2/ai_cartoon_3d.png?v=2";
         const styleVal = (typeof dataNode?.style === "string" && dataNode.style) ? dataNode.style : "cutout";
@@ -3735,8 +3736,13 @@ async function handleStudioRequest(request, env) {
           user_input: rawPrompt,
           style: styleVal,
           type: "normal",
-          filter_type: "cutout",
-          filterType: "cutout",
+          filter_type: styleVal,
+          filterType: styleVal,
+          status: "ready",
+          created_at: nowIso,
+          createdAt: nowIso,
+          updated_at: nowIso,
+          updatedAt: nowIso,
           overlay: true,
           image_url: iconImg,
           imageUrl: iconImg,
@@ -3753,17 +3759,15 @@ async function handleStudioRequest(request, env) {
           capture_button_colors: ["#F59E0B", "#EC4899"],
           captureButtonColors: ["#F59E0B", "#EC4899"],
           icon: {
-            type: "emoji",
-            data: "✨",
-            emoji: "✨",
-            sf_symbol: "sparkles",
-            sfSymbol: "sparkles",
-            symbol: "sparkles",
             url: iconImg,
-            icon_url: iconImg,
             iconUrl: iconImg,
-            remote_image: iconImg,
+            icon_url: iconImg,
             remoteImage: iconImg,
+            remote_image: iconImg,
+            sfSymbol: "sparkles",
+            sf_symbol: "sparkles",
+            symbol: "sparkles",
+            emoji: "✨",
           },
           output_url: null,
           outputUrl: null,
@@ -3793,15 +3797,13 @@ async function handleStudioRequest(request, env) {
           reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
           uiKeys: ui && typeof ui === "object" ? Object.keys(ui) : typeof ui,
           styleVal: String(dataNode?.style || "").slice(0, 40),
+          rawReqSnippet: rawBodyText.slice(0, 300),
           filterId: newId,
-          ts: new Date().toISOString(),
+          ts: nowIso,
         };
-        const wrappedData = Object.assign({}, filterObj, { filter: filterObj });
         return new Response(
           JSON.stringify({
-            data: wrappedData,
-            filter: filterObj,
-            result: { status: 200, success: true, data: wrappedData, filter: filterObj },
+            result: { status: 200, success: true, data: filterObj, filter: filterObj },
           }),
           { status: 200, headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }) }
         );
