@@ -344,6 +344,24 @@ function cleanupMemory() {
   }
 }
 
+function getPhotoboothUserKey(request, authHeader) {
+  try {
+    const m = String(authHeader || "").match(/(?:Bearer\s+)?([^.\s]+)\.([^.\s]+)\.([^.\s]+)/i);
+    if (m && m[2]) {
+      let b64 = m[2].replace(/-/g, "+").replace(/_/g, "/");
+      while (b64.length % 4) b64 += "=";
+      const jwt = JSON.parse(atob(b64));
+      const uid = jwt.user_id || jwt.sub || jwt.uid;
+      if (uid) return String(uid);
+    }
+  } catch (_) {}
+  try {
+    const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "";
+    if (ip) return ip.split(",")[0].trim();
+  } catch (_) {}
+  return "anon";
+}
+
 function base64ToUint8Array(base64) {
   const normalized = base64.replace(/-/g, "+").replace(/_/g, "/").replace(/\s+/g, "");
   const binary = atob(normalized);
@@ -4042,21 +4060,36 @@ async function handleStudioRequest(request, env) {
       let pbDebug = null;
 
       if (manifest.is4Cut) {
-        // Locket chụp 1 PHÁT ra kết quả ngay (không chụp tích lũy nhiều lần vào 1 khung), nên 4 ô
-        // trước đây bị LẶP CÙNG 1 ảnh. Giải pháp: từ 1 ảnh, tạo 4 BIẾN THỂ MÀU khác nhau cho 4 ô ->
-        // nhìn như photobooth thật, sinh động, giữ nguyên mặt (LUT chỉ grade màu, không AI).
+        // Multi-shot stateful 4-Cut Photobooth (giống Video 3: chụp từng kiểu 1 -> 2 -> 3 -> 4 rồi tự reset)
         const windows = manifest.windows || [];
-        // 4 tông khác biệt rõ: tươi/beauty, đen trắng, vintage ấm (kodak), phim lạnh (fuji).
-        const CUT_LUTS = ["lut_iphone_beauty", "dazz_grd", "lut_kodak_am", "lut_fuji_chrome"];
-        for (let idx = 0; idx < windows.length; idx++) {
-          const [x1, y1, x2, y2] = windows[idx];
-          const w = x2 - x1, h = y2 - y1;
-          // vẽ ảnh vào ô idx, rồi áp LUT riêng cho VÙNG đó
-          drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, windows[idx]);
-          const lut = LUT_FILTERS[CUT_LUTS[idx % CUT_LUTS.length]];
-          if (lut) applyLutToRgbRegion(canvasRgb, SIZE, SIZE, x1, y1, w, h, lut);
+        const userKey = getPhotoboothUserKey(request, authHeader);
+        const sessKey = `${userKey}:${filterId}`;
+        const existing = PHOTOBOOTH_SESSIONS.get(sessKey);
+        const sess = (existing && Date.now() - existing.ts < 180000)
+          ? existing
+          : { shots: [], ts: Date.now() };
+        sess.shots.push({ rgb: new Uint8Array(srcRgb), w: srcW, h: srcH });
+        sess.ts = Date.now();
+        const shotNum = sess.shots.length;
+
+        // Nền pastel trung tính cho các ô chưa chụp
+        for (let p = 0; p < canvasRgb.length; p += 3) {
+          canvasRgb[p] = 242;
+          canvasRgb[p + 1] = 238;
+          canvasRgb[p + 2] = 245;
         }
-        pbDebug = { cuts: windows.length, variants: CUT_LUTS.slice(0, windows.length) };
+        for (let idx = 0; idx < windows.length; idx++) {
+          if (idx < sess.shots.length) {
+            const shot = sess.shots[idx];
+            drawCoverRgb(canvasRgb, shot.rgb, shot.w, shot.h, windows[idx]);
+          }
+        }
+        if (shotNum >= windows.length) {
+          PHOTOBOOTH_SESSIONS.delete(sessKey);
+        } else {
+          PHOTOBOOTH_SESSIONS.set(sessKey, sess);
+        }
+        pbDebug = { mode: "multi_shot", shot: shotNum, total: windows.length, completed: shotNum >= windows.length };
       } else {
         const box = (manifest.windows && manifest.windows[0]) || [0, 0, SIZE, SIZE];
         drawCoverRgb(canvasRgb, srcRgb, srcW, srcH, box);
