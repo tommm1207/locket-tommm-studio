@@ -377,219 +377,254 @@ def draw_butterfly(draw, cx, cy, s, c1, c2, rot_deg=0):
     return tmp
 
 
+def draw_sakura_petal_img(w_sz, col_inner, col_outer, rot_deg, blur_r=0):
+    s = 2
+    n = 96 * s
+    tmp = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tmp)
+    cx, cy = n * 0.5, n * 0.5
+    pts = []
+    steps = 36
+    rx, ry = 13 * s, 21 * s
+    for k in range(steps):
+        t = (k / steps) * 2.0 * math.pi
+        # Authentic notched cherry blossom petal silhouette
+        notch = 1.0 - 0.24 * math.exp(-((math.sin(t) - 1.0) ** 2) * 18.0) if math.sin(t) > 0.6 else 1.0
+        px = math.sin(t) * rx * (0.65 + 0.35 * (1.0 - math.cos(t)))
+        py = -math.cos(t) * ry * notch
+        pts.append((cx + px, cy + py))
+    td.polygon(pts, fill=col_outer)
+    # Soft lighter inner gradient lobe (no black outline)
+    inner_pts = [(cx + (px - cx) * 0.62, cy + (py - cy) * 0.62 + 3 * s) for (px, py) in pts]
+    td.polygon(inner_pts, fill=col_inner)
+    tmp = tmp.resize((96, 96), Image.Resampling.LANCZOS)
+    if rot_deg:
+        tmp = tmp.rotate(rot_deg, resample=Image.Resampling.BICUBIC)
+    if blur_r > 0:
+        tmp = tmp.filter(ImageFilter.GaussianBlur(radius=blur_r))
+    if w_sz != 96:
+        tmp = tmp.resize((w_sz, w_sz), Image.Resampling.LANCZOS)
+    return tmp
+
+
+def draw_luminous_butterfly(scale, c_wing, c_glow, rot_deg=0, blur_r=0.8):
+    n = 160
+    glow = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    body = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    mx, my = n * 0.5, n * 0.5
+
+    def wing_poly(side, upper=True):
+        pts = []
+        steps = 20
+        for i in range(steps + 1):
+            t = i / steps
+            ang = t * math.pi
+            if upper:
+                r = (14 + 34 * math.sin(ang) ** 0.75 + 10 * math.sin(ang * 2)) * scale
+                a = -0.85 + t * 1.95
+            else:
+                r = (10 + 24 * math.sin(ang) ** 0.8) * scale
+                a = 0.65 + t * 1.85
+            dx = math.cos(a) * r * side
+            dy = math.sin(a) * r * (0.92 if upper else 1.05) - (8 * scale if upper else -4 * scale)
+            pts.append((mx + dx, my + dy))
+        return pts
+
+    gd = ImageDraw.Draw(glow)
+    bd = ImageDraw.Draw(body)
+    for side in (-1, 1):
+        uw = wing_poly(side, True)
+        lw = wing_poly(side, False)
+        gd.polygon(uw, fill=c_glow)
+        gd.polygon(lw, fill=c_glow)
+        bd.polygon(uw, fill=c_wing)
+        bd.polygon(lw, fill=(c_wing[0], c_wing[1], c_wing[2], max(90, c_wing[3] - 35)))
+        # Delicate translucent highlight shimmer inside wing (zero black outline)
+        hi = [(mx + (px - mx) * 0.58, my + (py - my) * 0.58) for (px, py) in uw]
+        bd.polygon(hi, fill=(255, 255, 255, 95))
+
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=7))
+    # Subtle soft body
+    bd.ellipse([mx - 2.2 * scale, my - 13 * scale, mx + 2.2 * scale, my + 16 * scale], fill=(255, 255, 255, 195))
+    out = Image.alpha_composite(glow, body)
+    if blur_r > 0:
+        out = out.filter(ImageFilter.GaussianBlur(radius=blur_r))
+    if rot_deg:
+        out = out.rotate(rot_deg, resample=Image.Resampling.BICUBIC)
+    return out
+
+
+def draw_koi_silhouette(scale, c_main, c_fin, rot_deg=0):
+    n = 160
+    tmp = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tmp)
+    mx, my = n * 0.5, n * 0.5
+    # Flowing koi body curve (zero black outlines)
+    pts = []
+    segs = 28
+    for i in range(segs + 1):
+        t = i / segs
+        x = (t - 0.45) * 76 * scale
+        half_w = math.sin(t * math.pi) ** 0.72 * 13.5 * scale * (1.15 - 0.35 * t)
+        bend = math.sin(t * 3.4) * 5.5 * scale
+        pts.append((mx + x, my + bend - half_w))
+    for i in range(segs, -1, -1):
+        t = i / segs
+        x = (t - 0.45) * 76 * scale
+        half_w = math.sin(t * math.pi) ** 0.72 * 13.5 * scale * (1.15 - 0.35 * t)
+        bend = math.sin(t * 3.4) * 5.5 * scale
+        pts.append((mx + x, my + bend + half_w))
+    # Flowing translucent tail fin
+    tx = mx - 0.45 * 76 * scale
+    td.polygon([(tx + 4 * scale, my), (tx - 24 * scale, my - 16 * scale), (tx - 15 * scale, my), (tx - 24 * scale, my + 14 * scale)], fill=c_fin)
+    # Soft side fins
+    td.polygon([(mx + 4 * scale, my - 8 * scale), (mx - 12 * scale, my - 24 * scale), (mx - 4 * scale, my - 6 * scale)], fill=c_fin)
+    td.polygon([(mx + 4 * scale, my + 8 * scale), (mx - 10 * scale, my + 24 * scale), (mx - 4 * scale, my + 6 * scale)], fill=c_fin)
+    td.polygon(pts, fill=c_main)
+    # Delicate pearlescent highlight along back
+    td.ellipse([mx + 6 * scale, my - 4 * scale, mx + 24 * scale, my + 4 * scale], fill=(255, 255, 255, 110))
+    tmp = tmp.filter(ImageFilter.GaussianBlur(radius=1.1))
+    if rot_deg:
+        tmp = tmp.rotate(rot_deg, resample=Image.Resampling.BICUBIC)
+    return tmp
+
+
 def fx_ca_cute():
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    # Dreamy purple-pink outer vignette glow leaving center face crisp
+    # Subtle aqua-teal ambient water caustics strictly near corners (zero opaque purple wash!)
     glow = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.rectangle([0, 0, SIZE, SIZE], fill=(168, 85, 247, 130))
-    gd.ellipse([54, 54, SIZE - 54, SIZE - 54], fill=(0, 0, 0, 0))
-    glow = glow.filter(ImageFilter.GaussianBlur(radius=30))
+    gd.ellipse([-90, -90, 220, 220], fill=(56, 189, 248, 52))
+    gd.ellipse([SIZE - 220, -80, SIZE + 80, 220], fill=(45, 212, 191, 46))
+    gd.ellipse([-80, SIZE - 220, 220, SIZE + 90], fill=(14, 165, 233, 52))
+    gd.ellipse([SIZE - 230, SIZE - 230, SIZE + 80, SIZE + 80], fill=(56, 189, 248, 46))
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=38))
     img = Image.alpha_composite(img, glow)
 
-    d = ImageDraw.Draw(img)
-    # Border cute fishes & sea friends
-    draw_cute_fish(d, 96, 82, 1.15, (251, 146, 60, 248), (254, 240, 138, 248))
-    draw_cute_fish(d, 404, 88, 1.25, (250, 204, 21, 248), (120, 53, 15, 230), flip=True)
-    draw_pufferfish(d, 444, 188, 0.92)
-    draw_cute_fish(d, 74, 206, 0.95, (196, 181, 253, 248), (129, 140, 248, 245))
-    draw_cute_fish(d, 86, 304, 0.85, (167, 243, 208, 248), (52, 211, 153, 245))
-    draw_cute_fish(d, 442, 344, 1.10, (253, 186, 116, 248), (239, 68, 68, 240), flip=True)
-    draw_pufferfish(d, 174, 444, 0.88)
-    draw_cute_shark(d, 86, 412, 1.08)
-    draw_cute_fish(d, 424, 446, 0.95, (244, 114, 182, 248), (251, 207, 232, 245), flip=True)
-    # Tiny cheek/floating bubbles & hearts
-    for bx, by, br in [(142, 54, 8), (336, 48, 7), (464, 128, 9), (42, 150, 7), (162, 290, 6), (366, 258, 6), (312, 456, 8), (48, 348, 7)]:
-        draw_soap_bubble(d, bx, by, br, (186, 230, 253))
-    for hx, hy in [(254, 44), (110, 148), (398, 298), (256, 474)]:
-        draw_heart(d, hx, hy, 14, (244, 114, 182, 235), (30, 41, 59, 190))
-    return img
-
-
-def fx_mua_roi():
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    mist = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    md = ImageDraw.Draw(mist)
-    md.rectangle([0, 0, SIZE, 88], fill=(30, 58, 138, 72))
-    md.rectangle([0, 400, SIZE, SIZE], fill=(56, 189, 248, 75))
-    mist = mist.filter(ImageFilter.GaussianBlur(radius=28))
-    img = Image.alpha_composite(img, mist)
-
-    d = ImageDraw.Draw(img)
-    rng = random.Random(101)
-    for _ in range(95):
-        x = rng.randint(10, SIZE + 40)
-        y = rng.randint(-30, SIZE - 20)
-        length = rng.randint(24, 62)
-        alpha = rng.randint(75, 195)
-        w = rng.choice([1, 2, 2])
-        d.line([x, y, x - int(length * 0.28), y + length], fill=(224, 242, 254, alpha), width=w)
-    for dx, dy, dr in [(46, 54, 9), (462, 76, 10), (38, 434, 11), (456, 444, 12), (424, 286, 8)]:
-        draw_water_drop(d, dx, dy, dr)
-    return img
-
-
-def fx_giot_nuoc():
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    drops = [
-        (56, 52, 18), (128, 38, 11), (398, 44, 16), (458, 74, 22),
-        (36, 152, 14), (82, 188, 9), (468, 168, 15), (422, 206, 10),
-        (44, 294, 20), (88, 344, 12), (462, 314, 19), (424, 372, 11),
-        (68, 446, 22), (164, 466, 14), (344, 468, 15), (448, 452, 21),
-        (252, 34, 12), (260, 474, 11),
+    specs = [
+        (86, 84, 0.92, (251, 146, 60, 195), (254, 215, 170, 130), -28),
+        (420, 92, 0.96, (249, 115, 22, 185), (254, 240, 138, 125), 148),
+        (72, 316, 0.78, (253, 186, 116, 185), (255, 237, 213, 125), 22),
+        (434, 344, 0.88, (251, 113, 133, 185), (254, 205, 211, 125), -145),
+        (114, 444, 0.84, (245, 158, 11, 185), (254, 243, 199, 120), 16),
+        (398, 444, 0.76, (251, 146, 60, 175), (255, 237, 213, 115), 164),
     ]
-    for cx, cy, r in drops:
-        draw_water_drop(d, cx, cy, r)
-    return img
+    for cx, cy, sc, cm, cf, rot in specs:
+        koi = draw_koi_silhouette(sc, cm, cf, rot)
+        img.alpha_composite(koi, (cx - 80, cy - 80))
 
-
-def fx_bong_bong():
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    bubbles = [
-        (68, 72, 32, (125, 211, 252)), (140, 46, 16, (244, 114, 182)), (386, 52, 22, (196, 181, 253)),
-        (446, 98, 34, (125, 211, 252)), (44, 194, 22, (244, 114, 182)), (464, 226, 20, (167, 243, 208)),
-        (58, 342, 28, (196, 181, 253)), (448, 348, 30, (244, 114, 182)), (88, 446, 36, (125, 211, 252)),
-        (194, 468, 18, (244, 114, 182)), (334, 462, 20, (167, 243, 208)), (432, 448, 34, (196, 181, 253)),
-        (104, 134, 10, (255, 255, 255)), (402, 142, 12, (255, 255, 255)), (396, 404, 11, (255, 255, 255)),
-    ]
-    for cx, cy, r, tint in bubbles:
-        draw_soap_bubble(d, cx, cy, r, tint)
+    rng = random.Random(77)
+    for bx, by, br in [(148, 52, 6), (344, 56, 5), (464, 158, 7), (44, 194, 6), (458, 254, 5), (56, 408, 7), (318, 468, 6), (206, 464, 5)]:
+        d.ellipse([bx - br, by - br, bx + br, by + br], outline=(224, 242, 254, 155), width=1)
+        d.ellipse([bx - br * 0.45, by - br * 0.45, bx, by], fill=(255, 255, 255, 185))
     return img
 
 
 def fx_canh_hoa():
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
     rng = random.Random(202)
-    # 5-petal blossoms in corners
-    for bx, by, r in [(54, 54, 16), (456, 62, 18), (58, 452, 18), (452, 448, 16)]:
-        for k in range(5):
-            a = k * 2 * math.pi / 5.0
-            px, py = bx + math.cos(a) * r, by + math.sin(a) * r
-            d.ellipse([px - r * 0.55, py - r * 0.55, px + r * 0.55, py + r * 0.55], fill=(251, 207, 232, 235), outline=(244, 114, 182, 210))
-        d.ellipse([bx - 5, by - 5, bx + 5, by + 5], fill=(253, 224, 71, 245))
-    # Floating petals around outer zone
-    spots = [(134, 44), (242, 34), (356, 48), (44, 152), (464, 164), (48, 286), (468, 294), (94, 376), (414, 376), (176, 466), (296, 474), (384, 460), (112, 110), (404, 118)]
-    for px, py in spots:
-        ang = rng.uniform(0, math.pi * 2)
-        pr = rng.uniform(10, 16)
-        c = rng.choice([(251, 207, 232, 230), (249, 168, 212, 225), (253, 242, 248, 235)])
-        pts = [
-            (px + math.cos(ang) * pr, py + math.sin(ang) * pr),
-            (px + math.cos(ang + 1.2) * pr * 0.65, py + math.sin(ang + 1.2) * pr * 0.65),
-            (px - math.cos(ang) * pr * 0.85, py - math.sin(ang) * pr * 0.85),
-            (px + math.cos(ang - 1.2) * pr * 0.65, py + math.sin(ang - 1.2) * pr * 0.65),
-        ]
-        d.polygon(pts, fill=c, outline=(244, 114, 182, 190))
+    # Soft out-of-focus foreground petals around outer frame + crisper drifting mid-ground petals
+    outer_spots = [
+        (46, 56, 86, 32, 3.0), (456, 64, 92, -38, 3.0), (54, 444, 90, 142, 3.2), (452, 440, 88, -124, 3.0),
+        (164, 36, 68, 18, 1.4), (356, 42, 72, -24, 1.4), (42, 224, 74, 74, 1.8), (468, 236, 70, -82, 1.8),
+        (124, 114, 54, 44, 0.5), (394, 118, 52, -48, 0.5), (104, 366, 56, 115, 0.6), (408, 368, 54, -112, 0.6),
+        (182, 470, 66, 15, 1.2), (336, 468, 68, -22, 1.2), (258, 28, 52, 52, 1.0), (264, 482, 56, -54, 1.0),
+    ]
+    palettes = [
+        ((255, 241, 246, 215), (251, 207, 232, 195)),
+        ((255, 245, 248, 205), (249, 168, 212, 185)),
+        ((254, 242, 248, 215), (244, 182, 216, 190)),
+    ]
+    for idx, (px, py, sz, rot, br) in enumerate(outer_spots):
+        ci, co = palettes[idx % len(palettes)]
+        ptl = draw_sakura_petal_img(sz, ci, co, rot + rng.randint(-12, 12), blur_r=br)
+        img.alpha_composite(ptl, (px - sz // 2, py - sz // 2))
     return img
 
 
-def fx_tuyet_roi():
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    bokeh = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    bd = ImageDraw.Draw(bokeh)
-    rng = random.Random(303)
-    for _ in range(36):
-        x, y = rng.randint(15, SIZE - 15), rng.randint(15, SIZE - 15)
-        if 140 < x < 372 and 125 < y < 375:
-            continue
-        r = rng.randint(5, 16)
-        bd.ellipse([x - r, y - r, x + r, y + r], fill=(255, 255, 255, rng.randint(95, 185)))
-    bokeh = bokeh.filter(ImageFilter.GaussianBlur(radius=3))
-    img = Image.alpha_composite(img, bokeh)
-
-    d = ImageDraw.Draw(img)
-    for fx, fy, fr in [(56, 62, 18), (154, 42, 12), (374, 48, 14), (456, 84, 19), (42, 212, 15), (468, 238, 14), (62, 384, 17), (444, 396, 18), (168, 466, 13), (344, 462, 15)]:
-        draw_snowflake(d, fx, fy, fr, (255, 255, 255, 235), width=2)
-    return img
+def make_diecut_sticker(draw_shape_fn, size=110):
+    pad = 16
+    full = size + pad * 2
+    art = Image.new("RGBA", (full, full), (0, 0, 0, 0))
+    draw_shape_fn(ImageDraw.Draw(art), full * 0.5, full * 0.5)
+    # Crisp white vinyl die-cut border from dilated alpha
+    a = art.split()[3]
+    halo = a.filter(ImageFilter.MaxFilter(11)).filter(ImageFilter.GaussianBlur(0.8))
+    white_cut = Image.new("RGBA", (full, full), (255, 255, 255, 250))
+    white_cut.putalpha(halo)
+    shadow = Image.new("RGBA", (full, full), (15, 23, 42, 85))
+    shadow.putalpha(halo.point(lambda v: int(v * 0.35)))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(3.5))
+    out = Image.new("RGBA", (full, full), (0, 0, 0, 0))
+    out.alpha_composite(shadow, (0, 3))
+    out.alpha_composite(white_cut, (0, 0))
+    out.alpha_composite(art, (0, 0))
+    return out
 
 
 def fx_sticker_doodle():
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    ink = (30, 41, 59, 235)
-    # 5-pt yellow stars
-    for sx, sy, sr in [(64, 64, 22), (446, 72, 24), (72, 434, 20), (448, 436, 22)]:
-        draw_5pt_star(d, sx, sy, sr, (253, 224, 71, 245), ink)
-    # Pastel hearts near cheeks & edges
-    for hx, hy, hs, hc in [(116, 142, 20, (244, 114, 182, 245)), (396, 146, 20, (251, 113, 133, 245)), (52, 268, 18, (196, 181, 253, 245)), (458, 272, 18, (125, 211, 252, 245))]:
-        draw_heart(d, hx, hy, hs, hc, ink)
-    # Smiling white doodle cloud top-center
-    d.ellipse([214, 26, 256, 62], fill=(255, 255, 255, 245), outline=ink, width=2)
-    d.ellipse([238, 18, 286, 60], fill=(255, 255, 255, 245), outline=ink, width=2)
-    d.ellipse([264, 26, 302, 62], fill=(255, 255, 255, 245), outline=ink, width=2)
-    d.rectangle([228, 42, 288, 62], fill=(255, 255, 255, 245))
-    d.ellipse([246, 38, 251, 43], fill=ink)
-    d.ellipse([265, 38, 270, 43], fill=ink)
-    d.arc([252, 42, 264, 52], start=10, end=170, fill=ink, width=2)
-    # Pink ribbon bow bottom-center
-    d.polygon([(256, 464), (222, 444), (222, 484)], fill=(244, 114, 182, 248), outline=ink)
-    d.polygon([(256, 464), (290, 444), (290, 484)], fill=(244, 114, 182, 248), outline=ink)
-    d.ellipse([246, 454, 266, 474], fill=(249, 168, 212, 252), outline=ink, width=2)
-    # KiraKira sparkles
-    for kx, ky in [(164, 52), (356, 46), (144, 456), (368, 456)]:
-        draw_4pt_star(d, kx, ky, 14, 4, (255, 255, 255, 245))
-    return img
 
+    def shape_heart(col):
+        def _fn(d, cx, cy):
+            r = 21
+            d.ellipse([cx - r, cy - r * 0.85, cx + 2, cy + r * 0.25], fill=col)
+            d.ellipse([cx - 2, cy - r * 0.85, cx + r, cy + r * 0.25], fill=col)
+            d.polygon([(cx - r * 0.96, cy - r * 0.15), (cx + r * 0.96, cy - r * 0.15), (cx, cy + r * 1.12)], fill=col)
+            d.ellipse([cx - r * 0.55, cy - r * 0.55, cx - r * 0.12, cy - r * 0.18], fill=(255, 255, 255, 130))
+        return _fn
 
-def fx_cau_vong():
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
-    cols = [
-        (255, 85, 85, 68), (255, 165, 60, 66), (255, 235, 75, 64),
-        (95, 235, 145, 60), (75, 195, 255, 64), (175, 115, 255, 68),
+    def shape_bow(d, cx, cy):
+        pink = (244, 114, 182, 255)
+        light = (251, 207, 232, 255)
+        d.polygon([(cx, cy), (cx - 28, cy - 17), (cx - 30, cy + 17)], fill=pink)
+        d.polygon([(cx, cy), (cx + 28, cy - 17), (cx + 30, cy + 17)], fill=pink)
+        d.ellipse([cx - 9, cy - 9, cx + 9, cy + 9], fill=light)
+
+    def shape_star(col):
+        def _fn(d, cx, cy):
+            pts = []
+            for k in range(10):
+                ang = -math.pi / 2 + k * math.pi / 5
+                rad = 24 if k % 2 == 0 else 11
+                pts.append((cx + math.cos(ang) * rad, cy + math.sin(ang) * rad))
+            d.polygon(pts, fill=col)
+            d.ellipse([cx - 7, cy - 9, cx + 2, cy - 1], fill=(255, 255, 255, 120))
+        return _fn
+
+    def shape_sparkle(col):
+        def _fn(d, cx, cy):
+            draw_4pt_star(d, cx, cy, 24, 6.5, col)
+        return _fn
+
+    stickers = [
+        (68, 72, make_diecut_sticker(shape_star((253, 224, 71, 255)), 92).rotate(14, resample=Image.Resampling.BICUBIC)),
+        (444, 76, make_diecut_sticker(shape_heart((251, 113, 133, 255)), 92).rotate(-14, resample=Image.Resampling.BICUBIC)),
+        (78, 434, make_diecut_sticker(shape_heart((196, 181, 253, 255)), 88).rotate(-16, resample=Image.Resampling.BICUBIC)),
+        (438, 432, make_diecut_sticker(shape_star((125, 211, 252, 255)), 92).rotate(-12, resample=Image.Resampling.BICUBIC)),
+        (256, 464, make_diecut_sticker(shape_bow, 96)),
+        (54, 248, make_diecut_sticker(shape_sparkle((251, 191, 36, 255)), 80)),
+        (456, 256, make_diecut_sticker(shape_sparkle((244, 114, 182, 255)), 80)),
     ]
-    for idx, col in enumerate(cols):
-        off = -130 + idx * 54
-        d.line([(0, 220 + off), (SIZE, 40 + off)], fill=col, width=48)
-    img = img.filter(ImageFilter.GaussianBlur(radius=22))
-    sd = ImageDraw.Draw(img)
-    for sx, sy, sr in [(74, 88, 16), (434, 84, 18), (94, 418, 15), (424, 412, 16)]:
-        draw_4pt_star(sd, sx, sy, sr, sr * 0.28, (255, 255, 255, 220))
+    for cx, cy, st in stickers:
+        img.alpha_composite(st, (cx - st.width // 2, cy - st.height // 2))
     return img
 
 
 def fx_buom_xinh():
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     specs = [
-        (78, 78, 1.05, (147, 197, 253, 235), (191, 219, 254, 235), 24),
-        (434, 84, 1.15, (249, 168, 212, 235), (251, 207, 232, 235), -22),
-        (56, 266, 0.85, (196, 181, 253, 235), (221, 214, 254, 235), 14),
-        (448, 294, 0.90, (125, 211, 252, 235), (186, 230, 253, 235), -16),
-        (94, 434, 0.95, (244, 114, 182, 235), (251, 207, 232, 235), -18),
-        (418, 434, 1.00, (167, 139, 250, 235), (221, 214, 254, 235), 20),
+        (82, 84, 0.92, (125, 211, 252, 185), (56, 189, 248, 75), 24, 0.9),
+        (430, 88, 0.98, (249, 168, 212, 185), (244, 114, 182, 75), -22, 0.9),
+        (64, 266, 0.78, (196, 181, 253, 180), (167, 139, 250, 70), 16, 1.1),
+        (446, 288, 0.84, (147, 197, 253, 180), (96, 165, 250, 70), -18, 1.1),
+        (96, 430, 0.90, (253, 186, 116, 175), (251, 146, 60, 68), -16, 1.0),
+        (416, 432, 0.92, (196, 181, 253, 180), (167, 139, 250, 70), 20, 1.0),
     ]
-    for cx, cy, s, c1, c2, rot in specs:
-        b = draw_butterfly(None, cx, cy, s, c1, c2, rot)
-        img.alpha_composite(b, (cx - 60, cy - 60))
-    d = ImageDraw.Draw(img)
-    for sx, sy in [(142, 54), (366, 54), (144, 456), (366, 454)]:
-        draw_4pt_star(d, sx, sy, 12, 3.5, (255, 255, 255, 235))
-    return img
-
-
-def fx_sao_lap_lanh():
-    img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    halo = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    hd = ImageDraw.Draw(halo)
-    stars = [
-        (68, 66, 26, (255, 255, 255, 250)), (158, 46, 16, (253, 224, 71, 245)),
-        (366, 44, 18, (255, 255, 255, 250)), (448, 76, 28, (251, 207, 232, 248)),
-        (46, 198, 20, (253, 224, 71, 245)), (466, 212, 22, (255, 255, 255, 250)),
-        (58, 356, 24, (251, 207, 232, 248)), (452, 368, 22, (253, 224, 71, 245)),
-        (92, 448, 26, (255, 255, 255, 250)), (254, 474, 16, (253, 224, 71, 245)),
-        (424, 446, 26, (255, 255, 255, 250)), (122, 122, 13, (255, 255, 255, 235)),
-        (394, 128, 13, (253, 224, 71, 235)), (118, 392, 14, (251, 207, 232, 235)),
-    ]
-    for sx, sy, sr, col in stars:
-        hd.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], fill=(col[0], col[1], col[2], 95))
-    halo = halo.filter(ImageFilter.GaussianBlur(radius=10))
-    img = Image.alpha_composite(img, halo)
-    d = ImageDraw.Draw(img)
-    for sx, sy, sr, col in stars:
-        draw_4pt_star(d, sx, sy, sr, max(3, sr * 0.24), col)
+    for cx, cy, s, c_w, c_g, rot, br in specs:
+        b = draw_luminous_butterfly(s, c_w, c_g, rot, br)
+        img.alpha_composite(b, (cx - b.width // 2, cy - b.height // 2))
     return img
 
 
@@ -638,6 +673,54 @@ def save_ai_icon(out_path, portrait_128, tint_rgb, label):
     im.save(out_path, "PNG")
 
 
+def build_clock_font_atlas():
+    W, H = 512, 256
+    atlas = Image.new("L", (W, H), 0)
+    font_semi = r"C:\Windows\Fonts\seguisb.ttf"
+    if not os.path.exists(font_semi):
+        font_semi = FONT_BOLD
+
+    def render_cell(ch, font_path, fsize, cw, ch_h, align_bottom_pad=10):
+        sc = 2
+        f = ImageFont.truetype(font_path, fsize * sc)
+        # Measure reference '0' so baseline stays locked across all digits/punctuation
+        big = Image.new("L", (cw * sc, ch_h * sc), 0)
+        bd = ImageDraw.Draw(big)
+        ref_bb = bd.textbbox((0, 0), "0", font=f)
+        g_bb = bd.textbbox((0, 0), ch, font=f)
+        gw = g_bb[2] - g_bb[0]
+        x = (cw * sc - gw) // 2 - g_bb[0]
+        y = (ch_h * sc - align_bottom_pad * sc) - ref_bb[3]
+        bd.text((x, y), ch, font=f, fill=255)
+        return big.resize((cw, ch_h), Image.Resampling.LANCZOS)
+
+    # Row 0: large iOS Lock-Screen time glyphs '0'-'9', ':', '/' (42x128 each)
+    for idx, ch in enumerate("0123456789:/"):
+        cell = render_cell(ch, FONT_BOLD, 98, 42, 128, align_bottom_pad=22)
+        atlas.paste(cell, (idx * 42, 0))
+
+    # Row 1: small date glyphs '0'-'9', '/', '•' (24x48 each)
+    for idx, ch in enumerate("0123456789/•"):
+        cell = render_cell(ch, font_semi, 27, 24, 48, align_bottom_pad=10)
+        atlas.paste(cell, (idx * 24, 128))
+
+    # Weekday labels (168x38 each)
+    weekdays = ["CHỦ NHẬT", "THỨ HAI", "THỨ BA", "THỨ TƯ", "THỨ NĂM", "THỨ SÁU", "THỨ BẢY"]
+    positions = [
+        (0, 176), (170, 176), (340, 176),
+        (0, 216), (170, 216), (340, 216),
+        (296, 128),
+    ]
+    for wtxt, (px, py) in zip(weekdays, positions):
+        cell = render_cell(wtxt, font_semi, 24, 168, 38, align_bottom_pad=8)
+        atlas.paste(cell, (px, py))
+
+    out_path = os.path.join(BINS_DIR, "clock_font_atlas.bin")
+    with open(out_path, "wb") as bf:
+        bf.write(zlib.compress(atlas.tobytes(), level=9))
+    print(f"Generated clock_font_atlas.bin ({os.path.getsize(out_path)} bytes)")
+
+
 def main():
     os.makedirs(FRAMES_DIR, exist_ok=True)
     os.makedirs(BINS_DIR, exist_ok=True)
@@ -654,19 +737,13 @@ def main():
     with open(MANIFEST_PATH, "r", encoding="utf-8") as mf:
         manifest = json.load(mf)
 
-    # Part B: 10 foreground sticker & weather/water overlays
+    # Part B: 2 decorative petal/sticker overlays (the 6 optical shaders use worker.js; fx_ca_cute & fx_buom_xinh use photorealistic AI)
     fx_specs = [
-        ("fx_ca_cute", "Cá Cute", fx_ca_cute, (88, 28, 135, 205)),
-        ("fx_mua_roi", "Mưa Rơi", fx_mua_roi, (15, 23, 42, 205)),
-        # fx_giot_nuoc now uses the real optical wet-glass refraction shader in worker.js (do not overwrite icon)
-        ("fx_bong_bong", "Bong Bóng", fx_bong_bong, (76, 29, 149, 205)),
         ("fx_canh_hoa", "Cánh Hoa", fx_canh_hoa, (157, 23, 77, 205)),
-        ("fx_tuyet_roi", "Tuyết Rơi", fx_tuyet_roi, (30, 58, 138, 205)),
         ("fx_sticker_doodle", "Sticker Mặt", fx_sticker_doodle, (190, 24, 93, 205)),
-        ("fx_cau_vong", "Cầu Vồng", fx_cau_vong, (109, 40, 217, 205)),
-        ("fx_buom_xinh", "Bướm Xinh", fx_buom_xinh, (67, 56, 202, 205)),
-        ("fx_sao_lap_lanh", "Lấp Lánh", fx_sao_lap_lanh, (180, 83, 9, 205)),
     ]
+    for old_shader_fx in ("fx_giot_nuoc", "fx_mua_roi", "fx_bong_bong", "fx_tuyet_roi", "fx_cau_vong", "fx_sao_lap_lanh", "fx_ca_cute", "fx_buom_xinh"):
+        manifest.pop(old_shader_fx, None)
     for fid, label, fn, pill_bg in fx_specs:
         ov = fn().convert("RGBA").resize((SIZE, SIZE), Image.Resampling.LANCZOS)
         ov.save(os.path.join(FRAMES_DIR, f"{fid}.png"), "PNG")
@@ -693,7 +770,8 @@ def main():
     for fid, tint, label in ai_specs:
         save_ai_icon(os.path.join(V2_DIR, f"{fid}.png"), portrait_128, tint, label)
 
-    print(f"Generated 14 overlay frames + 14 .bin + 6 AI icons. Total manifest frames: {len(manifest)}")
+    build_clock_font_atlas()
+    print(f"Generated {len(fx_specs)} overlay frames + .bin + 6 AI icons. Total manifest frames: {len(manifest)}")
 
 
 if __name__ == "__main__":
