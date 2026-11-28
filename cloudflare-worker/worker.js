@@ -5206,7 +5206,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const amCountry = String(extra?.country || "vn").trim();
   const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 10 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 11 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5248,14 +5248,37 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const coreClean = stripTrackBrackets(cleanTitle) || cleanTitle;
   const dashSplit = cleanTitle.split(/\s*[-–—|]\s*/).map((p) => p.trim()).filter(Boolean);
 
-  let primaryTitle = coreClean || cleanTitle;
+  const REMIX_VARIANT_RE = /\b(remix|vinahouse|lofi|lo-?fi|sped\s*up|slowed|reverb|mashup|nightcore|acoustic|cover|bootleg|dj\s+mix)\b/i;
+  const STRIP_VARIANT_WORDS_RE = /\b(remix|vinahouse|lofi|lo-?fi|sped\s*up|slowed|reverb|nightcore|acoustic|cover|bootleg|dj\s+mix)\b/gi;
+  const isRemixVariant = !!(videoId && !spId && !amId && REMIX_VARIANT_RE.test(cleanTitle));
+
+  let origCoreTitle = coreClean;
+  if (isRemixVariant) {
+    if (dashSplit.length >= 2) {
+      const nonRemixSegs = dashSplit.filter((p) => !REMIX_VARIANT_RE.test(p) && !isNoisyChannelName(p));
+      const pickedSeg = nonRemixSegs[0] || dashSplit[0];
+      origCoreTitle = stripTrackBrackets(pickedSeg) || pickedSeg;
+    }
+    origCoreTitle = String(origCoreTitle || coreClean)
+      .replace(STRIP_VARIANT_WORDS_RE, " ")
+      .replace(/\s+/g, " ")
+      .trim() || coreClean;
+  }
+
+  let primaryTitle = isRemixVariant ? origCoreTitle : (coreClean || cleanTitle);
   let primaryArtist = (cleanAuthor && cleanAuthor !== "YouTube" && (isTopicChannel || !isNoisyChannelName(cleanAuthor)))
     ? cleanAuthor
     : "";
   const expectedArtists = [];
   let strictArtist = false;
 
-  if (isTopicChannel && cleanAuthor) {
+  if (isRemixVariant) {
+    // Bài remix/lofi/sped-up trên YouTube: thả lỏng strictArtist để tìm được bản gốc làm nhạc preview, vẫn giữ tên YouTube để hiển thị.
+    if (primaryArtist && !REMIX_VARIANT_RE.test(primaryArtist) && !/\bdj\b/i.test(primaryArtist)) {
+      expectedArtists.push(primaryArtist);
+    }
+    strictArtist = false;
+  } else if (isTopicChannel && cleanAuthor) {
     expectedArtists.push(cleanAuthor);
     strictArtist = true;
   } else if (dashSplit.length >= 2) {
@@ -5295,9 +5318,15 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
     }
   }
 
-  // Xây danh sách query ưu tiên CÓ NGHỆ SĨ TRƯỚC để tránh ghép nhầm nghệ sĩ khác cùng tên bài (vd Vandebo thay vì BIGBANG)
+  // Xây danh sách query ưu tiên CÓ NGHỆ SĨ TRƯỚC (bài thường) hoặc TÊN BÀI GỐC TRƯỚC (bài remix)
   const rawTerms = [];
-  if (primaryTitle) {
+  if (isRemixVariant) {
+    if (origCoreTitle) {
+      if (expectedArtists[0]) rawTerms.push(`${origCoreTitle} ${expectedArtists[0]}`);
+      rawTerms.push(origCoreTitle);
+      rawTerms.push(`${origCoreTitle} Remix`);
+    }
+  } else if (primaryTitle) {
     if (primaryArtist && !foldCompact(primaryTitle).includes(foldCompact(primaryArtist))) {
       rawTerms.push(`${primaryTitle} ${primaryArtist}`);
     }
@@ -5365,6 +5394,10 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
 
     const qLower = cleanTitle.toLowerCase();
     const cLower = cTitleStr.toLowerCase();
+    const cArtLower = String(candArtist || "").toLowerCase();
+    if (isRemixVariant && !/\b(remix|karaoke|instrumental|piano|cover|live|vinahouse|lofi|sped\s*up|slowed)\b/i.test(cLower) && !/\b(remix|dj)\b/i.test(cArtLower)) {
+      score += 20;
+    }
     if (/\b(karaoke|instrumental|piano|lullaby|8-?bit|ringtone|tribute|cover)\b/i.test(cLower) && !/\b(karaoke|instrumental|piano|lullaby|8-?bit|ringtone|tribute|cover)\b/i.test(qLower)) {
       score -= 40;
     }
@@ -5422,8 +5455,14 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
     } catch (_) {}
   }
 
-  let title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || primaryTitle || cleanTitle || "YouTube Music").trim();
-  let artist = (itunesHit?.artistName || deezerHit?.artist?.name || primaryArtist || cleanAuthor || "YouTube").trim();
+  const candArt = (itunesHit?.artistName || deezerHit?.artist?.name || "").trim();
+  const safeOrigArtist = (candArt && !REMIX_VARIANT_RE.test(candArt) && !/\bdj\b/i.test(candArt)) ? candArt : "";
+  let title = isRemixVariant
+    ? cleanTitle
+    : (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || primaryTitle || cleanTitle || "YouTube Music").trim();
+  let artist = isRemixVariant
+    ? (safeOrigArtist || primaryArtist || cleanAuthor || "YouTube").trim()
+    : (candArt || primaryArtist || cleanAuthor || "YouTube").trim();
   if (!itunesHit && !deezerHit) {
     const dashMatch = cleanTitle.match(/^(.+?)\s+[-–]\s+(.+)$/);
     if (dashMatch && dashMatch[1].length >= 2 && dashMatch[2].length >= 2) {
@@ -5491,7 +5530,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
 
   const track = {
-    schemaVer: 10,
+    schemaVer: 11,
     platform,
     videoId: videoId || "",
     spotifyId: spId || "",
@@ -5500,6 +5539,8 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
     deezerId,
     title: finalTitle,
     artist: finalArtist,
+    isRemix: isRemixVariant,
+    searchTitle: isRemixVariant ? origCoreTitle : "",
     artworkUrl,
     previewUrl,
     spotifyUrl,
