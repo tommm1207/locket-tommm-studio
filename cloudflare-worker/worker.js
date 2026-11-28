@@ -4877,7 +4877,8 @@ function foldNorm(s) {
     .replace(/đ/g, "d")
     .replace(/Đ/g, "D")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    // Giữ a-z0-9 + Hangul (하루) + CJK (中文) + Hiragana/Katakana + fullwidth — KHÔNG xoá chữ châu Á
+    .replace(/[^a-z0-9가-힣一-鿿぀-ヿ＀-￯]+/g, " ")
     .trim();
 }
 
@@ -5158,7 +5159,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const amCountry = String(extra?.country || "vn").trim();
   const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 8 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 9 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5216,6 +5217,18 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   } else if (cleanAuthor) {
     rawTerms.push(cleanAuthor);
   }
+  // Tên phụ La-tinh trong ngoặc, vd "하루하루 (Haru Haru)" -> "Haru Haru".
+  // Bài Hàn/Nhật/Trung thường được iTunes lưu dưới tên La-tinh hoá này -> thêm làm query cứu cánh.
+  const bracketMatches = String(cleanTitle || "").match(/[([【]([^)\]】]+)[)\]】]/g) || [];
+  for (const bm of bracketMatches) {
+    const inner = bm.replace(/^[([【]|[)\]】]$/g, "").trim();
+    // bỏ noise kiểu "Official MV", "Audio", "Remix"...
+    const innerWords = foldNorm(inner).split(/\s+/).filter((w) => w && !TRACK_NOISE_WORDS.has(w));
+    if (inner && innerWords.length > 0 && /[a-z]/i.test(inner)) {
+      rawTerms.push(inner);
+      if (cleanAuthor && !isNoisyChannelName(cleanAuthor)) rawTerms.push(`${inner} ${cleanAuthor}`);
+    }
+  }
   const terms = Array.from(new Set(rawTerms.filter(Boolean)));
 
   let itunesHit = null;
@@ -5231,7 +5244,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
         fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
       ]);
       const pickItunes = (itJson) => {
-        const list = (itJson?.results || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.trackName) || titleMatchesTrack(titleQueryForMatch, x.trackName)));
+        const list = (itJson?.results || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.trackName) || titleMatchesTrack(titleQueryForMatch, x.trackName) || titleMatchesTrack(term, x.trackName)));
         return list.find((x) => x.previewUrl) || list[0] || null;
       };
       if (itVnRes && itVnRes.ok) {
@@ -5245,7 +5258,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       }
       if (dzRes && dzRes.ok && !deezerHit) {
         const dzJson = await dzRes.json().catch(() => null);
-        const dzList = (dzJson?.data || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.title_short || x.title) || titleMatchesTrack(titleQueryForMatch, x.title_short || x.title)));
+        const dzList = (dzJson?.data || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.title_short || x.title) || titleMatchesTrack(titleQueryForMatch, x.title_short || x.title) || titleMatchesTrack(term, x.title_short || x.title)));
         deezerHit = dzList.find((x) => x.preview) || dzList[0] || null;
       }
       if (itunesHit && deezerHit) break;
@@ -5316,7 +5329,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
 
   const track = {
-    schemaVer: 8,
+    schemaVer: 9,
     platform,
     videoId: videoId || "",
     spotifyId: spId || "",

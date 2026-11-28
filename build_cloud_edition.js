@@ -168,7 +168,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
     function simpleNorm(s) {
         return String(s || "")
             .toLowerCase()
-            .replace(/[^a-z0-9\\u00c0-\\u1ef9]+/g, " ")
+            .replace(/[^a-z0-9\\u00c0-\\u1ef9\\uac00-\\ud7a3\\u4e00-\\u9fff\\u3040-\\u30ff\\uff00-\\uffef]+/g, " ")
             .replace(/^\\s+|\\s+$/g, "");
     }
 
@@ -417,7 +417,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 8 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 9 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         ex.ts = Date.now();
                         saveTrackStores(ex);
                         finishOnce({});
@@ -471,7 +471,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
             if (rawExSp) {
                 try {
                     var exSp = JSON.parse(rawExSp);
-                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 8 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
+                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 9 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
                         exSp.ts = Date.now();
                         saveTrackStores(exSp);
                         finishOnce({});
@@ -526,7 +526,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
             if (rawExAm) {
                 try {
                     var exAm = JSON.parse(rawExAm);
-                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 8 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
+                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 9 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
                         exAm.ts = Date.now();
                         saveTrackStores(exAm);
                         finishOnce({});
@@ -624,6 +624,30 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
         var maxLinesVal = (prevMax && typeof prevMax === "object")
             ? prevMax
             : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
+        // GUARD: caption:music RỖNG (không preview, không spotify/apple url) sẽ bị Locket server DROP
+        // (overlayCount:0 -> mất sạch caption). Khi tìm bài thất bại -> giữ overlay dạng text hợp lệ
+        // (caption:music_text đơn giản, nền màu bìa) để KHÔNG mất chữ bài hát người dùng gõ.
+        var hasPreview = !!(track.previewUrl && String(track.previewUrl).indexOf("http") === 0);
+        var isSpotifyReady = !!((track.platform === "spotify" || track.spotifyId) && (track.spotifyUrl || track.spotifyId));
+        var hasAmUrl = !!(track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1);
+        if (!hasPreview && !isSpotifyReady && !hasAmUrl) {
+            // Không đủ dữ liệu nhạc native -> fallback text, giữ overlay_id gốc để server chấp nhận
+            ov.alt_text = fullLabel;
+            ov.data = ov.data || {};
+            if (!ov.data.type || ov.data.type === "music") ov.data.type = "static_content";
+            ov.data.text = fullLabel;
+            ov.data.text_color = "#FFFFFF";
+            ov.data.max_lines = maxLinesVal;
+            ov.data.background = {
+                material_blur: "regular",
+                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
+            };
+            if (track.artworkUrl) {
+                ov.data.icon = { type: "image", data: track.artworkUrl, source: "url" };
+            }
+            if (ov.data.payload) delete ov.data.payload;
+            return formatTrackLabel(songTitle, songArtist, 72);
+        }
         ov.overlay_id = "caption:music";
         ov.alt_text = fullLabel;
         var isSpotifyTrack = !!(track.platform === "spotify" || track.spotifyId);
@@ -744,7 +768,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 for (var k = 0; k < overlays.length; k++) {
                     var ov = overlays[k];
                     if (!ov) continue;
-                    if (ov.overlay_id === "caption:music" && typeof $httpClient !== "undefined") {
+                    if ((ov.overlay_id === "caption:music" || ov.overlay_id === "caption:yt_vinyl_spin") && typeof $httpClient !== "undefined") {
                         hasNativeMusicLog = true;
                         var describeVal = function (v, d) {
                             if (d > 4 || v == null) return v === null ? "null" : typeof v;
@@ -796,7 +820,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                                 if (!isVinylIconMode) {
                                     var isSpUp = !!(track.platform === "spotify" || track.spotifyId);
                                     var hasAmReady = !!(track.appleMusicUrl && track.appleMusicUrl.indexOf("music.apple.com") !== -1 && (track.appleMusicId || /[?&]i=\\d+|\\/song\\/\\d+/.test(track.appleMusicUrl)) && track.artworkUrl && String(track.artworkUrl).indexOf("mzstatic.com") !== -1);
-                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 8 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : !hasAmReady)));
+                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 9 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : !hasAmReady)));
                                     if (needsUpgrade) {
                                         cachedTrackForUpgrade = track;
                                         pendingUpgradeOvs.push(ov);
@@ -898,7 +922,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 };
                 var isSpCached = !!(cachedTrackForUpgrade.platform === "spotify" || cachedTrackForUpgrade.spotifyId);
                 var hasAmCachedReady = !!(cachedTrackForUpgrade.appleMusicUrl && cachedTrackForUpgrade.appleMusicUrl.indexOf("music.apple.com") !== -1 && (cachedTrackForUpgrade.appleMusicId || /[?&]i=\\d+|\\/song\\/\\d+/.test(cachedTrackForUpgrade.appleMusicUrl)) && cachedTrackForUpgrade.artworkUrl && String(cachedTrackForUpgrade.artworkUrl).indexOf("mzstatic.com") !== -1);
-                if (cachedTrackForUpgrade.schemaVer === 8 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : hasAmCachedReady)) {
+                if (cachedTrackForUpgrade.schemaVer === 9 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : hasAmCachedReady)) {
                     finishUpgrade(cachedTrackForUpgrade);
                     return;
                 }
