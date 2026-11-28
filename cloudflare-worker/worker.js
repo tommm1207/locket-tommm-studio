@@ -5052,7 +5052,7 @@ async function resolveAppleIdMetadata(appleId, country = "vn") {
       const html = await htmlRes.text();
       const ogTitle = html.match(/<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i)?.[1]
         || html.match(/<title>([^<]+)<\/title>/i)?.[1] || "";
-      const cleanOg = ogTitle.replace(/[\u200e\u200f]/g, "").replace(/\s*[-–|]\s*Apple Music\s*$/i, "").replace(/\s+on Apple Music\s*$/i, "").trim();
+      const cleanOg = ogTitle.replace(/[\u200e\u200f]/g, "").replace(/\u00a0/g, " ").replace(/\s*[-–|]\s*Apple Music\s*$/i, "").replace(/\s+on Apple Music\s*$/i, "").trim();
       let trackName = "";
       let artistName = "";
       const byMatch = cleanOg.match(/^(.+?)\s+(?:[-–]\s*Song\s+by|by)\s+(.+)$/i);
