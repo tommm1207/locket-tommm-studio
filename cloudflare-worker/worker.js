@@ -5030,21 +5030,51 @@ async function resolveAppleIdMetadata(appleId, country = "vn") {
   const id = String(appleId || "").trim();
   if (!/^\d+$/.test(id)) return null;
   const cc = /^[a-zA-Z]{2}$/.test(String(country || "")) ? String(country).toLowerCase() : "vn";
+  const ua = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    Accept: "application/json, text/html",
+  };
   try {
     const res = await fetch(`https://itunes.apple.com/lookup?id=${encodeURIComponent(id)}&country=${encodeURIComponent(cc)}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(3500),
+      headers: ua,
+      signal: AbortSignal.timeout(3000),
     });
-    if (!res.ok) return null;
-    const j = await res.json();
-    const hit = Array.isArray(j?.results) ? j.results[0] : null;
-    return hit && hit.trackName ? hit : null;
-  } catch (_) {
-    return null;
-  }
+    if (res.ok) {
+      const j = await res.json();
+      const hit = Array.isArray(j?.results) ? j.results[0] : null;
+      if (hit && hit.trackName) return hit;
+    }
+  } catch (_) {}
+  try {
+    const pageUrl = `https://music.apple.com/${encodeURIComponent(cc)}/song/${encodeURIComponent(id)}`;
+    const htmlRes = await fetch(pageUrl, { headers: ua, signal: AbortSignal.timeout(3500) });
+    if (htmlRes.ok) {
+      const html = await htmlRes.text();
+      const ogTitle = html.match(/<meta\s+(?:property|name)=["']og:title["']\s+content=["']([^"']+)["']/i)?.[1]
+        || html.match(/<title>([^<]+)<\/title>/i)?.[1] || "";
+      const cleanOg = ogTitle.replace(/[\u200e\u200f]/g, "").replace(/\s*[-–|]\s*Apple Music\s*$/i, "").replace(/\s+on Apple Music\s*$/i, "").trim();
+      let trackName = "";
+      let artistName = "";
+      const byMatch = cleanOg.match(/^(.+?)\s+(?:[-–]\s*Song\s+by|by)\s+(.+)$/i);
+      if (byMatch) {
+        trackName = byMatch[1].trim();
+        artistName = byMatch[2].trim();
+      } else if (cleanOg) {
+        trackName = cleanOg;
+      }
+      const ogImg = html.match(/<meta\s+(?:property|name)=["']og:image["']\s+content=["']([^"']+)["']/i)?.[1] || "";
+      if (trackName) {
+        return {
+          trackId: id,
+          trackName,
+          artistName,
+          trackViewUrl: pageUrl,
+          artworkUrl100: ogImg,
+        };
+      }
+    }
+  } catch (_) {}
+  return null;
 }
 
 async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra = null) {

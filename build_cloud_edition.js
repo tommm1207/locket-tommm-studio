@@ -192,7 +192,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
         var hasAppleUrl = !!(track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1);
         var hasItunesPreview = !!(track.previewUrl && String(track.previewUrl).indexOf("itunes.apple.com") !== -1);
         var hasAppleId = !!(track.appleMusicId);
-        if (hasAppleUrl && hasItunesPreview && hasAppleId) {
+        if (hasAppleUrl && hasItunesPreview && hasAppleId && track.title !== "YouTube Music") {
             doneCb(track);
             return;
         }
@@ -243,9 +243,35 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 else finishEnrich();
             });
         };
-        tryCountry("VN", function () {
-            tryCountry("US", null);
-        });
+        if (track.appleMusicId) {
+            $httpClient.get({
+                url: "https://itunes.apple.com/lookup?id=" + encodeURIComponent(String(track.appleMusicId)) + "&country=VN",
+                headers: uaHdrs
+            }, function (err, resp, body) {
+                var hitOk = false;
+                try {
+                    if (!err && body) {
+                        var jl = JSON.parse(body);
+                        var hl = jl && jl.results && jl.results[0];
+                        if (hl && hl.trackName) {
+                            if (hl.trackName && track.title === "YouTube Music") track.title = hl.trackName;
+                            if (hl.artistName && (!track.artist || track.artist === "YouTube")) track.artist = hl.artistName;
+                            if (hl.previewUrl) track.previewUrl = hl.previewUrl;
+                            if (hl.artworkUrl100) track.artworkUrl = String(hl.artworkUrl100).replace("100x100bb", "600x600bb");
+                            if (hl.trackViewUrl) track.appleMusicUrl = hl.trackViewUrl;
+                            if (hl.trackId) track.appleMusicId = String(hl.trackId);
+                            hitOk = !!(track.previewUrl && track.appleMusicUrl);
+                        }
+                    }
+                } catch (_) {}
+                if (hitOk) finishEnrich();
+                else tryCountry("VN", function () { tryCountry("US", null); });
+            });
+        } else {
+            tryCountry("VN", function () {
+                tryCountry("US", null);
+            });
+        }
     }
 
     // Mode 1: Sniff YouTube / YouTube Music playback & player requests (await HTTP callback before $done)
@@ -376,31 +402,67 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 } catch (_) {}
             }
             var amTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 4500) : null;
-            $httpClient.post({
-                url: WORKER_BASE + "/studio/yt-now-playing",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ appleId: amId, country: amCountry })
-            }, function (err, resp, data) {
-                var savedAm = null;
+            var sendAmToWorker = function (preMeta) {
+                var bodyObj = { appleId: amId, country: amCountry };
+                if (preMeta) {
+                    if (preMeta.title) bodyObj.title = preMeta.title;
+                    if (preMeta.artist) bodyObj.artist = preMeta.artist;
+                    if (preMeta.previewUrl) bodyObj.previewUrl = preMeta.previewUrl;
+                    if (preMeta.appleMusicUrl) bodyObj.appleMusicUrl = preMeta.appleMusicUrl;
+                    if (preMeta.artworkUrl) bodyObj.artworkUrl = preMeta.artworkUrl;
+                    bodyObj.appleMusicId = amId;
+                }
+                $httpClient.post({
+                    url: WORKER_BASE + "/studio/yt-now-playing",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(bodyObj)
+                }, function (err, resp, data) {
+                    var savedAm = null;
+                    try {
+                        if (!err && data) {
+                            var parsed = JSON.parse(data);
+                            if (parsed && parsed.ok && parsed.track && parsed.track.title) {
+                                savedAm = parsed.track;
+                                $persistentStore.write(JSON.stringify(savedAm), "tommm_yt_now_playing");
+                                try { console.log("[TommmAM] Saved: " + savedAm.title + " - " + (savedAm.artist || "")); } catch (_) {}
+                            }
+                        }
+                    } catch (_) {}
+                    if (savedAm) {
+                        enrichTrackOnDevice(savedAm, function () {
+                            if (amTimer && typeof clearTimeout !== "undefined") clearTimeout(amTimer);
+                            finishOnce({});
+                        }, 2000);
+                    } else {
+                        if (amTimer && typeof clearTimeout !== "undefined") clearTimeout(amTimer);
+                        finishOnce({});
+                    }
+                });
+            };
+            $httpClient.get({
+                url: "https://itunes.apple.com/lookup?id=" + encodeURIComponent(amId) + "&country=" + encodeURIComponent(amCountry),
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                    "Accept": "application/json"
+                }
+            }, function (lErr, lResp, lBody) {
+                var pre = null;
                 try {
-                    if (!err && data) {
-                        var parsed = JSON.parse(data);
-                        if (parsed && parsed.ok && parsed.track && parsed.track.title) {
-                            savedAm = parsed.track;
-                            $persistentStore.write(JSON.stringify(savedAm), "tommm_yt_now_playing");
-                            try { console.log("[TommmAM] Saved: " + savedAm.title + " - " + (savedAm.artist || "")); } catch (_) {}
+                    if (!lErr && lBody) {
+                        var jl = JSON.parse(lBody);
+                        var hl = jl && jl.results && jl.results[0];
+                        if (hl && hl.trackName) {
+                            pre = {
+                                title: hl.trackName,
+                                artist: hl.artistName || "",
+                                previewUrl: hl.previewUrl || "",
+                                appleMusicUrl: hl.trackViewUrl || "",
+                                artworkUrl: hl.artworkUrl100 ? String(hl.artworkUrl100).replace("100x100bb", "600x600bb") : ""
+                            };
                         }
                     }
                 } catch (_) {}
-                if (savedAm) {
-                    enrichTrackOnDevice(savedAm, function () {
-                        if (amTimer && typeof clearTimeout !== "undefined") clearTimeout(amTimer);
-                        finishOnce({});
-                    }, 2400);
-                } else {
-                    if (amTimer && typeof clearTimeout !== "undefined") clearTimeout(amTimer);
-                    finishOnce({});
-                }
+                sendAmToWorker(pre);
             });
             return;
         } catch (_) {
