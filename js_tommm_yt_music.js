@@ -187,6 +187,16 @@
         return matched >= Math.ceil(validQ * 0.65) && (validQ < 2 || matched >= 2);
     }
 
+    function saveTrackStores(tr) {
+        if (!tr || !tr.title || typeof $persistentStore === "undefined") return;
+        try {
+            var serialized = JSON.stringify(tr);
+            $persistentStore.write(serialized, "tommm_yt_now_playing");
+            var isSp = !!(tr.platform === "spotify" || tr.spotifyId);
+            $persistentStore.write(serialized, isSp ? "tommm_sp_now_playing" : "tommm_am_now_playing");
+        } catch (_) {}
+    }
+
     function enrichTrackOnDevice(track, doneCb, maxWaitMs) {
         if (!track || !track.title || typeof $httpClient === "undefined") {
             doneCb(track);
@@ -218,11 +228,7 @@
             if (completed) return;
             completed = true;
             if (eTimer && typeof clearTimeout !== "undefined") clearTimeout(eTimer);
-            try {
-                if (typeof $persistentStore !== "undefined") {
-                    $persistentStore.write(JSON.stringify(track), "tommm_yt_now_playing");
-                }
-            } catch (_) {}
+            saveTrackStores(track);
             doneCb(track);
         };
         var eTimer = typeof setTimeout !== "undefined" ? setTimeout(finishEnrich, maxWaitMs || 2400) : null;
@@ -364,11 +370,13 @@
                 finishOnce({});
                 return;
             }
-            var rawExisting = $persistentStore.read("tommm_yt_now_playing");
+            var rawExisting = $persistentStore.read("tommm_am_now_playing") || $persistentStore.read("tommm_yt_now_playing");
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
                     if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 8 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                        ex.ts = Date.now();
+                        saveTrackStores(ex);
                         finishOnce({});
                         return;
                     }
@@ -386,7 +394,7 @@
                         var parsed = JSON.parse(data);
                         if (parsed && parsed.ok && parsed.track && parsed.track.title) {
                             savedTrack = parsed.track;
-                            $persistentStore.write(JSON.stringify(savedTrack), "tommm_yt_now_playing");
+                            saveTrackStores(savedTrack);
                             try { console.log("[TommmYT] Saved: " + savedTrack.title + " - " + (savedTrack.artist || "")); } catch (_) {}
                         }
                     }
@@ -416,11 +424,13 @@
                 finishOnce({});
                 return;
             }
-            var rawExSp = $persistentStore.read("tommm_yt_now_playing");
+            var rawExSp = $persistentStore.read("tommm_sp_now_playing") || $persistentStore.read("tommm_yt_now_playing");
             if (rawExSp) {
                 try {
                     var exSp = JSON.parse(rawExSp);
                     if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 8 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
+                        exSp.ts = Date.now();
+                        saveTrackStores(exSp);
                         finishOnce({});
                         return;
                     }
@@ -438,7 +448,7 @@
                         var parsed = JSON.parse(data);
                         if (parsed && parsed.ok && parsed.track && parsed.track.title) {
                             savedSp = parsed.track;
-                            $persistentStore.write(JSON.stringify(savedSp), "tommm_yt_now_playing");
+                            saveTrackStores(savedSp);
                             try { console.log("[TommmSP] Saved: " + savedSp.title + " - " + (savedSp.artist || "")); } catch (_) {}
                         }
                     }
@@ -469,11 +479,13 @@
                 finishOnce({});
                 return;
             }
-            var rawExAm = $persistentStore.read("tommm_yt_now_playing");
+            var rawExAm = $persistentStore.read("tommm_am_now_playing") || $persistentStore.read("tommm_yt_now_playing");
             if (rawExAm) {
                 try {
                     var exAm = JSON.parse(rawExAm);
                     if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 8 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
+                        exAm.ts = Date.now();
+                        saveTrackStores(exAm);
                         finishOnce({});
                         return;
                     }
@@ -501,7 +513,7 @@
                             var parsed = JSON.parse(data);
                             if (parsed && parsed.ok && parsed.track && parsed.track.title) {
                                 savedAm = parsed.track;
-                                $persistentStore.write(JSON.stringify(savedAm), "tommm_yt_now_playing");
+                                saveTrackStores(savedAm);
                                 try { console.log("[TommmAM] Saved: " + savedAm.title + " - " + (savedAm.artist || "")); } catch (_) {}
                             }
                         }
@@ -627,7 +639,7 @@
                         var ro = rList[rk];
                         if (!ro || !ro.overlay_id) continue;
                         overlayIds.push(ro.overlay_id);
-                        if (ro.overlay_id === "caption:music" || ro.overlay_id.indexOf("yt_") !== -1) {
+                        if (ro.overlay_id === "caption:music" || ro.overlay_id.indexOf("yt_") !== -1 || ro.overlay_id.indexOf("sp_") !== -1) {
                             var rd = ro.data || {};
                             var rp = rd.payload || {};
                             captured.push({
@@ -712,10 +724,28 @@
                             finishOnce({});
                         });
                     }
-                    var isYtOv = (ov.overlay_id === "caption:yt_now_playing" || ov.overlay_id === "caption:yt_vinyl_spin" || (ov.overlay_id && ov.overlay_id.indexOf("yt_now_playing") !== -1));
+                    var isVinylIconMode = ov.overlay_id === "caption:yt_vinyl_spin";
+                    var isSpOv = ov.overlay_id === "caption:sp_now_playing";
+                    var isYtAmOv = ov.overlay_id === "caption:yt_now_playing" || (ov.overlay_id && ov.overlay_id.indexOf("yt_now_playing") !== -1);
+                    var isYtOv = isVinylIconMode || isSpOv || isYtAmOv;
                     if (isYtOv && typeof $persistentStore !== "undefined") {
-                        var isVinylIconMode = ov.overlay_id === "caption:yt_vinyl_spin";
-                        var rawYt = $persistentStore.read("tommm_yt_now_playing");
+                        var rawYt = null;
+                        if (isVinylIconMode) {
+                            rawYt = $persistentStore.read("tommm_yt_now_playing");
+                        } else if (isSpOv) {
+                            rawYt = $persistentStore.read("tommm_sp_now_playing");
+                            if (!rawYt) {
+                                var fbSp = $persistentStore.read("tommm_yt_now_playing");
+                                if (fbSp) {
+                                    try {
+                                        var fbSpObj = JSON.parse(fbSp);
+                                        if (fbSpObj && (fbSpObj.platform === "spotify" || fbSpObj.spotifyId)) rawYt = fbSp;
+                                    } catch (_) {}
+                                }
+                            }
+                        } else {
+                            rawYt = $persistentStore.read("tommm_am_now_playing") || $persistentStore.read("tommm_yt_now_playing");
+                        }
                         if (rawYt) {
                             var track = JSON.parse(rawYt);
                             if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
@@ -847,7 +877,7 @@
                             var parsed = JSON.parse(data);
                             if (parsed && parsed.ok && parsed.track && parsed.track.title) {
                                 picked = parsed.track;
-                                $persistentStore.write(JSON.stringify(picked), "tommm_yt_now_playing");
+                                saveTrackStores(picked);
                             }
                         }
                     } catch (_) {}

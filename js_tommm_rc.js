@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "86";
+var RC_VER = "87";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -256,44 +256,65 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
             if (sp >= Math.floor(maxLen * 0.55)) cut = cut.slice(0, sp);
             return cut.replace(/[\s(\[\-–•,|/]+$/, "").trim() + "…";
         };
-        var ytLabel = "Nhạc Đang Nghe • YT / Spotify / AM";
-        var ytVinylLabel = "Đĩa than • Tự gắn bài đang nghe";
-        var ytColors = ["#991B1B", "#DC2626"];
         var VINYL_ICON_DEF = "https://tommm1207.github.io/locket-tommm-studio/assets/captions_anim/vinyl_disc_icon.gif";
-        var ytIcon = { type: "image", data: VINYL_ICON_DEF, source: "url" };
-        var hasActiveYt = false;
-        try {
-            if (typeof $persistentStore !== "undefined") {
-                var rawYt = $persistentStore.read("tommm_yt_now_playing");
-                if (rawYt) {
-                    var yt = JSON.parse(rawYt);
-                    if (yt && yt.title && (!yt.ts || (Date.now() - yt.ts) < 2700000)) {
-                        hasActiveYt = true;
-                        ytLabel = formatRcTrackLabel(yt.title, yt.artist, 72);
-                        ytVinylLabel = ytLabel;
-                        if (Array.isArray(yt.colors) && yt.colors.length >= 2) ytColors = yt.colors.slice(0, 2);
-                        if (yt.artworkUrl) ytIcon = { type: "image", data: yt.artworkUrl, source: "url" };
-                    }
-                }
-            }
-        } catch (_) {}
-        var c0Hex = String(ytColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
-        var c1Hex = String(ytColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
-        var ytWaveBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=wave&v=5";
-        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=peek&v=5";
+        var readValidTrack = function (storeKey) {
+            try {
+                if (typeof $persistentStore === "undefined") return null;
+                var raw = $persistentStore.read(storeKey);
+                if (!raw) return null;
+                var obj = JSON.parse(raw);
+                if (obj && obj.title && (!obj.ts || (Date.now() - obj.ts) < 2700000)) return obj;
+            } catch (_) {}
+            return null;
+        };
+        var latestTr = readValidTrack("tommm_yt_now_playing");
+        var spTr = readValidTrack("tommm_sp_now_playing");
+        if (!spTr && latestTr && (latestTr.platform === "spotify" || latestTr.spotifyId)) spTr = latestTr;
+        var amTr = readValidTrack("tommm_am_now_playing");
+        if (!amTr && latestTr && !(latestTr.platform === "spotify" || latestTr.spotifyId)) amTr = latestTr;
+
+        var vinylColors = (latestTr && Array.isArray(latestTr.colors) && latestTr.colors.length >= 2) ? latestTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
+        var vinylIcon = (latestTr && latestTr.artworkUrl) ? { type: "image", data: latestTr.artworkUrl, source: "url" } : { type: "image", data: VINYL_ICON_DEF, source: "url" };
+        var vinylText = latestTr ? formatRcTrackLabel(latestTr.title, latestTr.artist, 72) : "Đĩa than • Tự gắn bài đang nghe";
+        var vC0 = String(vinylColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
+        var vC1 = String(vinylColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
+        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + vC0 + "&c1=" + vC1 + "&mode=peek&v=5";
+
+        var spColors = (spTr && Array.isArray(spTr.colors) && spTr.colors.length >= 2) ? spTr.colors.slice(0, 2) : ["#14532D", "#166534"];
+        var spIcon = (spTr && spTr.artworkUrl) ? { type: "image", data: spTr.artworkUrl, source: "url" } : { type: "image", data: VINYL_ICON_DEF, source: "url" };
+        var spText = spTr ? formatRcTrackLabel(spTr.title, spTr.artist, 72) : "Spotify • Tự gắn bài đang nghe";
+
+        var amColors = (amTr && Array.isArray(amTr.colors) && amTr.colors.length >= 2) ? amTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
+        var amIcon = (amTr && amTr.artworkUrl) ? { type: "image", data: amTr.artworkUrl, source: "url" } : { type: "image", data: VINYL_ICON_DEF, source: "url" };
+        var amText = amTr ? formatRcTrackLabel(amTr.title, amTr.artist, 72) : "YT / Apple Music • Tự gắn bài đang nghe";
+
         rawItems = [
             {
                 overlay_id: "caption:yt_vinyl_spin",
                 source: "remote",
                 caption: {
                     type: "static_content",
-                    text: hasActiveYt ? ytVinylLabel : "Đĩa than • Tự gắn bài đang nghe",
+                    text: vinylText,
                     max_lines: 1,
                     text_color: "#FFFFFF",
-                    icon: ytIcon,
+                    icon: vinylIcon,
                     background: {
-                        colors: ytColors,
+                        colors: vinylColors,
                         image: { type: "image", data: ytPeekBg, source: "url" }
+                    }
+                }
+            },
+            {
+                overlay_id: "caption:sp_now_playing",
+                source: "remote",
+                caption: {
+                    type: "static_content",
+                    text: spText,
+                    max_lines: 1,
+                    text_color: "#FFFFFF",
+                    icon: spIcon,
+                    background: {
+                        colors: spColors
                     }
                 }
             },
@@ -302,12 +323,12 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                 source: "remote",
                 caption: {
                     type: "static_content",
-                    text: ytLabel,
+                    text: amText,
                     max_lines: 1,
                     text_color: "#FFFFFF",
-                    icon: ytIcon,
+                    icon: amIcon,
                     background: {
-                        colors: ytColors
+                        colors: amColors
                     }
                 }
             }
