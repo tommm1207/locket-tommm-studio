@@ -4882,6 +4882,10 @@ function foldNorm(s) {
     .trim();
 }
 
+function foldCompact(s) {
+  return foldNorm(s).replace(/\s+/g, "");
+}
+
 const TRACK_NOISE_WORDS = new Set([
   "remix", "mix", "edit", "version", "ver", "live", "cover", "official", "mv",
   "audio", "video", "lyrics", "lyric", "feat", "ft", "prod", "dj", "vinahouse",
@@ -4901,6 +4905,49 @@ function stripTrackBrackets(s) {
 
 function isNoisyChannelName(s) {
   return /\b(media|music|channel|official|tv|records|ent|entertainment|studio|remix|dj|audio|lyrics?|vpop|nhac|youtube|topic)\b/i.test(foldNorm(s));
+}
+
+function splitArtistTokens(s) {
+  return String(s || "")
+    .split(/\s*(?:,|&|\/|·|;|\b(?:ft\.?|feat\.?|featuring|with|vs\.?|x)\b)\s*/i)
+    .map((p) => p.trim())
+    .filter((p) => p && foldCompact(p).length >= 2 && foldNorm(p) !== "youtube");
+}
+
+function artistMatchesExpected(expectedList, candArtist) {
+  if (!expectedList || expectedList.length === 0 || !candArtist) return false;
+  const candParts = splitArtistTokens(candArtist);
+  if (candParts.length === 0) candParts.push(String(candArtist));
+  for (const expRaw of expectedList) {
+    const expParts = splitArtistTokens(expRaw);
+    if (expParts.length === 0 && foldCompact(expRaw).length >= 2) expParts.push(String(expRaw));
+    for (const ep of expParts) {
+      const epC = foldCompact(ep);
+      if (epC.length < 2) continue;
+      const epWords = foldNorm(ep).split(/\s+/).filter((w) => w && !TRACK_NOISE_WORDS.has(w));
+      for (const cp of candParts) {
+        const cpC = foldCompact(cp);
+        if (cpC.length < 2) continue;
+        if (epC === cpC) return true;
+        if ((epC.length >= 4 && cpC.includes(epC)) || (cpC.length >= 4 && epC.includes(cpC))) return true;
+        const cpWords = foldNorm(cp).split(/\s+/).filter((w) => w && !TRACK_NOISE_WORDS.has(w));
+        if (epWords.length === 1 && cpWords.length === 1 && epWords[0] === cpWords[0] && epWords[0].length >= 2) {
+          return true;
+        }
+        if (epWords.length >= 2 && cpWords.length >= 2) {
+          const cpSet = new Set(cpWords);
+          let shared = 0;
+          for (const w of epWords) {
+            if ((w.length >= 3 || (/[\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff]/.test(w) && w.length >= 2)) && cpSet.has(w)) {
+              shared++;
+            }
+          }
+          if (shared >= 2 || shared >= Math.min(epWords.length, cpWords.length)) return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 function titleMatchesTrack(queryTitle, candTitle) {
@@ -5159,7 +5206,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const amCountry = String(extra?.country || "vn").trim();
   const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 9 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 10 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5196,43 +5243,141 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
     }
   }
 
+  const isTopicChannel = /\s*-\s*Topic$/i.test(String(ytAuthor || ""));
   const { cleanTitle, cleanAuthor } = cleanYoutubeTitle(ytTitle, ytAuthor);
   const coreClean = stripTrackBrackets(cleanTitle) || cleanTitle;
-  let titleQueryForMatch = coreClean || cleanTitle;
-  const dashSplit = cleanTitle.split(/\s*[-–|]\s*/).filter(Boolean);
-  if (dashSplit.length >= 2) {
-    titleQueryForMatch = dashSplit.reduce((a, b) => (a.length >= b.length ? a : b));
-  }
-  const rawTerms = [];
-  if (coreClean) {
-    if (cleanAuthor && !isNoisyChannelName(cleanAuthor) && !coreClean.toLowerCase().includes(cleanAuthor.toLowerCase())) {
-      rawTerms.push(`${coreClean} ${cleanAuthor}`);
+  const dashSplit = cleanTitle.split(/\s*[-–—|]\s*/).map((p) => p.trim()).filter(Boolean);
+
+  let primaryTitle = coreClean || cleanTitle;
+  let primaryArtist = (cleanAuthor && cleanAuthor !== "YouTube" && (isTopicChannel || !isNoisyChannelName(cleanAuthor)))
+    ? cleanAuthor
+    : "";
+  const expectedArtists = [];
+  let strictArtist = false;
+
+  if (isTopicChannel && cleanAuthor) {
+    expectedArtists.push(cleanAuthor);
+    strictArtist = true;
+  } else if (dashSplit.length >= 2) {
+    const p0Clean = stripTrackBrackets(dashSplit[0]) || dashSplit[0];
+    const p1Clean = stripTrackBrackets(dashSplit[1]) || dashSplit[1];
+    if (primaryArtist && artistMatchesExpected([primaryArtist], dashSplit[0])) {
+      primaryTitle = p1Clean || dashSplit[1];
+      expectedArtists.push(primaryArtist, dashSplit[0]);
+      strictArtist = true;
+    } else if (primaryArtist && artistMatchesExpected([primaryArtist], dashSplit[1])) {
+      primaryTitle = p0Clean || dashSplit[0];
+      expectedArtists.push(primaryArtist, dashSplit[1]);
+      strictArtist = true;
+    } else {
+      const nonNoiseParts = dashSplit.filter((p) => {
+        const ws = foldNorm(p).split(/\s+/).filter((w) => w && !TRACK_NOISE_WORDS.has(w));
+        return ws.length > 0;
+      });
+      if (primaryArtist) expectedArtists.push(primaryArtist);
+      for (const np of nonNoiseParts) expectedArtists.push(np);
+      if (expectedArtists.length > 0) strictArtist = true;
+      primaryTitle = dashSplit.reduce((a, b) => (a.length >= b.length ? a : b));
     }
-    if (/\bremix\b/i.test(cleanTitle)) {
-      rawTerms.push(`${coreClean} Remix`);
-    }
-    rawTerms.push(coreClean);
-    if (cleanTitle && cleanTitle !== coreClean) rawTerms.push(cleanTitle);
-    if (dashSplit.length >= 2) rawTerms.push(`${dashSplit[0]} ${dashSplit[1]}`);
-  } else if (cleanAuthor) {
-    rawTerms.push(cleanAuthor);
+  } else if (primaryArtist) {
+    expectedArtists.push(primaryArtist);
+    strictArtist = true;
   }
-  // Tên phụ La-tinh trong ngoặc, vd "하루하루 (Haru Haru)" -> "Haru Haru".
-  // Bài Hàn/Nhật/Trung thường được iTunes lưu dưới tên La-tinh hoá này -> thêm làm query cứu cánh.
+
+  // Tên phụ La-tinh trong ngoặc, vd "하루하루 (Haru Haru)" -> "Haru Haru" (bỏ noise kiểu Official MV/Audio/Remix)
+  const latinBracketTerms = [];
   const bracketMatches = String(cleanTitle || "").match(/[([【]([^)\]】]+)[)\]】]/g) || [];
   for (const bm of bracketMatches) {
     const inner = bm.replace(/^[([【]|[)\]】]$/g, "").trim();
-    // bỏ noise kiểu "Official MV", "Audio", "Remix"...
     const innerWords = foldNorm(inner).split(/\s+/).filter((w) => w && !TRACK_NOISE_WORDS.has(w));
-    if (inner && innerWords.length > 0 && /[a-z]/i.test(inner)) {
-      rawTerms.push(inner);
-      if (cleanAuthor && !isNoisyChannelName(cleanAuthor)) rawTerms.push(`${inner} ${cleanAuthor}`);
+    if (inner && innerWords.length > 0 && /[a-z]/i.test(inner) && !latinBracketTerms.includes(inner)) {
+      latinBracketTerms.push(inner);
     }
+  }
+
+  // Xây danh sách query ưu tiên CÓ NGHỆ SĨ TRƯỚC để tránh ghép nhầm nghệ sĩ khác cùng tên bài (vd Vandebo thay vì BIGBANG)
+  const rawTerms = [];
+  if (primaryTitle) {
+    if (primaryArtist && !foldCompact(primaryTitle).includes(foldCompact(primaryArtist))) {
+      rawTerms.push(`${primaryTitle} ${primaryArtist}`);
+    }
+    for (const inner of latinBracketTerms) {
+      if (primaryArtist) rawTerms.push(`${inner} ${primaryArtist}`);
+    }
+    if (dashSplit.length >= 2) {
+      rawTerms.push(`${stripTrackBrackets(dashSplit[0]) || dashSplit[0]} ${stripTrackBrackets(dashSplit[1]) || dashSplit[1]}`);
+    }
+    if (/\bremix\b/i.test(cleanTitle)) {
+      rawTerms.push(`${primaryTitle} Remix`);
+    }
+    rawTerms.push(primaryTitle);
+    if (coreClean && coreClean !== primaryTitle) {
+      if (primaryArtist) rawTerms.push(`${coreClean} ${primaryArtist}`);
+      rawTerms.push(coreClean);
+    }
+    if (cleanTitle && cleanTitle !== coreClean && cleanTitle !== primaryTitle) {
+      rawTerms.push(cleanTitle);
+    }
+  } else if (cleanAuthor) {
+    rawTerms.push(cleanAuthor);
+  }
+  for (const inner of latinBracketTerms) {
+    rawTerms.push(inner);
   }
   const terms = Array.from(new Set(rawTerms.filter(Boolean)));
 
+  const titleCheckPool = Array.from(new Set([
+    primaryTitle,
+    coreClean,
+    cleanTitle,
+    ...dashSplit.map((p) => stripTrackBrackets(p) || p),
+    ...latinBracketTerms,
+  ].filter(Boolean)));
+
+  const scoreCandidate = (candTitle, candArtist, hasPreview, searchTerm) => {
+    const cTitleStr = String(candTitle || "").trim();
+    if (!cTitleStr) return -1;
+    const cNorm = foldNorm(stripTrackBrackets(cTitleStr) || cTitleStr);
+    const pNorm = foldNorm(stripTrackBrackets(primaryTitle) || primaryTitle);
+    let bestTitleBase = 0;
+    for (const qt of titleCheckPool) {
+      if (titleMatchesTrack(qt, cTitleStr)) {
+        const qn = foldNorm(stripTrackBrackets(qt) || qt);
+        if (qn && cNorm && qn === cNorm) bestTitleBase = Math.max(bestTitleBase, 50);
+        else if (qt === primaryTitle || qt === coreClean) bestTitleBase = Math.max(bestTitleBase, 40);
+        else bestTitleBase = Math.max(bestTitleBase, 30);
+      }
+    }
+    if (bestTitleBase === 0 && searchTerm && titleMatchesTrack(searchTerm, cTitleStr)) {
+      bestTitleBase = 20;
+    }
+    if (bestTitleBase === 0) return -1;
+
+    const artistOk = expectedArtists.length > 0 ? artistMatchesExpected(expectedArtists, candArtist) : false;
+    if (strictArtist && expectedArtists.length > 0 && !artistOk) {
+      return -1;
+    }
+
+    let score = bestTitleBase;
+    if (artistOk) score += 100;
+    if (hasPreview) score += 15;
+    if (pNorm && cNorm === pNorm) score += 10;
+
+    const qLower = cleanTitle.toLowerCase();
+    const cLower = cTitleStr.toLowerCase();
+    if (/\b(karaoke|instrumental|piano|lullaby|8-?bit|ringtone|tribute|cover)\b/i.test(cLower) && !/\b(karaoke|instrumental|piano|lullaby|8-?bit|ringtone|tribute|cover)\b/i.test(qLower)) {
+      score -= 40;
+    }
+    if (/\blive\b/i.test(cLower) && !/\blive\b/i.test(qLower)) {
+      score -= 15;
+    }
+    return score;
+  };
+
   let itunesHit = null;
+  let bestItunesScore = -1;
   let deezerHit = null;
+  let bestDeezerScore = -1;
   const searchHeaders = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     "Accept": "application/json",
@@ -5240,38 +5385,55 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   for (const term of terms) {
     try {
       const [itVnRes, dzRes] = await Promise.all([
-        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=VN&media=music&entity=song&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
-        fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=VN&media=music&entity=song&limit=10`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
+        fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=10`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
       ]);
-      const pickItunes = (itJson) => {
-        const list = (itJson?.results || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.trackName) || titleMatchesTrack(titleQueryForMatch, x.trackName) || titleMatchesTrack(term, x.trackName)));
-        return list.find((x) => x.previewUrl) || list[0] || null;
+      const considerItunes = (itJson) => {
+        for (const x of (itJson?.results || [])) {
+          if (!x) continue;
+          const sc = scoreCandidate(x.trackName, x.artistName, !!x.previewUrl, term);
+          if (sc > bestItunesScore) {
+            bestItunesScore = sc;
+            itunesHit = x;
+          }
+        }
       };
       if (itVnRes && itVnRes.ok) {
-        itunesHit = pickItunes(await itVnRes.json().catch(() => null));
+        considerItunes(await itVnRes.json().catch(() => null));
       }
-      if (!itunesHit) {
-        const itUsRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=US&media=music&entity=song&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3000) }).catch(() => null);
+      if (bestItunesScore < 120) {
+        const itUsRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=US&media=music&entity=song&limit=10`, { headers: searchHeaders, signal: AbortSignal.timeout(3000) }).catch(() => null);
         if (itUsRes && itUsRes.ok) {
-          itunesHit = pickItunes(await itUsRes.json().catch(() => null));
+          considerItunes(await itUsRes.json().catch(() => null));
         }
       }
-      if (dzRes && dzRes.ok && !deezerHit) {
+      if (dzRes && dzRes.ok && bestDeezerScore < 120) {
         const dzJson = await dzRes.json().catch(() => null);
-        const dzList = (dzJson?.data || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.title_short || x.title) || titleMatchesTrack(titleQueryForMatch, x.title_short || x.title) || titleMatchesTrack(term, x.title_short || x.title)));
-        deezerHit = dzList.find((x) => x.preview) || dzList[0] || null;
+        for (const x of (dzJson?.data || [])) {
+          if (!x) continue;
+          const sc = scoreCandidate(x.title_short || x.title, x.artist?.name, !!x.preview, term);
+          if (sc > bestDeezerScore) {
+            bestDeezerScore = sc;
+            deezerHit = x;
+          }
+        }
       }
-      if (itunesHit && deezerHit) break;
+      if (bestItunesScore >= 120 && bestDeezerScore >= 120) break;
     } catch (_) {}
   }
 
-  let title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || cleanTitle || "YouTube Music").trim();
-  let artist = (itunesHit?.artistName || deezerHit?.artist?.name || cleanAuthor || "YouTube").trim();
+  let title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || primaryTitle || cleanTitle || "YouTube Music").trim();
+  let artist = (itunesHit?.artistName || deezerHit?.artist?.name || primaryArtist || cleanAuthor || "YouTube").trim();
   if (!itunesHit && !deezerHit) {
-    const dashMatch = title.match(/^(.+?)\s+[-–]\s+(.+)$/);
+    const dashMatch = cleanTitle.match(/^(.+?)\s+[-–]\s+(.+)$/);
     if (dashMatch && dashMatch[1].length >= 2 && dashMatch[2].length >= 2) {
-      title = dashMatch[1].trim();
-      artist = dashMatch[2].trim();
+      if (primaryArtist && artistMatchesExpected([primaryArtist], dashMatch[1])) {
+        title = dashMatch[2].trim();
+        artist = primaryArtist;
+      } else {
+        title = dashMatch[1].trim();
+        artist = dashMatch[2].trim();
+      }
     }
   }
 
@@ -5329,7 +5491,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
 
   const track = {
-    schemaVer: 9,
+    schemaVer: 10,
     platform,
     videoId: videoId || "",
     spotifyId: spId || "",

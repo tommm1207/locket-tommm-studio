@@ -123,10 +123,18 @@
     }
 
     function simpleNorm(s) {
-        return String(s || "")
+        var out = String(s || "");
+        try { out = out.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (_) {}
+        return out
+            .replace(/đ/g, "d")
+            .replace(/Đ/g, "D")
             .toLowerCase()
-            .replace(/[^a-z0-9\u00c0-\u1ef9\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff\uff00-\uffef]+/g, " ")
+            .replace(/[^a-z0-9\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff\uff00-\uffef]+/g, " ")
             .replace(/^\s+|\s+$/g, "");
+    }
+
+    function compactNormEs5(s) {
+        return simpleNorm(s).replace(/\s+/g, "");
     }
 
     var NOISE_WORDS_MAP = {
@@ -150,6 +158,23 @@
         return /\b(media|music|channel|official|tv|records|ent|entertainment|studio|remix|dj|audio|lyrics?|vpop|nhac|youtube|topic)\b/i.test(simpleNorm(s));
     }
 
+    function extractBracketTermsEs5(s) {
+        var raw = String(s || "");
+        var ms = raw.match(/[([【][^)\]】]+[)\]】]/g) || [];
+        var out = [];
+        for (var i = 0; i < ms.length; i++) {
+            var inner = ms[i].replace(/^[([【]|[)\]】]$/g, "").replace(/^\s+|\s+$/g, "");
+            if (!inner || !/[a-zA-Z]/.test(inner)) continue;
+            var ws = simpleNorm(inner).split(/\s+/);
+            var cleanWs = [];
+            for (var j = 0; j < ws.length; j++) {
+                if (ws[j] && !NOISE_WORDS_MAP[ws[j]]) cleanWs.push(ws[j]);
+            }
+            if (cleanWs.length > 0 && out.indexOf(inner) === -1) out.push(inner);
+        }
+        return out;
+    }
+
     function filterNoiseWordsEs5(normStr) {
         var arr = String(normStr || "").split(/\s+/);
         var out = [];
@@ -158,6 +183,49 @@
             if (w.length >= 2 && !NOISE_WORDS_MAP[w]) out.push(w);
         }
         return out;
+    }
+
+    function splitArtistPartsEs5(s) {
+        var raw = String(s || "").split(/\s*(?:,|&|\/|·|;|\b(?:ft\.?|feat\.?|featuring|with|vs\.?|x)\b)\s*/i);
+        var out = [];
+        for (var i = 0; i < raw.length; i++) {
+            var p = raw[i].replace(/^\s+|\s+$/g, "");
+            if (p && compactNormEs5(p).length >= 2 && simpleNorm(p) !== "youtube") out.push(p);
+        }
+        return out;
+    }
+
+    function artistMatchEs5(expectedArtist, candArtist) {
+        if (!expectedArtist || !candArtist) return false;
+        var expParts = splitArtistPartsEs5(expectedArtist);
+        var candParts = splitArtistPartsEs5(candArtist);
+        if (expParts.length === 0 || candParts.length === 0) return false;
+        for (var ei = 0; ei < expParts.length; ei++) {
+            var epC = compactNormEs5(expParts[ei]);
+            if (epC.length < 2) continue;
+            var epWords = filterNoiseWordsEs5(simpleNorm(expParts[ei]));
+            for (var ci = 0; ci < candParts.length; ci++) {
+                var cpC = compactNormEs5(candParts[ci]);
+                if (cpC.length < 2) continue;
+                if (epC === cpC) return true;
+                if ((epC.length >= 4 && cpC.indexOf(epC) !== -1) || (cpC.length >= 4 && epC.indexOf(cpC) !== -1)) return true;
+                var cpWords = filterNoiseWordsEs5(simpleNorm(candParts[ci]));
+                if (epWords.length === 1 && cpWords.length === 1 && epWords[0] === cpWords[0] && epWords[0].length >= 2) {
+                    return true;
+                }
+                if (epWords.length >= 2 && cpWords.length >= 2) {
+                    var cMap = {};
+                    for (var wi = 0; wi < cpWords.length; wi++) cMap[cpWords[wi]] = true;
+                    var shared = 0;
+                    for (var wj = 0; wj < epWords.length; wj++) {
+                        var ew = epWords[wj];
+                        if ((ew.length >= 3 || (/[\uac00-\ud7a3\u4e00-\u9fff\u3040-\u30ff]/.test(ew) && ew.length >= 2)) && cMap[ew]) shared++;
+                    }
+                    if (shared >= 2 || shared >= Math.min(epWords.length, cpWords.length)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     function titleTokenMatch(qTitle, candTitle) {
@@ -185,6 +253,50 @@
         }
         if (validQ === 0) return false;
         return matched >= Math.ceil(validQ * 0.65) && (validQ < 2 || matched >= 2);
+    }
+
+    function pickBestItunesHit(resList, track, extraTitles) {
+        if (!Array.isArray(resList) || resList.length === 0) return null;
+        var hasReliableArtist = !!(track.artist && track.artist !== "YouTube" && !isNoisyChannelEs5(track.artist));
+        var qTitle = String(track.title || "");
+        var qTitleNorm = simpleNorm(stripBracketsEs5(qTitle) || qTitle);
+        var qLower = qTitle.toLowerCase();
+        var best = null;
+        var bestScore = -1;
+        for (var i = 0; i < resList.length; i++) {
+            var h = resList[i];
+            if (!h || !h.trackName || (!h.previewUrl && !h.trackViewUrl)) continue;
+            var titleOk = titleTokenMatch(qTitle, h.trackName);
+            var viaBracket = false;
+            if (!titleOk && Array.isArray(extraTitles)) {
+                for (var bi = 0; bi < extraTitles.length; bi++) {
+                    if (titleTokenMatch(extraTitles[bi], h.trackName)) {
+                        titleOk = true;
+                        viaBracket = true;
+                        break;
+                    }
+                }
+            }
+            if (!titleOk) continue;
+            var artistOk = hasReliableArtist ? artistMatchEs5(track.artist, h.artistName || "") : false;
+            if (hasReliableArtist && !artistOk) continue;
+            var cNorm = simpleNorm(stripBracketsEs5(h.trackName) || h.trackName);
+            var score = (cNorm && qTitleNorm && cNorm === qTitleNorm) ? 50 : (viaBracket ? 35 : 40);
+            if (artistOk) score += 100;
+            if (h.previewUrl) score += 15;
+            var cLower = String(h.trackName || "").toLowerCase();
+            if (/\b(karaoke|instrumental|piano|lullaby|8-?bit|ringtone|tribute|cover)\b/i.test(cLower) && !/\b(karaoke|instrumental|piano|lullaby|8-?bit|ringtone|tribute|cover)\b/i.test(qLower)) {
+                score -= 40;
+            }
+            if (/\blive\b/i.test(cLower) && !/\blive\b/i.test(qLower)) {
+                score -= 15;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                best = h;
+            }
+        }
+        return bestScore > 0 ? best : null;
     }
 
     function saveTrackStores(tr) {
@@ -243,21 +355,40 @@
         };
         var eTimer = typeof setTimeout !== "undefined" ? setTimeout(finishEnrich, maxWaitMs || 2400) : null;
         var coreTitle = stripBracketsEs5(track.title) || track.title;
+        var bracketTerms = extractBracketTermsEs5(track.title);
+        var hasReliableArt = !!(track.artist && track.artist !== "YouTube" && !isNoisyChannelEs5(track.artist));
         var qList = [];
         var pushQ = function (s) {
             var val = String(s || "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
             if (val && qList.indexOf(val) === -1) qList.push(val);
         };
-        if (track.artist && track.artist !== "YouTube" && !isNoisyChannelEs5(track.artist)) {
+        if (hasReliableArt) {
             pushQ(coreTitle + " " + track.artist);
+            for (var bi = 0; bi < bracketTerms.length; bi++) {
+                pushQ(bracketTerms[bi] + " " + track.artist);
+            }
         }
         if (/\bremix\b/i.test(track.title)) {
             pushQ(coreTitle + " Remix");
         }
         pushQ(coreTitle);
+        for (var bj = 0; bj < bracketTerms.length; bj++) {
+            pushQ(bracketTerms[bj]);
+        }
+        var usFallbackQ = qList[0] || coreTitle;
         var uaHdrs = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             "Accept": "application/json"
+        };
+        var applyItunesHit = function (h) {
+            if (!h) return false;
+            if (h.previewUrl) track.previewUrl = h.previewUrl;
+            if (h.artworkUrl100 && (!isSpotify || !track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) {
+                track.artworkUrl = String(h.artworkUrl100).replace("100x100bb", "600x600bb");
+            }
+            if (h.trackViewUrl) track.appleMusicUrl = h.trackViewUrl;
+            if (h.trackId) track.appleMusicId = String(h.trackId);
+            return true;
         };
         var runQueryList = function (cc, idx, onAllMiss) {
             if (idx >= qList.length) {
@@ -266,31 +397,34 @@
                 return;
             }
             $httpClient.get({
-                url: "https://itunes.apple.com/search?term=" + encodeURIComponent(qList[idx]) + "&country=" + cc + "&media=music&entity=song&limit=5",
+                url: "https://itunes.apple.com/search?term=" + encodeURIComponent(qList[idx]) + "&country=" + cc + "&media=music&entity=song&limit=10",
                 headers: uaHdrs
             }, function (err, resp, body) {
                 var matched = false;
                 try {
                     if (!err && body) {
                         var j = JSON.parse(body);
-                        var res = (j && j.results) || [];
-                        for (var i = 0; i < res.length; i++) {
-                            var h = res[i];
-                            if (h && titleTokenMatch(track.title, h.trackName) && (h.previewUrl || h.trackViewUrl)) {
-                                if (h.previewUrl) track.previewUrl = h.previewUrl;
-                                if (h.artworkUrl100 && (!isSpotify || !track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) {
-                                    track.artworkUrl = String(h.artworkUrl100).replace("100x100bb", "600x600bb");
-                                }
-                                if (h.trackViewUrl) track.appleMusicUrl = h.trackViewUrl;
-                                if (h.trackId) track.appleMusicId = String(h.trackId);
-                                matched = true;
-                                break;
-                            }
-                        }
+                        var hit = pickBestItunesHit((j && j.results) || [], track, bracketTerms);
+                        if (hit) matched = applyItunesHit(hit);
                     }
                 } catch (_) {}
                 if (matched) finishEnrich();
                 else runQueryList(cc, idx + 1, onAllMiss);
+            });
+        };
+        var searchUsFallback = function () {
+            $httpClient.get({
+                url: "https://itunes.apple.com/search?term=" + encodeURIComponent(usFallbackQ) + "&country=US&media=music&entity=song&limit=10",
+                headers: uaHdrs
+            }, function (uErr, uResp, uBody) {
+                try {
+                    if (!uErr && uBody) {
+                        var uj = JSON.parse(uBody);
+                        var uHit = pickBestItunesHit((uj && uj.results) || [], track, bracketTerms);
+                        if (uHit) applyItunesHit(uHit);
+                    }
+                } catch (_) {}
+                finishEnrich();
             });
         };
         if (track.appleMusicId && !isSpotify) {
@@ -315,56 +449,10 @@
                     }
                 } catch (_) {}
                 if (hitOk) finishEnrich();
-                else runQueryList("VN", 0, function () {
-                    $httpClient.get({
-                        url: "https://itunes.apple.com/search?term=" + encodeURIComponent(coreTitle) + "&country=US&media=music&entity=song&limit=5",
-                        headers: uaHdrs
-                    }, function (uErr, uResp, uBody) {
-                        try {
-                            if (!uErr && uBody) {
-                                var uj = JSON.parse(uBody);
-                                var uRes = (uj && uj.results) || [];
-                                for (var ui = 0; ui < uRes.length; ui++) {
-                                    var uh = uRes[ui];
-                                    if (uh && titleTokenMatch(track.title, uh.trackName) && (uh.previewUrl || uh.trackViewUrl)) {
-                                        if (uh.previewUrl) track.previewUrl = uh.previewUrl;
-                                        if (uh.artworkUrl100 && (!isSpotify || !track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) track.artworkUrl = String(uh.artworkUrl100).replace("100x100bb", "600x600bb");
-                                        if (uh.trackViewUrl) track.appleMusicUrl = uh.trackViewUrl;
-                                        if (uh.trackId) track.appleMusicId = String(uh.trackId);
-                                        break;
-                                    }
-                                }
-                            }
-                        } catch (_) {}
-                        finishEnrich();
-                    });
-                });
+                else runQueryList("VN", 0, searchUsFallback);
             });
         } else {
-            runQueryList("VN", 0, function () {
-                $httpClient.get({
-                    url: "https://itunes.apple.com/search?term=" + encodeURIComponent(coreTitle) + "&country=US&media=music&entity=song&limit=5",
-                    headers: uaHdrs
-                }, function (uErr, uResp, uBody) {
-                    try {
-                        if (!uErr && uBody) {
-                            var uj = JSON.parse(uBody);
-                            var uRes = (uj && uj.results) || [];
-                            for (var ui = 0; ui < uRes.length; ui++) {
-                                var uh = uRes[ui];
-                                if (uh && titleTokenMatch(track.title, uh.trackName) && (uh.previewUrl || uh.trackViewUrl)) {
-                                    if (uh.previewUrl) track.previewUrl = uh.previewUrl;
-                                    if (uh.artworkUrl100 && (!track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) track.artworkUrl = String(uh.artworkUrl100).replace("100x100bb", "600x600bb");
-                                    if (uh.trackViewUrl) track.appleMusicUrl = uh.trackViewUrl;
-                                    if (uh.trackId) track.appleMusicId = String(uh.trackId);
-                                    break;
-                                }
-                            }
-                        }
-                    } catch (_) {}
-                    finishEnrich();
-                });
-            });
+            runQueryList("VN", 0, searchUsFallback);
         }
     }
 
@@ -384,7 +472,7 @@
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 9 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 10 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         ex.ts = Date.now();
                         saveTrackStores(ex);
                         finishOnce({});
@@ -438,7 +526,7 @@
             if (rawExSp) {
                 try {
                     var exSp = JSON.parse(rawExSp);
-                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 9 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
+                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 10 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
                         exSp.ts = Date.now();
                         saveTrackStores(exSp);
                         finishOnce({});
@@ -493,7 +581,7 @@
             if (rawExAm) {
                 try {
                     var exAm = JSON.parse(rawExAm);
-                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 9 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
+                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 10 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
                         exAm.ts = Date.now();
                         saveTrackStores(exAm);
                         finishOnce({});
@@ -805,7 +893,7 @@
                                 if (!isVinylIconMode) {
                                     var isSpUp = !!(track.platform === "spotify" || track.spotifyId);
                                     var hasAmReady = !!(track.appleMusicUrl && track.appleMusicUrl.indexOf("music.apple.com") !== -1 && (track.appleMusicId || /[?&]i=\d+|\/song\/\d+/.test(track.appleMusicUrl)) && track.artworkUrl && String(track.artworkUrl).indexOf("mzstatic.com") !== -1);
-                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 9 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : !hasAmReady)));
+                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 10 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : !hasAmReady)));
                                     if (needsUpgrade) {
                                         cachedTrackForUpgrade = track;
                                         pendingUpgradeOvs.push(ov);
@@ -927,7 +1015,7 @@
                 };
                 var isSpCached = !!(cachedTrackForUpgrade.platform === "spotify" || cachedTrackForUpgrade.spotifyId);
                 var hasAmCachedReady = !!(cachedTrackForUpgrade.appleMusicUrl && cachedTrackForUpgrade.appleMusicUrl.indexOf("music.apple.com") !== -1 && (cachedTrackForUpgrade.appleMusicId || /[?&]i=\d+|\/song\/\d+/.test(cachedTrackForUpgrade.appleMusicUrl)) && cachedTrackForUpgrade.artworkUrl && String(cachedTrackForUpgrade.artworkUrl).indexOf("mzstatic.com") !== -1);
-                if (cachedTrackForUpgrade.schemaVer === 9 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : hasAmCachedReady)) {
+                if (cachedTrackForUpgrade.schemaVer === 10 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : hasAmCachedReady)) {
                     finishUpgrade(cachedTrackForUpgrade);
                     return;
                 }
