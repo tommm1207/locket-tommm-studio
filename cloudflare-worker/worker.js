@@ -2223,7 +2223,8 @@ function applyBokehSnowfall(rgb, w, h) {
   }
   const rnd = makeFxRng(0x5000f411);
 
-  const splatFlake = (cx, cy, rx, ry, alpha, softPow) => {
+  // Zero-Math.pow fast round bokeh & snow disc splat
+  const splatFlake = (cx, cy, rx, ry, alpha, isBokeh) => {
     const maxR = Math.max(rx, ry);
     const x0 = Math.max(0, Math.floor(cx - maxR - 1));
     const x1 = Math.min(w - 1, Math.ceil(cx + maxR + 1));
@@ -2240,58 +2241,74 @@ function applyBokehSnowfall(rgb, w, h) {
         const nx = (x - cx) * invRx;
         const d2 = nx * nx + ny2;
         if (d2 >= 1) continue;
-        const f = Math.pow(1 - d2, softPow);
+        const t = 1 - d2;
+        const f = isBokeh ? t * (0.45 + 0.55 * t) : t * t;
         const a = alpha * f;
         screenPixel(rgb, (row + x) * 3, 248 * a, 251 * a, 255 * a);
       }
     }
   };
 
-  // Softly blurred tiny 6-point snowflake crystal helper
-  const segDist2 = (px, py, ax, ay, bx, by) => {
-    const abx = bx - ax, aby = by - ay;
-    const apx = px - ax, apy = py - ay;
-    const ab2 = abx * abx + aby * aby;
-    let t = ab2 > 1e-6 ? (apx * abx + apy * aby) / ab2 : 0;
-    if (t < 0) t = 0; else if (t > 1) t = 1;
-    const dx = apx - abx * t, dy = apy - aby * t;
-    return dx * dx + dy * dy;
-  };
+  // Ultra-fast 3-axis folded-symmetry soft-blurred 6-point snowflake crystal
   const splatCrystal = (cx, cy, rad, rot, alpha) => {
-    const segs = [];
-    const brPos = rad * 0.56;
-    const brLen = rad * 0.34;
-    for (let k = 0; k < 6; k++) {
+    const axes = [];
+    for (let k = 0; k < 3; k++) {
       const a = rot + k * 1.04719755;
-      const ca = Math.cos(a), sa = Math.sin(a);
-      segs.push([0, 0, ca * rad, sa * rad]);
-      const bx0 = ca * brPos, by0 = sa * brPos;
-      for (const sgn of (-0.65, 0.65)) {
-        const ba = a + sgn;
-        segs.push([bx0, by0, bx0 + Math.cos(ba) * brLen, by0 + Math.sin(ba) * brLen]);
-      }
+      axes.push(Math.cos(a), Math.sin(a));
     }
-    const sigma = 1.38 * s;
-    const invSig2 = 1 / (sigma * sigma);
-    const pad = rad + 4 * s;
+    const u0 = axes[0], v0 = axes[1];
+    const u1 = axes[2], v1 = axes[3];
+    const u2 = axes[4], v2 = axes[5];
+    const brPos = rad * 0.52;
+    const brEndX = brPos + rad * 0.21;
+    const brEndY = rad * 0.30;
+    const brDx = brEndX - brPos;
+    const brLen2 = brDx * brDx + brEndY * brEndY;
+    const invBrLen2 = 1 / Math.max(1e-4, brLen2);
+
+    const blurW = 2.4 * s;
+    const invBlurW2 = 1 / (blurW * blurW);
+    const pad = rad + blurW + 1;
+    const pad2 = pad * pad;
     const x0 = Math.max(0, Math.floor(cx - pad));
     const x1 = Math.min(w - 1, Math.ceil(cx + pad));
     const y0 = Math.max(0, Math.floor(cy - pad));
     const y1 = Math.min(h - 1, Math.ceil(cy + pad));
+
+    const axisDist2 = (dx, dy, ux, uy) => {
+      const ap = Math.abs(dx * ux + dy * uy);
+      const perp = Math.abs(-dx * uy + dy * ux);
+      // Distance to main stem clamped at rad
+      const stemOvershoot = ap > rad ? ap - rad : 0;
+      let best = stemOvershoot * stemOvershoot + perp * perp;
+      // Distance to folded symmetric V-branch segment (brPos,0)->(brEndX,brEndY)
+      if (ap > brPos * 0.55) {
+        let t = ((ap - brPos) * brDx + perp * brEndY) * invBrLen2;
+        if (t < 0) t = 0; else if (t > 1) t = 1;
+        const bx = ap - (brPos + brDx * t);
+        const by = perp - brEndY * t;
+        const d2b = bx * bx + by * by;
+        if (d2b < best) best = d2b;
+      }
+      return best;
+    };
+
     for (let y = y0; y <= y1; y++) {
       const dy = y - cy;
+      const dy2 = dy * dy;
       const row = y * w;
       for (let x = x0; x <= x1; x++) {
         const dx = x - cx;
-        if (dx * dx + dy * dy > pad * pad) continue;
-        let minD2 = 1e9;
-        for (let si = 0; si < segs.length; si++) {
-          const sg = segs[si];
-          const d2 = segDist2(dx, dy, sg[0], sg[1], sg[2], sg[3]);
-          if (d2 < minD2) minD2 = d2;
-        }
-        const g = Math.exp(-minD2 * invSig2);
-        if (g < 0.03) continue;
+        if (dx * dx + dy2 > pad2) continue;
+        let d2 = axisDist2(dx, dy, u0, v0);
+        const d2_1 = axisDist2(dx, dy, u1, v1);
+        if (d2_1 < d2) d2 = d2_1;
+        const d2_2 = axisDist2(dx, dy, u2, v2);
+        if (d2_2 < d2) d2 = d2_2;
+
+        const q = d2 * invBlurW2;
+        if (q >= 1) continue;
+        const g = (1 - q) * (1 - q);
         const a = alpha * g;
         screenPixel(rgb, (row + x) * 3, 248 * a, 252 * a, 255 * a);
       }
@@ -2303,22 +2320,22 @@ function applyBokehSnowfall(rgb, w, h) {
     const cx = (0.04 + rnd() * 0.92) * w;
     const cy = (0.04 + rnd() * 0.92) * h;
     const r = (13 + rnd() * 15) * s;
-    splatFlake(cx, cy, r, r * (0.94 + rnd() * 0.14), 0.24 + rnd() * 0.16, 1.35);
+    splatFlake(cx, cy, r, r * (0.94 + rnd() * 0.14), 0.24 + rnd() * 0.16, true);
   }
   // Layer 2: ~95 mid-ground soft round snowballs
   for (let k = 0; k < 95; k++) {
     const r = (3.8 + rnd() * 4.2) * s;
-    splatFlake(rnd() * w, rnd() * h, r, r * (0.88 + rnd() * 0.24), 0.54 + rnd() * 0.28, 1.7);
+    splatFlake(rnd() * w, rnd() * h, r, r * (0.88 + rnd() * 0.24), 0.54 + rnd() * 0.28, false);
   }
   // Layer 3: ~28 tiny softly-blurred 6-point snowflake crystals
   for (let k = 0; k < 28; k++) {
     const rad = (7.5 + rnd() * 8.5) * s;
-    splatCrystal((0.05 + rnd() * 0.90) * w, (0.05 + rnd() * 0.90) * h, rad, rnd() * Math.PI, 0.44 + rnd() * 0.28);
+    splatCrystal((0.05 + rnd() * 0.90) * w, (0.05 + rnd() * 0.90) * h, rad, rnd() * Math.PI, 0.46 + rnd() * 0.28);
   }
   // Layer 4: ~200 fine crisp snow grains
   for (let k = 0; k < 200; k++) {
     const r = (1.5 + rnd() * 1.6) * s;
-    splatFlake(rnd() * w, rnd() * h, r, r * (0.9 + rnd() * 0.2), 0.40 + rnd() * 0.30, 1.5);
+    splatFlake(rnd() * w, rnd() * h, r, r * (0.9 + rnd() * 0.2), 0.40 + rnd() * 0.30, false);
   }
 }
 
