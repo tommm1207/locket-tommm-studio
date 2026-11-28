@@ -702,22 +702,28 @@
         var isSpotifyReady = !!((track.platform === "spotify" || track.spotifyId) && (track.spotifyUrl || track.spotifyId));
         var hasAmUrl = !!(track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1);
         if (!hasPreview && !isSpotifyReady && !hasAmUrl) {
-            // Không đủ dữ liệu nhạc native -> fallback text, giữ overlay_id gốc để server chấp nhận
-            ov.alt_text = fullLabel;
-            ov.data = ov.data || {};
-            if (!ov.data.type || ov.data.type === "music") ov.data.type = "static_content";
-            ov.data.text = fullLabel;
-            ov.data.text_color = "#FFFFFF";
-            ov.data.max_lines = maxLinesVal;
-            ov.data.background = {
-                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#991B1B", "#DC2626"],
-                image: { type: "image", data: "star_sign_background", source: "local" }
+            // Không đủ dữ liệu nhạc native -> dựng ov.data GIỐNG HỆT caption:music_now_playing (static_content + star_sign + music.note)
+            // đã kiểm chứng đậu 100% trên server Locket, giới hạn text <= 54 ký tự để không bao giờ bị overlayCount:0.
+            var shortLabel = formatTrackLabel(songTitle, songArtist, 54);
+            var safeCols = (Array.isArray(bgCols) && bgCols.length >= 2 && /^#[0-9A-Fa-f]{6}$/.test(String(bgCols[0] || "")) && /^#[0-9A-Fa-f]{6}$/.test(String(bgCols[1] || "")))
+                ? [String(bgCols[0]), String(bgCols[1])]
+                : ["#0E0C12", "#4A3219"];
+            ov.overlay_id = "caption:music_now_playing";
+            ov.alt_text = shortLabel;
+            ov.data = {
+                type: "static_content",
+                text: shortLabel,
+                max_lines: maxLinesVal,
+                text_color: "#FFFFFF",
+                icon: isLocketSafeStaticUrl(track.artworkUrl)
+                    ? { type: "image", data: track.artworkUrl, source: "url" }
+                    : { type: "sf_symbol", data: "music.note" },
+                background: {
+                    colors: safeCols,
+                    image: { type: "image", data: "star_sign_background", source: "local" }
+                }
             };
-            ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
-                ? { type: "image", data: track.artworkUrl, source: "url" }
-                : { type: "sf_symbol", data: "music.note" };
-            if (ov.data.payload) delete ov.data.payload;
-            return formatTrackLabel(songTitle, songArtist, 72);
+            return shortLabel;
         }
         ov.overlay_id = "caption:music";
         ov.alt_text = fullLabel;
@@ -915,23 +921,28 @@
                                         changed = true;
                                     }
                                 } else {
-                                    var displayTxt = formatTrackLabel(track.title, track.artist, 72);
+                                    var displayTxt = formatTrackLabel(track.title, track.artist, 54);
+                                    var safeVinylCols = (Array.isArray(bgCols) && bgCols.length >= 2 && /^#[0-9A-Fa-f]{6}$/.test(String(bgCols[0] || "")) && /^#[0-9A-Fa-f]{6}$/.test(String(bgCols[1] || "")))
+                                        ? [String(bgCols[0]), String(bgCols[1])]
+                                        : ["#0E0C12", "#4A3219"];
                                     var prevVinylMax = ov && ov.data && ov.data.max_lines;
+                                    ov.overlay_id = "caption:music_now_playing";
                                     ov.alt_text = displayTxt;
-                                    ov.data = ov.data || {};
-                                    if (!ov.data.type) ov.data.type = "static_content";
-                                    ov.data.text = displayTxt;
-                                    ov.data.text_color = "#FFFFFF";
-                                    ov.data.max_lines = (prevVinylMax && typeof prevVinylMax === "object")
-                                        ? prevVinylMax
-                                        : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
-                                    ov.data.background = {
-                                        colors: bgCols,
-                                        image: { type: "image", data: "star_sign_background", source: "local" }
+                                    ov.data = {
+                                        type: "static_content",
+                                        text: displayTxt,
+                                        text_color: "#FFFFFF",
+                                        max_lines: (prevVinylMax && typeof prevVinylMax === "object")
+                                            ? prevVinylMax
+                                            : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" },
+                                        background: {
+                                            colors: safeVinylCols,
+                                            image: { type: "image", data: "star_sign_background", source: "local" }
+                                        },
+                                        icon: isLocketSafeStaticUrl(track.artworkUrl)
+                                            ? { type: "image", data: track.artworkUrl, source: "url" }
+                                            : { type: "sf_symbol", data: "music.note" }
                                     };
-                                    ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
-                                        ? { type: "image", data: track.artworkUrl, source: "url" }
-                                        : { type: "sf_symbol", data: "music.note" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -956,6 +967,13 @@
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {
+                            if (ov.overlay_id === "caption:sp_now_playing" || ov.overlay_id === "caption:yt_now_playing" || ov.overlay_id === "caption:yt_vinyl_spin") {
+                                ov.overlay_id = "caption:music_now_playing";
+                            }
+                            if (ov.data.text && String(ov.data.text).length > 54) {
+                                ov.data.text = String(ov.data.text).slice(0, 53).trim() + "…";
+                                ov.alt_text = ov.data.text;
+                            }
                             changed = true;
                             sanitizedStatic = true;
                             if (!mutatedOvRef) {
