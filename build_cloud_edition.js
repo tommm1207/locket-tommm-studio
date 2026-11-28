@@ -728,11 +728,6 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
         return /^https:\\/\\/(?:public\\.locketcamera\\.com|storage\\.googleapis\\.com|firebasestorage\\.googleapis\\.com)\\//i.test(String(uStr || ""));
     }
 
-    function isLocketSafeIconUrl(uStr) {
-        if (isLocketSafeStaticUrl(uStr)) return true;
-        return /^https:\\/\\/(?:i\\.scdn\\.co|mosaic\\.scdn\\.co|is\\d+-ssl\\.mzstatic\\.com|i\\.ytimg\\.com|img\\.youtube\\.com|lh3\\.googleusercontent\\.com|yt3\\.ggpht\\.com)\\//i.test(String(uStr || ""));
-    }
-
     function applyNativeMusicOverlay(ov, track, bgCols) {
         var songTitle = String(track.title || "YouTube Music").trim();
         var songArtist = String(track.artist || "YouTube").trim();
@@ -761,9 +756,9 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#991B1B", "#DC2626"],
                 image: { type: "image", data: "star_sign_background", source: "local" }
             };
-            ov.data.icon = isLocketSafeIconUrl(track.artworkUrl)
+            ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
                 ? { type: "image", data: track.artworkUrl, source: "url" }
-                : { type: "emoji", data: "🎵" };
+                : { type: "emoji", data: (track.platform === "spotify" || track.spotifyId) ? "🎧" : "🎵" };
             if (ov.data.payload) delete ov.data.payload;
             return formatTrackLabel(songTitle, songArtist, 72);
         }
@@ -977,7 +972,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                                         colors: bgCols,
                                         image: { type: "image", data: "star_sign_background", source: "local" }
                                     };
-                                    ov.data.icon = isLocketSafeIconUrl(track.artworkUrl)
+                                    ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
                                         ? { type: "image", data: track.artworkUrl, source: "url" }
                                         : { type: "emoji", data: "🎵" };
                                     replacedWith = displayTxt;
@@ -997,8 +992,8 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                             };
                             didSanitizeThis = true;
                         }
-                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeIconUrl(ov.data.icon.data)) {
-                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1)) ? "🎵" : "✨" };
+                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
+                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1 || ov.overlay_id.indexOf("now_playing") !== -1)) ? "🎵" : "✨" };
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {
@@ -2007,7 +2002,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "101";
+var RC_VER = "102";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
