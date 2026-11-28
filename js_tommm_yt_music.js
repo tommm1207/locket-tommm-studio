@@ -80,6 +80,112 @@
     var isPlaybackUrl = /^https?:\/\/(s|www|music|m)\.youtube\.com\/api\/stats\/(playback|watchtime|qoe)/i.test(u);
     var isPlayerUrl = /(youtubei\.googleapis\.com|music\.youtube\.com)\/youtubei\/v1\/(player|get_watch)/i.test(u);
 
+    function simpleNorm(s) {
+        return String(s || "")
+            .toLowerCase()
+            .replace(/[^a-z0-9\u00c0-\u1ef9]+/g, " ")
+            .replace(/^\s+|\s+$/g, "");
+    }
+
+    function titleTokenMatch(qTitle, candTitle) {
+        var q = simpleNorm(qTitle);
+        var c = simpleNorm(candTitle);
+        if (!q || !c) return true;
+        if (c.indexOf(q) !== -1 || q.indexOf(c) !== -1) return true;
+        var words = q.split(/\s+/);
+        for (var i = 0; i < words.length; i++) {
+            if (words[i].length >= 2 && c.indexOf(words[i]) !== -1) return true;
+        }
+        return false;
+    }
+
+    function enrichTrackOnDevice(track, doneCb, maxWaitMs) {
+        if (!track || !track.title || typeof $httpClient === "undefined") {
+            doneCb(track);
+            return;
+        }
+        var needSpotify = !track.spotifyUrl;
+        var needItunes = !track.previewUrl || track.previewUrl.indexOf("itunes.apple.com") === -1;
+        if (!needSpotify && !needItunes) {
+            doneCb(track);
+            return;
+        }
+        var pending = 0;
+        var completed = false;
+        var finishEnrich = function () {
+            if (completed) return;
+            completed = true;
+            if (eTimer && typeof clearTimeout !== "undefined") clearTimeout(eTimer);
+            try {
+                if (typeof $persistentStore !== "undefined") {
+                    $persistentStore.write(JSON.stringify(track), "tommm_yt_now_playing");
+                }
+            } catch (_) {}
+            doneCb(track);
+        };
+        var eTimer = typeof setTimeout !== "undefined" ? setTimeout(finishEnrich, maxWaitMs || 2400) : null;
+        var qBase = track.title + (track.artist && track.artist !== "YouTube" ? (" " + track.artist) : "");
+
+        if (needSpotify) pending++;
+        if (needItunes) pending++;
+
+        var markOneDone = function () {
+            pending--;
+            if (pending <= 0) finishEnrich();
+        };
+
+        if (needSpotify) {
+            $httpClient.get({
+                url: "https://lite.duckduckgo.com/lite/?q=" + encodeURIComponent("site:open.spotify.com/track " + qBase),
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+                    "Accept": "text/html,application/xhtml+xml"
+                }
+            }, function (err, resp, body) {
+                try {
+                    if (!err && body) {
+                        var dec = String(body);
+                        try { dec = decodeURIComponent(dec); } catch (_) {}
+                        var m = dec.match(/open\.spotify\.com(?:\/intl-[a-z-]+)?\/track\/([A-Za-z0-9]{22})/i);
+                        if (m && m[1]) {
+                            track.spotifyUrl = "https://open.spotify.com/track/" + m[1];
+                        }
+                    }
+                } catch (_) {}
+                markOneDone();
+            });
+        }
+
+        if (needItunes) {
+            $httpClient.get({
+                url: "https://itunes.apple.com/search?term=" + encodeURIComponent(qBase) + "&country=VN&media=music&entity=song&limit=3",
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+                    "Accept": "application/json"
+                }
+            }, function (err, resp, body) {
+                try {
+                    if (!err && body) {
+                        var j = JSON.parse(body);
+                        var res = (j && j.results) || [];
+                        for (var i = 0; i < res.length; i++) {
+                            var h = res[i];
+                            if (h && h.previewUrl && titleTokenMatch(track.title, h.trackName)) {
+                                track.previewUrl = h.previewUrl;
+                                if (h.artworkUrl100) {
+                                    track.artworkUrl = String(h.artworkUrl100).replace("100x100bb", "600x600bb");
+                                }
+                                if (h.trackViewUrl) track.appleMusicUrl = h.trackViewUrl;
+                                break;
+                            }
+                        }
+                    }
+                } catch (_) {}
+                markOneDone();
+            });
+        }
+    }
+
     // Mode 1: Sniff YouTube / YouTube Music playback & player requests (await HTTP callback before $done)
     if (isPlaybackUrl || isPlayerUrl) {
         try {
@@ -96,29 +202,38 @@
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 2 && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 2 && ex.spotifyUrl && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
                 } catch (_) {}
             }
-            var timer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 2800) : null;
+            var timer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 4500) : null;
             $httpClient.post({
                 url: WORKER_BASE + "/studio/yt-now-playing",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ videoId: vid })
             }, function (err, resp, data) {
+                var savedTrack = null;
                 try {
                     if (!err && data) {
                         var parsed = JSON.parse(data);
                         if (parsed && parsed.ok && parsed.track && parsed.track.title) {
-                            $persistentStore.write(JSON.stringify(parsed.track), "tommm_yt_now_playing");
-                            try { console.log("[TommmYT] Saved: " + parsed.track.title + " - " + (parsed.track.artist || "")); } catch (_) {}
+                            savedTrack = parsed.track;
+                            $persistentStore.write(JSON.stringify(savedTrack), "tommm_yt_now_playing");
+                            try { console.log("[TommmYT] Saved: " + savedTrack.title + " - " + (savedTrack.artist || "")); } catch (_) {}
                         }
                     }
                 } catch (_) {}
-                if (timer && typeof clearTimeout !== "undefined") clearTimeout(timer);
-                finishOnce({});
+                if (savedTrack) {
+                    enrichTrackOnDevice(savedTrack, function () {
+                        if (timer && typeof clearTimeout !== "undefined") clearTimeout(timer);
+                        finishOnce({});
+                    }, 2400);
+                } else {
+                    if (timer && typeof clearTimeout !== "undefined") clearTimeout(timer);
+                    finishOnce({});
+                }
             });
             return;
         } catch (_) {
@@ -149,6 +264,7 @@
             : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
         ov.overlay_id = "caption:music";
         ov.alt_text = fullLabel;
+        var spFallback = "https://open.spotify.com/search/" + encodeURIComponent(songTitle + (songArtist && songArtist !== "YouTube" ? (" " + songArtist) : ""));
         ov.data = {
             type: "music",
             text: fullLabel,
@@ -167,7 +283,7 @@
                 song_title: songTitle,
                 artist: songArtist,
                 preview_url: track.previewUrl || "",
-                spotify_url: track.spotifyUrl || "",
+                spotify_url: track.spotifyUrl || spFallback,
                 isrc: track.isrc || ""
             }
         };
@@ -225,7 +341,7 @@
                             if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
                                 var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
                                 if (!isVinylIconMode) {
-                                    var needsUpgrade = !!(track.videoId && typeof $httpClient !== "undefined" && (track.schemaVer !== 2 || (!track.spotifyUrl && !track.previewUrl)));
+                                    var needsUpgrade = !!(track.videoId && typeof $httpClient !== "undefined" && (track.schemaVer !== 2 || !track.spotifyUrl || !track.previewUrl));
                                     if (needsUpgrade) {
                                         cachedTrackForUpgrade = track;
                                         pendingUpgradeOvs.push(ov);
@@ -283,7 +399,16 @@
                     changed = true;
                     finalizeBody();
                 };
-                var upgTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishUpgrade(cachedTrackForUpgrade); }, 1800) : null;
+                var enrichAndFinish = function (baseTrack) {
+                    enrichTrackOnDevice(baseTrack, function (enriched) {
+                        finishUpgrade(enriched || baseTrack);
+                    }, 1500);
+                };
+                if (cachedTrackForUpgrade.schemaVer === 2 && cachedTrackForUpgrade.previewUrl) {
+                    enrichAndFinish(cachedTrackForUpgrade);
+                    return;
+                }
+                var upgTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { enrichAndFinish(cachedTrackForUpgrade); }, 1800) : null;
                 $httpClient.post({
                     url: WORKER_BASE + "/studio/yt-now-playing",
                     headers: { "Content-Type": "application/json" },
@@ -300,7 +425,7 @@
                         }
                     } catch (_) {}
                     if (upgTimer && typeof clearTimeout !== "undefined") clearTimeout(upgTimer);
-                    finishUpgrade(picked);
+                    enrichAndFinish(picked);
                 });
                 return;
             }

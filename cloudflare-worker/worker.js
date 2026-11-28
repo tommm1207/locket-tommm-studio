@@ -4904,47 +4904,52 @@ async function resolveSpotifyTrackUrl(title, artist) {
   if (qArtist) queries.push(`site:open.spotify.com/track ${qTitle} ${qArtist}`);
   queries.push(`site:open.spotify.com/track ${qTitle}`);
   const hdrs = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
     "Accept": "text/html,application/xhtml+xml",
   };
   for (const dq of queries) {
-    try {
-      const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(dq)}`;
-      const res = await fetch(ddgUrl, { headers: hdrs, signal: AbortSignal.timeout(3200) });
-      if (!res.ok) continue;
-      const html = await res.text();
-      let decoded = html;
-      try { decoded = decodeURIComponent(html); } catch (_) {}
-      const ids = [];
-      const re = /open\.spotify\.com(?:\/intl-[a-z-]+)?\/track\/([A-Za-z0-9]{22})/gi;
-      let m;
-      while ((m = re.exec(decoded)) !== null && ids.length < 3) {
-        if (!ids.includes(m[1])) ids.push(m[1]);
-      }
-      if (ids.length === 0) continue;
-      const verified = await Promise.all(
-        ids.map(async (tid) => {
-          const spUrl = `https://open.spotify.com/track/${tid}`;
-          try {
-            const oRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spUrl)}`, {
-              headers: { "User-Agent": hdrs["User-Agent"] },
-              signal: AbortSignal.timeout(2200),
-            });
-            if (!oRes.ok) return null;
-            const oJson = await oRes.json().catch(() => null);
-            return oJson && oJson.title
-              ? { tid, spotifyUrl: spUrl, spTitle: String(oJson.title), spotifyThumb: String(oJson.thumbnail_url || "") }
-              : null;
-          } catch (_) {
-            return null;
-          }
-        })
-      );
-      const valid = verified.filter(Boolean);
-      const exact = valid.find((v) => titleMatchesTrack(qTitle, v.spTitle)) || valid[0];
-      if (exact) return { spotifyUrl: exact.spotifyUrl, spotifyThumb: exact.spotifyThumb };
-      return { spotifyUrl: `https://open.spotify.com/track/${ids[0]}`, spotifyThumb: "" };
-    } catch (_) {}
+    const endpoints = [
+      `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(dq)}`,
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(dq)}`,
+    ];
+    for (const ddgUrl of endpoints) {
+      try {
+        const res = await fetch(ddgUrl, { headers: hdrs, signal: AbortSignal.timeout(3000) });
+        if (!res.ok) continue;
+        const html = await res.text();
+        let decoded = html;
+        try { decoded = decodeURIComponent(html); } catch (_) {}
+        const ids = [];
+        const re = /open\.spotify\.com(?:\/intl-[a-z-]+)?\/track\/([A-Za-z0-9]{22})/gi;
+        let m;
+        while ((m = re.exec(decoded)) !== null && ids.length < 3) {
+          if (!ids.includes(m[1])) ids.push(m[1]);
+        }
+        if (ids.length === 0) continue;
+        const verified = await Promise.all(
+          ids.map(async (tid) => {
+            const spUrl = `https://open.spotify.com/track/${tid}`;
+            try {
+              const oRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spUrl)}`, {
+                headers: { "User-Agent": hdrs["User-Agent"] },
+                signal: AbortSignal.timeout(2200),
+              });
+              if (!oRes.ok) return null;
+              const oJson = await oRes.json().catch(() => null);
+              return oJson && oJson.title
+                ? { tid, spotifyUrl: spUrl, spTitle: String(oJson.title), spotifyThumb: String(oJson.thumbnail_url || "") }
+                : null;
+            } catch (_) {
+              return null;
+            }
+          })
+        );
+        const valid = verified.filter(Boolean);
+        const exact = valid.find((v) => titleMatchesTrack(qTitle, v.spTitle)) || valid[0];
+        if (exact) return { spotifyUrl: exact.spotifyUrl, spotifyThumb: exact.spotifyThumb };
+        return { spotifyUrl: `https://open.spotify.com/track/${ids[0]}`, spotifyThumb: "" };
+      } catch (_) {}
+    }
   }
   return { spotifyUrl: "", spotifyThumb: "" };
 }
@@ -5056,12 +5061,14 @@ async function resolveYoutubeTrack(videoId, manualQuery = "") {
     } catch (_) {}
   }
 
+  const deezerId = deezerHit?.id ? String(deezerHit.id) : "";
   const itunesArt = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb");
   const artworkUrl = itunesArt || spRes.spotifyThumb || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
-  const previewUrl = itunesHit?.previewUrl || dzDetail?.preview || deezerHit?.preview || "";
+  const permanentDzPreview = deezerId ? `https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/preview.mp3?dz=${deezerId}` : "";
+  const previewUrl = itunesHit?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
   const appleMusicUrl = itunesHit?.trackViewUrl || deezerHit?.link || "";
   const spotifyUrl = spRes.spotifyUrl || "";
-  const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerHit?.id ? String(deezerHit.id) : (videoId || "query"));
+  const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerId || (videoId || "query"));
 
   let colors = ["#1E1B4B", "#4C1D95"];
   if (artworkUrl) {
@@ -5078,6 +5085,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "") {
     schemaVer: 2,
     videoId: videoId || "",
     songId,
+    deezerId,
     title,
     artist,
     artworkUrl,
@@ -5372,6 +5380,32 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
         "Cache-Control": "public, max-age=86400",
       }),
     });
+  }
+
+  if (url.pathname === "/studio/preview.mp3" && request.method === "GET") {
+    const dz = (url.searchParams.get("dz") || "").replace(/\D/g, "");
+    if (!dz) {
+      return new Response("missing dz", { status: 400, headers: corsHeaders() });
+    }
+    try {
+      const dr = await fetch(`https://api.deezer.com/track/${dz}`, {
+        headers: { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X)", Accept: "application/json" },
+        signal: AbortSignal.timeout(3500),
+      });
+      if (dr.ok) {
+        const dj = await dr.json().catch(() => null);
+        if (dj && typeof dj.preview === "string" && dj.preview.startsWith("http")) {
+          return new Response(null, {
+            status: 302,
+            headers: corsHeaders({
+              Location: dj.preview,
+              "Cache-Control": "no-store",
+            }),
+          });
+        }
+      }
+    } catch (_) {}
+    return new Response("preview not found", { status: 404, headers: corsHeaders() });
   }
 
   if (url.pathname === "/studio/music-schema-log") {
