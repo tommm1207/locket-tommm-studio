@@ -1,11 +1,30 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "107";
+var RC_VER = "108";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
     rcFinished = true;
     try { $done(res || {}); } catch (_) {}
+}
+function postRcDebugAndFinish(debugObj, finalRes) {
+    if (typeof $httpClient !== "undefined" && debugObj) {
+        var dbgTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce(finalRes); }, 250) : null;
+        try {
+            $httpClient.post({
+                url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/rc-camera-debug",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(debugObj)
+            }, function () {
+                if (dbgTimer && typeof clearTimeout !== "undefined") clearTimeout(dbgTimer);
+                finishOnce(finalRes);
+            });
+            return;
+        } catch (_) {
+            if (dbgTimer && typeof clearTimeout !== "undefined") clearTimeout(dbgTimer);
+        }
+    }
+    finishOnce(finalRes);
 }
 function writeRcStore(v, k) {
     try { if (typeof $persistentStore !== "undefined") $persistentStore.write(String(v), k); } catch (_) {}
@@ -18,7 +37,12 @@ var hasLiveEntries = !!(obj.entries && typeof obj.entries === "object" && Object
 
 // CRITICAL GOLDEN RULE: Never wipe Remote Config on NO_CHANGE or empty entries!
 if (!hasLiveEntries || rawState === "NO_CHANGE") {
-    finishOnce({});
+    postRcDebugAndFinish({
+        rcVer: RC_VER,
+        rawState: rawState,
+        hasLiveEntries: hasLiveEntries,
+        entryKeysCount: (obj.entries && typeof obj.entries === "object") ? Object.keys(obj.entries).length : 0
+    }, {});
     return;
 }
 obj.state = "UPDATE";
@@ -45,12 +69,24 @@ try {
 
 // 2b. MERGE feature_gates: GIỮ NGUYÊN toàn bộ gate native mà server Locket trả về,
 // tự động bật các gate dương tính (timer/zoom/preset/lut/dazz/retro/lens) + ép bật TOMMM_FORCE_GATES.
-var TOMMM_FORCE_GATES = ["app_icon_picker","camera_roll","camera_roll_video","camera_roll_video_30s","camera_roll_video_upload","photo_library_video","can_upload_30s_video","can_record_30s_video","video","video_30s","video_60s","longer_video","longer_video_30s","extended_video_30s","camera_timer","self_timer","timer","countdown_timer","cameras","camera_picker","camera_switcher","camera_selector","camera_effects","camera_fx","vintage_cameras","digital_cameras","instant_cameras","special_cameras","locket_cameras","retro_cam","capture_modes","capture_styles","live_camera_filters","point_and_shoot","disposable","vhs","noir","fisheye","daydream","bubblegum","lofi","atlas_35mm","home_movie","digicam","retro_camera","retro_cameras","film_camera","film_cameras","camera_lenses","lenses","camera_modes","dazz_cam","vintage_camera","camera_presets","presets","camera_luts","luts","lut","camera_styles","analog_camera","disposable_camera","film_presets","live_filters","realtime_filters","camera_lut_picker","lut_picker","color_filters","camera_zoom","zoom","camera_filter_sheet","camera_filters","camera_filter","filter","filters","photo_filters","ai_filters","ar_filters","face_filters","camera_filter_button","custom_filters","create_filter","holiday_effects","holiday_filters","camera_theme","locket_views","long_captions","remove_ads","priority_support","custom_widget_frames","streak_recovery","streak_reminders","profile_badge","gold_badge","locket_gold_badge","user_badge","badge","unlimited_friends"];
+var TOMMM_FORCE_GATES = ["app_icon_picker","camera_roll","camera_roll_video","camera_roll_video_30s","camera_roll_video_upload","photo_library_video","can_upload_30s_video","can_record_30s_video","video","video_30s","video_60s","longer_video","longer_video_30s","extended_video_30s","camera_timer","self_timer","timer","countdown_timer","cameras","camera_picker","camera_switcher","camera_selector","camera_effects","camera_fx","camera_style","camera_styles","camera_styles_enabled","camera_presets_enabled","camera_lenses_enabled","vintage_cameras","digital_cameras","instant_cameras","special_cameras","locket_cameras","retro_cam","capture_modes","capture_styles","live_camera_filters","dazz_camera","point_and_shoot","disposable","vhs","noir","fisheye","daydream","bubblegum","lofi","atlas_35mm","home_movie","golden_hour","laptop","digicam","retro_camera","retro_cameras","film_camera","film_cameras","retro","film","vintage","instant","camera_lenses","lenses","camera_modes","dazz_cam","vintage_camera","camera_presets","presets","camera_luts","luts","lut","camera_styles","analog_camera","disposable_camera","film_presets","live_filters","realtime_filters","camera_lut_picker","lut_picker","color_filters","camera_zoom","zoom","camera_filter_sheet","camera_filters","camera_filter","filter","filters","photo_filters","ai_filters","ar_filters","face_filters","camera_filter_button","custom_filters","create_filter","holiday_effects","holiday_filters","camera_theme","locket_views","long_captions","remove_ads","priority_support","custom_widget_frames","streak_recovery","streak_reminders","profile_badge","gold_badge","locket_gold_badge","user_badge","badge","unlimited_friends"];
 var liveGates = {};
 try { liveGates = JSON.parse(obj.entries["feature_gates"] || "{}"); } catch (_) { liveGates = {}; }
 if (!liveGates || typeof liveGates !== "object") liveGates = {};
+var rcDiagAllKeys = Object.keys(obj.entries || {}).sort();
+var rcDiagGatesBefore = JSON.parse(JSON.stringify(liveGates));
+var rcDiagUpsellBefore = {};
+try { rcDiagUpsellBefore = JSON.parse(obj.entries["upsell_features"] || "{}"); } catch (_) { rcDiagUpsellBefore = {}; }
+var rcDiagInteresting = {};
+for (var di = 0; di < rcDiagAllKeys.length; di++) {
+    var dk0 = rcDiagAllKeys[di];
+    if (dk0 === "camera_filter_config" || dk0 === "overlay_items" || dk0 === "feature_gates" || dk0 === "upsell_features") continue;
+    if (/cam|dazz|film|retro|lens|style|preset|mode|upsell|gate|gold|roll|photo|cap|effect/i.test(dk0)) {
+        rcDiagInteresting[dk0] = String(obj.entries[dk0] || "").slice(0, 360);
+    }
+}
 for (var gk in liveGates) {
-    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(gk) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|shader|point_and_shoot|daydream|bubblegum|lofi|noir/i.test(gk)) {
+    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(gk) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|style|shader|point_and_shoot|daydream|bubblegum|lofi|noir|golden_hour|laptop|atlas/i.test(gk)) {
         var gv = liveGates[gk];
         if (gv === "disabled" || gv === "off" || gv === false) liveGates[gk] = "enabled";
     }
@@ -60,9 +96,24 @@ for (var fgi = 0; fgi < TOMMM_FORCE_GATES.length; fgi++) {
 }
 obj.entries["feature_gates"] = JSON.stringify(liveGates);
 
+// Merge động upsell_features: giữ nguyên mọi key live từ server và ép về false (tắt khóa Gold cho mọi tính năng, kể cả Dazz Cam)
+var liveUpsell = {};
+try { liveUpsell = JSON.parse(obj.entries["upsell_features"] || "{}"); } catch (_) { liveUpsell = {}; }
+if (!liveUpsell || typeof liveUpsell !== "object" || Array.isArray(liveUpsell)) liveUpsell = {};
+for (var uk in liveUpsell) {
+    if (Object.prototype.hasOwnProperty.call(liveUpsell, uk)) liveUpsell[uk] = false;
+}
+var forceNoUpsell = [
+    "app_icon_picker", "camera_roll", "camera_roll_video", "camera_theme", "locket_views", "remove_ads",
+    "custom_widget_frames", "filter", "filters", "camera_filter", "camera_filters", "holiday_filters",
+    "dazz_cam", "retro_cameras", "camera_presets", "camera_styles", "camera_lenses", "cameras", "lenses"
+];
+for (var ui = 0; ui < forceNoUpsell.length; ui++) liveUpsell[forceNoUpsell[ui]] = false;
+obj.entries["upsell_features"] = JSON.stringify(liveUpsell);
+
 // Tự động bật các key dương tính top-level nếu server trả false/disabled cho camera/timer/zoom/preset/lut/dazz/retro/lens
 for (var ek in obj.entries) {
-    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(ek) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|shader|point_and_shoot|daydream|bubblegum|lofi|noir/i.test(ek)) {
+    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(ek) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|style|shader|point_and_shoot|daydream|bubblegum|lofi|noir|golden_hour|laptop|atlas/i.test(ek)) {
         if (obj.entries[ek] === "false") obj.entries[ek] = "true";
         else if (obj.entries[ek] === "disabled") obj.entries[ek] = "enabled";
     }
@@ -76,7 +127,7 @@ for (var dk in TOMMM_DEFAULTS) {
     }
 }
 
-var TOMMM_ENTRIES = {"upsell_features":"{\"app_icon_picker\":true,\"camera_roll\":true,\"camera_theme\":true,\"locket_views\":true,\"remove_ads\":true,\"custom_widget_frames\":true}","paywall_presentation_config":"{\"uid\":\"paywall_testflight\",\"onboarding\":false,\"after_sent_moment\":false,\"on_foreground\":false,\"interval\":2592000,\"profile_banner\":true}","android_subscribe_gold_button_enabled":"false","profile_badge_visible":"true","lunar_new_year_app_icon_enabled":"true","star_sign_caption_image_url":"https://storage.googleapis.com/locket-public/overlays/star_signs","history_ads_mode":"off","history_ads_prefetch_count":"0","history_ads_prefetch_immediate":"false","history_ads_prefetch_reroute":"false","history_ads_dynamic_insertion":"false","history_ads_refresh_prefetch_on_foreground":"false","history_ads_floor_price":"0","history_ads_floor_price_att":"0","history_ad_log_displayed_on_background":"false","history_ads_debug_menu":"false","history_ads_nimbus_interceptors":"[]","history_ads_nimbus_formats":"[]","sentry_sample_rate":"0","sentry_network_tracing":"false","sentry_performance_tracking":"false","sentry_trace_sample_rate":"0","sentry_profiles_sample_rate":"0","max_friends_count":"999999999","friend_limit_mode":"0","soft_friend_limit_threshold_count":"999999999","show_friend_limit_on_cam":"false","signup_max_friends_count":"999999999","celebrity_inbox_limit":"999999999","celebrity_inbox_enabled":"true","celebrity_vip_qr_redemption_enabled":"true","moment_views_enabled":"true","moment_views_v2":"true","record_moment_views":"true","notify_moment_views":"true","captions_enabled":"true","music_caption_enabled":"true","music_caption_song_preview_enabled":"true","link_caption_link_enabled":"true","rollcall_enabled":"true","rollcall_profile_button":"true","camera_filter_fetch_cache_max_age_seconds":"2592000","beta_features_enabled":"true","zoom_enabled":"true","camera_microphone_enabled":"true","microphone_enabled":"true","overlay_navigator_enabled":"true","overlays_v2_config":"{\"suggestions_enabled\":true,\"logging_enabled\":false,\"remember_suggestions\":false,\"fetch_from_server\":false}","video_sound_enabled":"true","audio_session_deactivation_enabled":"true","fetch_users_from_cloud_function":"true","user_cache_max_age_sec":"172800","friends_cache_max_age_sec":"2592000","refresh_interval":"0","send_to_self_only_mode":"always_enabled","private_moment_enabled":"true","private_moments_enabled":"true","custom_audience_enabled":"true","audience_selection_enabled":"true","post_audience_selection_enabled":"true","longer_camera_roll_videos_enabled":"true","camera_roll_preview_enabled":"true","camera_roll_video_enabled":"true","camera_roll_video_upload_enabled":"true","internal_camera_roll_video_upload_enabled":"true","can_record_long_video":"true","camera_roll_video_max_duration":"45","camera_roll_max_duration":"45","camera_roll_duration":"45","video_max_duration":"45","max_video_duration":"45","video_duration":"45","video_length_seconds":"45","max_video_length":"45","max_video_length_seconds":"45","longer_video_max_duration":"45","trim_max_duration":"45","video_trim_max_duration":"45","gold_max_duration":"45","quality_mbps":"0.42","qualityMbps":"0.42","camera_quality_mbps":"0.5","camera_roll_quality_mbps":"0.42","video_quality_mbps":"0.42","video_bitrate":"420000","bitrate":"420000","upload_main_image_quality":"0.6","upload_thumbnail_image_quality":"0.8","rollcall_share_templates":"{\"templates\":[\"bold\",\"pop_off\",\"stacking\",\"full_screen\",\"shadow_box\",\"collage\",\"pop_collage\"],\"random_order\":false}","time_travel_rewind_v2_share_templates":"{\"templates\":[\"rounded_square\",\"grid_collage\",\"cutout_collage\",\"rounded_square_bold\",\"wall_calendar\"],\"random_order\":false}","feature_discovery_popup_config":"{\"tag\":\"LOCKET GOLD\",\"tag_gradient\":true,\"tag_style\":\"gold_gradient\",\"title\":\"✨Tommm✨\",\"feature_set\":[{\"title\":\"Trải nghiệm Locket Gold nào! 💛\",\"body\":\"Đã mở khoá thành công Locket Gold! Hãy lưu giữ khoảnh khắc đáng nhớ và tận hưởng các tính năng cao cấp nhé!\",\"imageURL\":\"https://tommm1207.github.io/locket-tommm-studio/assets/welcome_icon.png\"}],\"primary_button_title\":\"Bắt đầu ngay\",\"campaign\":\"locket_gold_welcome_by_tommm_v15\",\"start_at\":\"2020-01-01T00:00:00\",\"end_at\":\"2099-12-31T23:59:59\",\"use_local_time_zone\":true}","overlay_dynamic_captions":"[\"standard\",\"poll\",\"color_palette\",\"review\",\"quote\",\"breaking_news\",\"music\",\"location\",\"weather\",\"time\",\"streak\",\"star_sign\",\"party_time\",\"locket_count\",\"good_morning\",\"goodnight\",\"ootd\",\"miss_you\",\"custom\",\"halloween_2026\"]","show_filter_button":"true","camera_filters_enabled":"true","ai_filters_enabled":"true","camera_filter_button_enabled":"true","allows_custom_filters":"true"};
+var TOMMM_ENTRIES = {"paywall_presentation_config":"{\"uid\":\"paywall_testflight\",\"onboarding\":false,\"after_sent_moment\":false,\"on_foreground\":false,\"interval\":2592000,\"profile_banner\":true}","android_subscribe_gold_button_enabled":"false","profile_badge_visible":"true","lunar_new_year_app_icon_enabled":"true","star_sign_caption_image_url":"https://storage.googleapis.com/locket-public/overlays/star_signs","history_ads_mode":"off","history_ads_prefetch_count":"0","history_ads_prefetch_immediate":"false","history_ads_prefetch_reroute":"false","history_ads_dynamic_insertion":"false","history_ads_refresh_prefetch_on_foreground":"false","history_ads_floor_price":"0","history_ads_floor_price_att":"0","history_ad_log_displayed_on_background":"false","history_ads_debug_menu":"false","history_ads_nimbus_interceptors":"[]","history_ads_nimbus_formats":"[]","sentry_sample_rate":"0","sentry_network_tracing":"false","sentry_performance_tracking":"false","sentry_trace_sample_rate":"0","sentry_profiles_sample_rate":"0","max_friends_count":"999999999","friend_limit_mode":"0","soft_friend_limit_threshold_count":"999999999","show_friend_limit_on_cam":"false","signup_max_friends_count":"999999999","celebrity_inbox_limit":"999999999","celebrity_inbox_enabled":"true","celebrity_vip_qr_redemption_enabled":"true","moment_views_enabled":"true","moment_views_v2":"true","record_moment_views":"true","notify_moment_views":"true","captions_enabled":"true","music_caption_enabled":"true","music_caption_song_preview_enabled":"true","link_caption_link_enabled":"true","rollcall_enabled":"true","rollcall_profile_button":"true","camera_filter_fetch_cache_max_age_seconds":"2592000","beta_features_enabled":"true","zoom_enabled":"true","camera_microphone_enabled":"true","microphone_enabled":"true","overlay_navigator_enabled":"true","overlays_v2_config":"{\"suggestions_enabled\":true,\"logging_enabled\":false,\"remember_suggestions\":false,\"fetch_from_server\":false}","video_sound_enabled":"true","audio_session_deactivation_enabled":"true","fetch_users_from_cloud_function":"true","user_cache_max_age_sec":"172800","friends_cache_max_age_sec":"2592000","refresh_interval":"0","send_to_self_only_mode":"always_enabled","private_moment_enabled":"true","private_moments_enabled":"true","custom_audience_enabled":"true","audience_selection_enabled":"true","post_audience_selection_enabled":"true","longer_camera_roll_videos_enabled":"true","camera_roll_preview_enabled":"true","camera_roll_video_enabled":"true","camera_roll_video_upload_enabled":"true","internal_camera_roll_video_upload_enabled":"true","can_record_long_video":"true","camera_roll_video_max_duration":"45","camera_roll_max_duration":"45","camera_roll_duration":"45","video_max_duration":"45","max_video_duration":"45","video_duration":"45","video_length_seconds":"45","max_video_length":"45","max_video_length_seconds":"45","longer_video_max_duration":"45","trim_max_duration":"45","video_trim_max_duration":"45","gold_max_duration":"45","quality_mbps":"0.42","qualityMbps":"0.42","camera_quality_mbps":"0.5","camera_roll_quality_mbps":"0.42","video_quality_mbps":"0.42","video_bitrate":"420000","bitrate":"420000","upload_main_image_quality":"0.6","upload_thumbnail_image_quality":"0.8","rollcall_share_templates":"{\"templates\":[\"bold\",\"pop_off\",\"stacking\",\"full_screen\",\"shadow_box\",\"collage\",\"pop_collage\"],\"random_order\":false}","time_travel_rewind_v2_share_templates":"{\"templates\":[\"rounded_square\",\"grid_collage\",\"cutout_collage\",\"rounded_square_bold\",\"wall_calendar\"],\"random_order\":false}","feature_discovery_popup_config":"{\"tag\":\"LOCKET GOLD\",\"tag_gradient\":true,\"tag_style\":\"gold_gradient\",\"title\":\"✨Tommm✨\",\"feature_set\":[{\"title\":\"Trải nghiệm Locket Gold nào! 💛\",\"body\":\"Đã mở khoá thành công Locket Gold! Hãy lưu giữ khoảnh khắc đáng nhớ và tận hưởng các tính năng cao cấp nhé!\",\"imageURL\":\"https://tommm1207.github.io/locket-tommm-studio/assets/welcome_icon.png\"}],\"primary_button_title\":\"Bắt đầu ngay\",\"campaign\":\"locket_gold_welcome_by_tommm_v15\",\"start_at\":\"2020-01-01T00:00:00\",\"end_at\":\"2099-12-31T23:59:59\",\"use_local_time_zone\":true}","overlay_dynamic_captions":"[\"standard\",\"poll\",\"color_palette\",\"review\",\"quote\",\"breaking_news\",\"music\",\"location\",\"weather\",\"time\",\"streak\",\"star_sign\",\"party_time\",\"locket_count\",\"good_morning\",\"goodnight\",\"ootd\",\"miss_you\",\"custom\",\"halloween_2026\"]","show_filter_button":"true","camera_filters_enabled":"true","ai_filters_enabled":"true","camera_filter_button_enabled":"true","allows_custom_filters":"true"};
 Object.assign(obj.entries, TOMMM_ENTRIES);
 
 // JSON-merge camera (chỉ giữ các key Codable đã kiểm chứng trên Locket để iOS không từ chối giải mã camera JSON)
@@ -472,5 +523,15 @@ activeFilterCfg.remote_filters = mergedRemote;
 obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 
 writeRcStore(RC_VER, "tommm_rc_applied_ver");
-finishOnce({ body: JSON.stringify(obj) });
+postRcDebugAndFinish({
+    rcVer: RC_VER,
+    rawState: rawState,
+    entryKeysCount: rcDiagAllKeys.length,
+    entryKeys: rcDiagAllKeys,
+    liveGatesBefore: rcDiagGatesBefore,
+    liveUpsellBefore: rcDiagUpsellBefore,
+    interestingEntries: rcDiagInteresting,
+    liveFilterCfgKeys: (liveFilterCfg && typeof liveFilterCfg === "object") ? Object.keys(liveFilterCfg) : [],
+    liveSheetIds: (liveFilterCfg && Array.isArray(liveFilterCfg.sheet_filters)) ? liveFilterCfg.sheet_filters.map(function (g) { return g && g.id; }) : []
+}, { body: JSON.stringify(obj) });
 })();

@@ -1606,7 +1606,7 @@ defaultOnlyRcEntries["zoom_enabled"] = "true";
 // never clobber Locket 2.74.0's live Camera UI / Navigation / A-B flags!
 const baseRcEntries = {};
 for (const gk of [
-    "upsell_features", "paywall_presentation_config", "android_subscribe_gold_button_enabled",
+    "paywall_presentation_config", "android_subscribe_gold_button_enabled",
     "profile_badge_visible", "lunar_new_year_app_icon_enabled", "star_sign_caption_image_url",
     "history_ads_mode", "history_ads_prefetch_count", "history_ads_prefetch_immediate",
     "history_ads_prefetch_reroute", "history_ads_dynamic_insertion", "history_ads_refresh_prefetch_on_foreground",
@@ -2008,10 +2008,11 @@ const TOMMM_FORCE_GATES = [
     "video", "video_30s", "video_60s", "longer_video", "longer_video_30s", "extended_video_30s",
     "camera_timer", "self_timer", "timer", "countdown_timer",
     "cameras", "camera_picker", "camera_switcher", "camera_selector", "camera_effects", "camera_fx",
+    "camera_style", "camera_styles", "camera_styles_enabled", "camera_presets_enabled", "camera_lenses_enabled",
     "vintage_cameras", "digital_cameras", "instant_cameras", "special_cameras", "locket_cameras", "retro_cam",
-    "capture_modes", "capture_styles", "live_camera_filters",
-    "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie",
-    "digicam", "retro_camera", "retro_cameras", "film_camera", "film_cameras",
+    "capture_modes", "capture_styles", "live_camera_filters", "dazz_camera",
+    "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie", "golden_hour", "laptop",
+    "digicam", "retro_camera", "retro_cameras", "film_camera", "film_cameras", "retro", "film", "vintage", "instant",
     "camera_lenses", "lenses", "camera_modes", "dazz_cam", "vintage_camera",
     "camera_presets", "presets", "camera_luts", "luts", "lut", "camera_styles",
     "analog_camera", "disposable_camera", "film_presets", "live_filters", "realtime_filters",
@@ -2039,12 +2040,31 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "107";
+var RC_VER = "108";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
     rcFinished = true;
     try { $done(res || {}); } catch (_) {}
+}
+function postRcDebugAndFinish(debugObj, finalRes) {
+    if (typeof $httpClient !== "undefined" && debugObj) {
+        var dbgTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce(finalRes); }, 250) : null;
+        try {
+            $httpClient.post({
+                url: "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/rc-camera-debug",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(debugObj)
+            }, function () {
+                if (dbgTimer && typeof clearTimeout !== "undefined") clearTimeout(dbgTimer);
+                finishOnce(finalRes);
+            });
+            return;
+        } catch (_) {
+            if (dbgTimer && typeof clearTimeout !== "undefined") clearTimeout(dbgTimer);
+        }
+    }
+    finishOnce(finalRes);
 }
 function writeRcStore(v, k) {
     try { if (typeof $persistentStore !== "undefined") $persistentStore.write(String(v), k); } catch (_) {}
@@ -2057,7 +2077,12 @@ var hasLiveEntries = !!(obj.entries && typeof obj.entries === "object" && Object
 
 // CRITICAL GOLDEN RULE: Never wipe Remote Config on NO_CHANGE or empty entries!
 if (!hasLiveEntries || rawState === "NO_CHANGE") {
-    finishOnce({});
+    postRcDebugAndFinish({
+        rcVer: RC_VER,
+        rawState: rawState,
+        hasLiveEntries: hasLiveEntries,
+        entryKeysCount: (obj.entries && typeof obj.entries === "object") ? Object.keys(obj.entries).length : 0
+    }, {});
     return;
 }
 obj.state = "UPDATE";
@@ -2088,8 +2113,20 @@ var TOMMM_FORCE_GATES = ${JSON.stringify(TOMMM_FORCE_GATES)};
 var liveGates = {};
 try { liveGates = JSON.parse(obj.entries["feature_gates"] || "{}"); } catch (_) { liveGates = {}; }
 if (!liveGates || typeof liveGates !== "object") liveGates = {};
+var rcDiagAllKeys = Object.keys(obj.entries || {}).sort();
+var rcDiagGatesBefore = JSON.parse(JSON.stringify(liveGates));
+var rcDiagUpsellBefore = {};
+try { rcDiagUpsellBefore = JSON.parse(obj.entries["upsell_features"] || "{}"); } catch (_) { rcDiagUpsellBefore = {}; }
+var rcDiagInteresting = {};
+for (var di = 0; di < rcDiagAllKeys.length; di++) {
+    var dk0 = rcDiagAllKeys[di];
+    if (dk0 === "camera_filter_config" || dk0 === "overlay_items" || dk0 === "feature_gates" || dk0 === "upsell_features") continue;
+    if (/cam|dazz|film|retro|lens|style|preset|mode|upsell|gate|gold|roll|photo|cap|effect/i.test(dk0)) {
+        rcDiagInteresting[dk0] = String(obj.entries[dk0] || "").slice(0, 360);
+    }
+}
 for (var gk in liveGates) {
-    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(gk) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|shader|point_and_shoot|daydream|bubblegum|lofi|noir/i.test(gk)) {
+    if (Object.prototype.hasOwnProperty.call(liveGates, gk) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(gk) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|style|shader|point_and_shoot|daydream|bubblegum|lofi|noir|golden_hour|laptop|atlas/i.test(gk)) {
         var gv = liveGates[gk];
         if (gv === "disabled" || gv === "off" || gv === false) liveGates[gk] = "enabled";
     }
@@ -2099,9 +2136,24 @@ for (var fgi = 0; fgi < TOMMM_FORCE_GATES.length; fgi++) {
 }
 obj.entries["feature_gates"] = JSON.stringify(liveGates);
 
+// Merge động upsell_features: giữ nguyên mọi key live từ server và ép về false (tắt khóa Gold cho mọi tính năng, kể cả Dazz Cam)
+var liveUpsell = {};
+try { liveUpsell = JSON.parse(obj.entries["upsell_features"] || "{}"); } catch (_) { liveUpsell = {}; }
+if (!liveUpsell || typeof liveUpsell !== "object" || Array.isArray(liveUpsell)) liveUpsell = {};
+for (var uk in liveUpsell) {
+    if (Object.prototype.hasOwnProperty.call(liveUpsell, uk)) liveUpsell[uk] = false;
+}
+var forceNoUpsell = [
+    "app_icon_picker", "camera_roll", "camera_roll_video", "camera_theme", "locket_views", "remove_ads",
+    "custom_widget_frames", "filter", "filters", "camera_filter", "camera_filters", "holiday_filters",
+    "dazz_cam", "retro_cameras", "camera_presets", "camera_styles", "camera_lenses", "cameras", "lenses"
+];
+for (var ui = 0; ui < forceNoUpsell.length; ui++) liveUpsell[forceNoUpsell[ui]] = false;
+obj.entries["upsell_features"] = JSON.stringify(liveUpsell);
+
 // Tự động bật các key dương tính top-level nếu server trả false/disabled cho camera/timer/zoom/preset/lut/dazz/retro/lens
 for (var ek in obj.entries) {
-    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(ek) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|shader|point_and_shoot|daydream|bubblegum|lofi|noir/i.test(ek)) {
+    if (Object.prototype.hasOwnProperty.call(obj.entries, ek) && !/disable|legacy|hide|kill|block|deprecat|suppress|ads|ad_|sentry|debug|log|limit|upsell|paywall|require|lock/i.test(ek) && /camera|timer|zoom|countdown|dazz|digi|retro|film|lens|preset|lut|color_filter|live_filter|analog|vintage|disposable|instant|vhs|fisheye|capture_mode|capture_style|style|shader|point_and_shoot|daydream|bubblegum|lofi|noir|golden_hour|laptop|atlas/i.test(ek)) {
         if (obj.entries[ek] === "false") obj.entries[ek] = "true";
         else if (obj.entries[ek] === "disabled") obj.entries[ek] = "enabled";
     }
@@ -2511,7 +2563,17 @@ activeFilterCfg.remote_filters = mergedRemote;
 obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 
 writeRcStore(RC_VER, "tommm_rc_applied_ver");
-finishOnce({ body: JSON.stringify(obj) });
+postRcDebugAndFinish({
+    rcVer: RC_VER,
+    rawState: rawState,
+    entryKeysCount: rcDiagAllKeys.length,
+    entryKeys: rcDiagAllKeys,
+    liveGatesBefore: rcDiagGatesBefore,
+    liveUpsellBefore: rcDiagUpsellBefore,
+    interestingEntries: rcDiagInteresting,
+    liveFilterCfgKeys: (liveFilterCfg && typeof liveFilterCfg === "object") ? Object.keys(liveFilterCfg) : [],
+    liveSheetIds: (liveFilterCfg && Array.isArray(liveFilterCfg.sheet_filters)) ? liveFilterCfg.sheet_filters.map(function (g) { return g && g.id; }) : []
+}, { body: JSON.stringify(obj) });
 })();
 `;
 fs.writeFileSync(path.join(baseDir, 'js_tommm_rc.js'), locketRcJs, 'utf8');
@@ -2581,9 +2643,9 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60, script-update-interval=1800
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
+tommm_gold = type=http-response, pattern=^https:\\/\\/(api\\.revenuecat\\.com|api\\.rc-backup\\.com)(:443)?\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com|api\\.rc-backup\\.com|firebaseremoteconfig\\.googleapis\\.com)(:443)?\\/v1\\/, script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60, script-update-interval=1800
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com(:443)?\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
 tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js, timeout=60, script-update-interval=1800
 tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js, requires-body=true, max-size=524288, timeout=10, script-update-interval=1800
 tommm_yt_music_res = type=http-response, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js, requires-body=true, max-size=524288, timeout=10, script-update-interval=1800
@@ -2672,9 +2734,9 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/initplayback.+&oad 'data-type=text data="" status-code=200'
 
 [Script]
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60, script-update-interval=1800
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
+tommm_gold = type=http-response, pattern=^https:\\/\\/(api\\.revenuecat\\.com|api\\.rc-backup\\.com)(:443)?\\/.+\\/(receipts|subscribers), script-path=${ghRawBase}/js_tommm_gold.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com|api\\.rc-backup\\.com|firebaseremoteconfig\\.googleapis\\.com)(:443)?\\/v1\\/, script-path=${ghRawBase}/js_tommm_deleteHeader.js, timeout=60, script-update-interval=1800
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com(:443)?\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js, requires-body=true, max-size=-1, timeout=60, script-update-interval=1800
 tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js, timeout=60, script-update-interval=1800
 tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js, requires-body=true, max-size=524288, timeout=10, script-update-interval=1800
 tommm_yt_music_res = type=http-response, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js, requires-body=true, max-size=524288, timeout=10, script-update-interval=1800
