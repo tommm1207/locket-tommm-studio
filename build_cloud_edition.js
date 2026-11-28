@@ -1663,6 +1663,47 @@ baseRcEntries["camera_modes_enabled"] = "true";
 baseRcEntries["camera_looks_enabled"] = "true";
 baseRcEntries["camera_effects_enabled"] = "true";
 baseRcEntries["camera_zoom_v2_enabled"] = "true";
+baseRcEntries["camera_zoom_enabled"] = "true";
+baseRcEntries["camera_zoom_pill_enabled"] = "true";
+baseRcEntries["zoom_pill_enabled"] = "true";
+baseRcEntries["zoom_controls_enabled"] = "true";
+baseRcEntries["camera_zoom_controls_enabled"] = "true";
+baseRcEntries["multi_lens_zoom_enabled"] = "true";
+baseRcEntries["optical_zoom_enabled"] = "true";
+baseRcEntries["zoom_presets_enabled"] = "true";
+baseRcEntries["zoom_selector_enabled"] = "true";
+baseRcEntries["lens_switcher_enabled"] = "true";
+baseRcEntries["timer_enabled"] = "true";
+baseRcEntries["camera_timer_enabled"] = "true";
+baseRcEntries["self_timer_enabled"] = "true";
+baseRcEntries["countdown_timer_enabled"] = "true";
+baseRcEntries["camera_countdown_enabled"] = "true";
+baseRcEntries["timer"] = "true";
+baseRcEntries["camera_controls_v2_enabled"] = "true";
+baseRcEntries["new_camera_controls_enabled"] = "true";
+baseRcEntries["camera_toolbar_v2_enabled"] = "true";
+baseRcEntries["viewfinder_v2_enabled"] = "true";
+baseRcEntries["camera_hud_v2_enabled"] = "true";
+baseRcEntries["capture_controls_v2_enabled"] = "true";
+baseRcEntries["camera_sheet_v2_enabled"] = "true";
+baseRcEntries["camera_filter_v2_enabled"] = "true";
+baseRcEntries["camera_filter_sheet_enabled"] = "true";
+baseRcEntries["camera_filter_sheet_selection_enabled"] = "true";
+baseRcEntries["camera_filter_unlocked"] = "true";
+baseRcEntries["camera_filters_unlocked"] = "true";
+baseRcEntries["camera_filter_requires_gold"] = "false";
+baseRcEntries["camera_filters_requires_gold"] = "false";
+baseRcEntries["filter_selection_enabled"] = "true";
+baseRcEntries["sheet_filters_selectable"] = "true";
+baseRcEntries["reference_image_attachment_enabled"] = "true";
+baseRcEntries["face_filters_enabled"] = "true";
+baseRcEntries["ar_filters_enabled"] = "true";
+baseRcEntries["photo_filters_enabled"] = "true";
+baseRcEntries["create_filter_enabled"] = "true";
+baseRcEntries["create_look_enabled"] = "true";
+baseRcEntries["ai_looks_enabled"] = "true";
+baseRcEntries["looks_enabled"] = "true";
+baseRcEntries["camera_filter_looks_enabled"] = "true";
 baseRcEntries["dazz_cam_enabled"] = "true";
 baseRcEntries["dazz_enabled"] = "true";
 baseRcEntries["retro_camera_enabled"] = "true";
@@ -2018,9 +2059,15 @@ for (const g of nativeGroups) {
 }
 const fallbackFilterCfg = {
     allows_custom_filters: true,
+    allowsCustomFilters: true,
     show_filter_button: true,
+    showFilterButton: true,
     sheet_enabled: true,
+    sheetEnabled: true,
     open_sheet_immediately: true,
+    openSheetImmediately: true,
+    reference_image_attachment_enabled: true,
+    referenceImageAttachmentEnabled: true,
     sheet_filters: nativeGroups,
     filter_groups: dvFilterCfg.filter_groups || [],
     picker_filters: nativeIds,
@@ -2041,12 +2088,14 @@ const TOMMM_FORCE_GATES = [
     "app_icon_picker", "camera_roll", "camera_roll_video", "camera_roll_video_30s", "camera_roll_video_upload",
     "photo_library_video", "can_upload_30s_video", "can_record_30s_video",
     "video", "video_30s", "video_60s", "longer_video", "longer_video_30s", "extended_video_30s",
-    "camera_timer", "self_timer", "timer", "countdown_timer",
+    "camera_timer", "self_timer", "timer", "countdown_timer", "camera_countdown",
     "cameras", "camera_picker", "camera_switcher", "camera_selector", "camera_effects", "camera_fx",
     "camera_style", "camera_styles", "camera_styles_enabled", "camera_presets_enabled", "camera_lenses_enabled",
     "liquid_glass", "liquid_glass_navigation", "liquid_glass_camera", "camera_v2", "new_camera_ui", "camera_redesign", "redesigned_camera",
-    "dazz", "dazz_presets", "camera_styles_v2", "camera_looks", "looks", "look_picker", "film_simulations",
-    "zoom_pill", "zoom_controls", "optical_zoom", "camera_zoom_v2", "lens_switcher", "camera_sheet_v2",
+    "camera_controls_v2", "new_camera_controls", "camera_toolbar_v2", "viewfinder_v2", "camera_hud_v2", "capture_controls_v2",
+    "dazz", "dazz_presets", "camera_styles_v2", "camera_looks", "looks", "look_picker", "create_look", "ai_looks", "film_simulations",
+    "zoom_pill", "camera_zoom_pill", "zoom_controls", "camera_zoom_controls", "multi_lens_zoom", "optical_zoom", "zoom_presets", "zoom_selector", "camera_zoom_v2", "lens_switcher", "camera_sheet_v2",
+    "camera_filter_v2", "camera_filter_sheet", "camera_filter_sheet_selection", "reference_image_attachment",
     "vintage_cameras", "digital_cameras", "instant_cameras", "special_cameras", "locket_cameras", "retro_cam",
     "capture_modes", "capture_styles", "live_camera_filters", "dazz_camera",
     "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie", "golden_hour", "laptop",
@@ -2078,7 +2127,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "110";
+var RC_VER = "111";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2219,12 +2268,23 @@ try {
         ultra_wide: true,
         telephoto: true,
         flash_button: true,
+        timer_button: true,
         volume_button: true,
         srgb: true,
         lanczos: true,
         quality_mbps: 0.5
     });
     obj.entries["camera"] = JSON.stringify(camObj);
+} catch (_) {}
+
+try {
+    var navV2 = {};
+    try { navV2 = JSON.parse(obj.entries["navigation_v2_config"] || "{}"); } catch (_) { navV2 = {}; }
+    if (!navV2 || typeof navV2 !== "object" || Array.isArray(navV2)) navV2 = {};
+    navV2.tab_bar = true;
+    navV2.nav_header = true;
+    navV2.camera = true;
+    obj.entries["navigation_v2_config"] = JSON.stringify(navV2);
 } catch (_) {}
 
 try {
@@ -2552,9 +2612,15 @@ pushCustomFilter("weekday_depth_de", "Wochentag (DE)", "#78350F", "#FBBF24", FBA
 
 var activeFilterCfg = (liveFilterCfg && typeof liveFilterCfg === "object") ? JSON.parse(JSON.stringify(liveFilterCfg)) : ${JSON.stringify(fallbackFilterCfg)};
 activeFilterCfg.allows_custom_filters = true;
+activeFilterCfg.allowsCustomFilters = true;
 activeFilterCfg.show_filter_button = true;
+activeFilterCfg.showFilterButton = true;
 activeFilterCfg.sheet_enabled = true;
+activeFilterCfg.sheetEnabled = true;
+activeFilterCfg.reference_image_attachment_enabled = true;
+activeFilterCfg.referenceImageAttachmentEnabled = true;
 if (typeof activeFilterCfg.open_sheet_immediately === "undefined") activeFilterCfg.open_sheet_immediately = true;
+if (typeof activeFilterCfg.openSheetImmediately === "undefined") activeFilterCfg.openSheetImmediately = true;
 
 var existingSheets = Array.isArray(activeFilterCfg.sheet_filters) ? activeFilterCfg.sheet_filters : [];
 var seenGroupIds = {};
