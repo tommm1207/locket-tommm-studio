@@ -1751,6 +1751,21 @@ baseRcEntries["custom_ai_filters_enabled"] = "true";
 baseRcEntries["filter_looks_enabled"] = "true";
 baseRcEntries["user_filters_enabled"] = "true";
 baseRcEntries["camera_filter_v2"] = "true";
+baseRcEntries["open_sheet_immediately"] = "false";
+baseRcEntries["openSheetImmediately"] = "false";
+baseRcEntries["capture_timer_enabled"] = "true";
+baseRcEntries["photo_timer_enabled"] = "true";
+baseRcEntries["camera_self_timer_enabled"] = "true";
+baseRcEntries["countdown_enabled"] = "true";
+baseRcEntries["wide_angle_toggle_enabled"] = "true";
+baseRcEntries["selfie_wide_angle_enabled"] = "true";
+baseRcEntries["zoom_bar_enabled"] = "true";
+baseRcEntries["camera_zoom_bar_enabled"] = "true";
+baseRcEntries["camera_quick_zoom_enabled"] = "true";
+baseRcEntries["camera_filter_bar_enabled"] = "true";
+baseRcEntries["inline_filter_picker_enabled"] = "true";
+baseRcEntries["filter_carousel_enabled"] = "true";
+baseRcEntries["quick_filter_picker_enabled"] = "true";
 baseRcEntries["dazz_cam_enabled"] = "true";
 baseRcEntries["dazz_enabled"] = "true";
 baseRcEntries["retro_camera_enabled"] = "true";
@@ -2038,11 +2053,12 @@ const customFrameGroups = [
 ];
 const frameOnlyIds = photoboothIds.concat(singleFrameIds, nmFrameIds);
 const customFrameIds = [
-    "nm_dia_than_classic", "nm_dia_than_hong", "nm_son_tung_mtp", "nm_spotify_pc", "nm_polaroid_vintage", "nm_bang_tin_khan",
-    "clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone",
+    "nm_dia_than_classic", "dazz_cpm35", "lut_iphone_beauty", "nm_dia_than_hong", "nm_polaroid_vintage", "nm_spotify_pc",
+    "lut_hong_dao", "lut_phim_nhat", "lut_matcha", "fx_tuyet_roi", "fx_cau_vong", "fx_buom_xinh",
+    "nm_son_tung_mtp", "nm_bang_tin_khan", "clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone",
     "warp_fisheye", "warp_fisheye_dazz",
     "weekday_depth", "weekday_depth_en", "weekday_depth_zh", "weekday_depth_tw", "weekday_depth_ja", "weekday_depth_ko", "weekday_depth_es", "weekday_depth_fr", "weekday_depth_de",
-    "dazz_cpm35", "lut_iphone_beauty", "warp_big_head", "ai_cong_chua_phong_tro"
+    "warp_big_head", "ai_cong_chua_phong_tro"
 ].concat(aiHotIds.slice(0, 4), photoboothIds.slice(0, 4));
 
 const customRemoteFilters = frameOnlyIds.map(id => {
@@ -2111,8 +2127,8 @@ const fallbackFilterCfg = {
     showFilterButton: true,
     sheet_enabled: true,
     sheetEnabled: true,
-    open_sheet_immediately: true,
-    openSheetImmediately: true,
+    open_sheet_immediately: false,
+    openSheetImmediately: false,
     reference_image_attachment_enabled: true,
     referenceImageAttachmentEnabled: true,
     sheet_filters: nativeGroups,
@@ -2177,7 +2193,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "112";
+var RC_VER = "113";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2325,13 +2341,6 @@ try {
         gold_max_duration: 45,
         max_duration: 45,
         ultra_wide: true,
-        telephoto: true,
-        flash_button: true,
-        timer_button: true,
-        timer: true,
-        self_timer: true,
-        zoom_controls: true,
-        zoom_pill: true,
         volume_button: true,
         srgb: true,
         lanczos: true,
@@ -2370,7 +2379,6 @@ try {
     delete crObj["maxDuration"];
     delete crObj["cameraRollMaxDuration"];
     delete crObj["qualityMbps"];
-    delete crObj["flash_button"];
     Object.assign(crObj, {
         gold_max_duration: 45,
         max_duration: 45,
@@ -2642,7 +2650,19 @@ function pushCustomFilter(id, name, c0, c1, fUrl, sfSym, emoji) {
         outputUrl: null,
         productUrl: null,
         textColor: "#FFFFFF",
-        referenceImages: []
+        referenceImages: [],
+        requires_gold: false,
+        requiresGold: false,
+        is_gold: false,
+        isGold: false,
+        unlocked: true,
+        is_unlocked: true,
+        isUnlocked: true,
+        free: true,
+        allowsTryFilter: true,
+        allows_try_filter: true,
+        tryButtonEnabled: true,
+        try_button_enabled: true
     });
 }
 for (var ca = 0; ca < CUSTOM_AI_SPECS.length; ca++) {
@@ -2656,12 +2676,12 @@ for (var cl = 0; cl < CUSTOM_LUT_SPECS.length; cl++) {
 for (var cf = 0; cf < CUSTOM_FRAME_SPECS.length; cf++) {
     var sp = CUSTOM_FRAME_SPECS[cf];
     var is4 = sp[4] === 1;
-    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=21") : (FBASE + sp[0] + ".png");
+    var cfIconUrl = (sp[0].indexOf("nm_") === 0 || sp[0].indexOf("fx_") === 0) ? (F2BASE + sp[0] + ".png?v=22") : (FBASE + sp[0] + ".png");
     pushCustomFilter(sp[0], sp[1], sp[2], sp[3], cfIconUrl, is4 ? "square.grid.2x2" : "photo.on.rectangle", is4 ? "📸" : "🖼️");
 }
 for (var cv = 0; cv < CUSTOM_V2_SPECS.length; cv++) {
     var vp = CUSTOM_V2_SPECS[cv];
-    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=21", vp[4], vp[5]);
+    pushCustomFilter(vp[0], vp[1], vp[2], vp[3], F2BASE + vp[0] + ".png?v=22", vp[4], vp[5]);
 }
 pushCustomFilter("weekday_depth", "Thứ Sau Chủ Thể (VI)", "#243B53", "#FFFFFF", FBASE + "weekday_depth.png", "calendar", "🇻🇳");
 pushCustomFilter("weekday_depth_en", "Day Depth (EN)", "#1E3A8A", "#60A5FA", FBASE + "weekday_depth_en.png?v=4", "calendar", "🇬🇧");
@@ -2682,8 +2702,8 @@ activeFilterCfg.sheet_enabled = true;
 activeFilterCfg.sheetEnabled = true;
 activeFilterCfg.reference_image_attachment_enabled = true;
 activeFilterCfg.referenceImageAttachmentEnabled = true;
-if (typeof activeFilterCfg.open_sheet_immediately === "undefined") activeFilterCfg.open_sheet_immediately = true;
-if (typeof activeFilterCfg.openSheetImmediately === "undefined") activeFilterCfg.openSheetImmediately = true;
+activeFilterCfg.open_sheet_immediately = false;
+activeFilterCfg.openSheetImmediately = false;
 
 var existingSheets = Array.isArray(activeFilterCfg.sheet_filters) ? activeFilterCfg.sheet_filters : [];
 var seenGroupIds = {};
