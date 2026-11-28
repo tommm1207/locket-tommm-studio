@@ -5006,7 +5006,7 @@ async function resolveSpotifyTrackUrl(title, artist, env = null) {
 async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
   const cacheKey = videoId || ("q:" + foldNorm(manualQuery));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 3 && cached.spotifyUrl && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 4 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5088,14 +5088,11 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
     }
   }
 
-  const [dzDetail, spRes] = await Promise.all([
-    deezerHit?.id
-      ? fetch(`https://api.deezer.com/track/${deezerHit.id}`, { headers: searchHeaders, signal: AbortSignal.timeout(2500) })
-          .then((r) => (r.ok ? r.json().catch(() => null) : null))
-          .catch(() => null)
-      : Promise.resolve(null),
-    resolveSpotifyTrackUrl(title, artist, env),
-  ]);
+  const dzDetail = deezerHit?.id
+    ? await fetch(`https://api.deezer.com/track/${deezerHit.id}`, { headers: searchHeaders, signal: AbortSignal.timeout(2500) })
+        .then((r) => (r.ok ? r.json().catch(() => null) : null))
+        .catch(() => null)
+    : null;
 
   let isrc = String(dzDetail?.isrc || "").trim();
   if (!isrc && title) {
@@ -5115,11 +5112,11 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
 
   const deezerId = deezerHit?.id ? String(deezerHit.id) : "";
   const itunesArt = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb");
-  const artworkUrl = itunesArt || spRes.spotifyThumb || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
+  const artworkUrl = itunesArt || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
   const permanentDzPreview = deezerId ? `https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/preview.mp3?dz=${deezerId}` : "";
   const previewUrl = itunesHit?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
-  const appleMusicUrl = itunesHit?.trackViewUrl || deezerHit?.link || "";
-  const spotifyUrl = spRes.spotifyUrl || "";
+  const appleMusicUrl = itunesHit?.trackViewUrl || "";
+  const spotifyUrl = "";
   const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerId || (videoId || "query"));
 
   let colors = ["#1E1B4B", "#4C1D95"];
@@ -5134,7 +5131,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
   }
 
   const track = {
-    schemaVer: 3,
+    schemaVer: 4,
     videoId: videoId || "",
     songId,
     deezerId,
