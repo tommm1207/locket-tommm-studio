@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "100";
+var RC_VER = "101";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -291,14 +291,19 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         var amIcon = (amTr && amTr.artworkUrl) ? { type: "image", data: amTr.artworkUrl, source: "url" } : { type: "emoji", data: "🎵" };
         var amText = amTr ? formatRcTrackLabel(amTr.title, amTr.artist, 72) : "YT / Apple Music • Tự gắn bài đang nghe";
 
-        var spBg = { colors: spColors };
-        if (spTr && !(spTr.previewUrl && String(spTr.previewUrl).indexOf("http") === 0) && !spTr.spotifyUrl && !spTr.spotifyId) {
-            spBg.image = { type: "image", data: "star_sign_background", source: "local" };
-        }
-        var amBg = { colors: amColors };
-        if (amTr && !(amTr.previewUrl && String(amTr.previewUrl).indexOf("http") === 0) && !(amTr.appleMusicUrl && amTr.appleMusicUrl.indexOf("music.apple.com") !== -1)) {
-            amBg.image = { type: "image", data: "star_sign_background", source: "local" };
-        }
+        var WORKER_VINYL_BG = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif";
+        var spC0 = String(spColors[0] || "#14532D").replace(/[^0-9a-fA-F]/g, "") || "14532D";
+        var spC1 = String(spColors[1] || "#166534").replace(/[^0-9a-fA-F]/g, "") || "166534";
+        var spBg = {
+            colors: spColors,
+            image: { type: "image", data: WORKER_VINYL_BG + "?c0=" + spC0 + "&c1=" + spC1 + "&mode=peek&v=5", source: "url" }
+        };
+        var amC0 = String(amColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
+        var amC1 = String(amColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
+        var amBg = {
+            colors: amColors,
+            image: { type: "image", data: WORKER_VINYL_BG + "?c0=" + amC0 + "&c1=" + amC1 + "&mode=peek&v=5", source: "url" }
+        };
 
         rawItems = [
             {
