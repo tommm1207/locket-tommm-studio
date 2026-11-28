@@ -5414,9 +5414,9 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
   const W = 200;
   const H = 48;
   const FRAMES = 12;
-  const CX = 178;
+  const CX = 183;
   const CY = 24;
-  const R_DISC = 23.0;
+  const R_DISC = 19.5;
   const out = [];
 
   const pushU16 = (v) => { out.push(v & 0xff, (v >> 8) & 0xff); };
@@ -5493,7 +5493,20 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
   }
 
   const pixels = new Uint8Array(W * H);
-  const sparkPoints = [[34, 8], [88, 10], [142, 7], [178, 11]];
+  const bokehSpecs = [
+    { x: 24, y: 10, rMax: 2.3, phase: 0.2, freq: 1, kind: "orb" },
+    { x: 42, y: 19, rMax: 1.9, phase: 1.4, freq: 2, kind: "star" },
+    { x: 58, y: 7, rMax: 2.5, phase: 2.1, freq: 1, kind: "orb" },
+    { x: 74, y: 16, rMax: 1.8, phase: 3.3, freq: 1, kind: "orb" },
+    { x: 91, y: 8, rMax: 2.2, phase: 4.0, freq: 2, kind: "star" },
+    { x: 108, y: 21, rMax: 2.0, phase: 0.9, freq: 1, kind: "orb" },
+    { x: 122, y: 11, rMax: 2.6, phase: 2.8, freq: 1, kind: "orb" },
+    { x: 138, y: 6, rMax: 2.0, phase: 5.0, freq: 2, kind: "star" },
+    { x: 147, y: 18, rMax: 1.9, phase: 1.9, freq: 1, kind: "orb" },
+    { x: 155, y: 9, rMax: 1.7, phase: 3.7, freq: 2, kind: "star" },
+    { x: 168, y: 14, rMax: 2.3, phase: 0.6, freq: 1, kind: "orb", waveOnly: true },
+    { x: 184, y: 8, rMax: 2.0, phase: 2.6, freq: 2, kind: "star", waveOnly: true },
+  ];
   for (let f = 0; f < FRAMES; f++) {
     const theta = (2 * Math.PI * f) / FRAMES;
     // Graphic Control Extension (80ms = delay 8 * 10ms)
@@ -5508,7 +5521,24 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     pushU16(H);
     out.push(0x00);
 
-    const eqLimitX = mode === "wave" ? 192 : 150;
+    const activeSparks = [];
+    for (let si = 0; si < bokehSpecs.length; si++) {
+      const s = bokehSpecs[si];
+      if (s.waveOnly && mode !== "wave") continue;
+      const pulse = 0.5 + 0.5 * Math.sin(theta * s.freq + s.phase);
+      const blink = pulse * pulse;
+      if (s.kind === "orb" && blink <= 0.12) continue;
+      if (s.kind === "star" && blink <= 0.16) continue;
+      activeSparks.push({
+        x: s.x,
+        y: s.y + Math.sin(theta + s.phase) * 1.1,
+        rMax: s.rMax,
+        blink,
+        kind: s.kind,
+      });
+    }
+
+    const eqLimitX = mode === "wave" ? 192 : 160;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         // Base gradient index
@@ -5533,27 +5563,49 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
           }
         }
 
-        if (mode === "wave") {
-          for (let sp = 0; sp < sparkPoints.length; sp++) {
-            const sy = sparkPoints[sp][1] + Math.round(Math.sin(theta + sp * 1.3));
-            if (x === sparkPoints[sp][0] && y === sy) {
-              const pulse = 0.5 + 0.5 * Math.cos(theta + sp * 1.5);
-              idx = pulse > 0.5 ? 30 : 29;
+        // Blink-blink bokeh orbs and 4-point twinkling star sparkles (drawn before right vinyl disc)
+        for (let sp = 0; sp < activeSparks.length; sp++) {
+          const sk = activeSparks[sp];
+          const adx = Math.abs(x - sk.x);
+          const ady = Math.abs(y - sk.y);
+          if (adx > sk.rMax + 2 || ady > sk.rMax + 2) continue;
+          let sparkIdx = -1;
+          if (sk.kind === "orb") {
+            const curR = 0.8 + (sk.rMax - 0.8) * sk.blink;
+            const d = Math.hypot(adx, ady);
+            if (d <= curR) {
+              if (d <= curR * 0.42) sparkIdx = sk.blink > 0.65 ? 27 : 31;
+              else if (d <= curR * 0.72) sparkIdx = 30;
+              else sparkIdx = 29;
+            }
+          } else {
+            const arm = 1.0 + (sk.rMax - 0.6) * sk.blink;
+            const inStar = (adx <= 0.65 && ady <= arm) || (ady <= 0.65 && adx <= arm) || (adx + ady <= arm * 0.65);
+            if (inStar) {
+              const dStar = adx + ady;
+              if (dStar <= 0.9) sparkIdx = sk.blink > 0.60 ? 27 : 31;
+              else if (dStar <= arm * 0.65) sparkIdx = 30;
+              else sparkIdx = 29;
             }
           }
-        } else {
-          // Crisp glowing vinyl LP disc spinning visibly on the right side
+          if (sparkIdx !== -1 && (idx < 12 || sparkIdx === 27 || sparkIdx > idx)) {
+            idx = sparkIdx;
+          }
+        }
+
+        if (mode !== "wave") {
+          // Slightly smaller crisp glowing vinyl LP disc spinning visibly on the right side
           const dx = x - CX;
           const dy = y - CY;
           const r = Math.hypot(dx, dy);
           if (r <= R_DISC) {
             const angle = Math.atan2(dy, dx);
-            if (r <= 2.4) {
+            if (r <= 2.0) {
               idx = 12;
-            } else if (r <= 8.5) {
+            } else if (r <= 7.0) {
               const rotNotch = Math.cos(angle - theta);
               const tLbl = 0.5 + 0.5 * Math.sin(angle - theta);
-              if (rotNotch > 0.55 && r > 3.2) {
+              if (rotNotch > 0.55 && r > 2.7) {
                 idx = rotNotch > 0.80 ? 27 : 26;
               } else {
                 idx = 22 + Math.min(3, Math.floor(tLbl * 3.99));
@@ -5563,7 +5615,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
               const c = Math.max(0, Math.cos(2 * (angle - theta + 0.55)));
               const sheen = c * c * c;
               let tone = 0.22 * groove + 0.78 * sheen;
-              if (r > R_DISC - 1.3) tone = Math.max(tone, 0.70);
+              if (r > R_DISC - 1.2) tone = Math.max(tone, 0.70);
               idx = 12 + Math.min(9, Math.max(0, Math.floor(tone * 9.99)));
             }
           }

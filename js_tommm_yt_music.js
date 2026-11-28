@@ -11,7 +11,7 @@
         var c0 = String((cols && cols[0]) || "#1E1B4B").replace(/[^0-9a-fA-F]/g, "") || "1E1B4B";
         var c1 = String((cols && cols[1]) || "#4C1D95").replace(/[^0-9a-fA-F]/g, "") || "4C1D95";
         var m = mode === "wave" ? "wave" : "peek";
-        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&mode=" + m + "&v=4";
+        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&mode=" + m + "&v=5";
     }
 
     function formatTrackLabel(title, artist, maxLen) {
@@ -745,7 +745,7 @@
                                         colors: bgCols,
                                         image: { type: "image", data: chosenBg, source: "url" }
                                     });
-                                    ov.data.icon = { type: "image", data: VINYL_ICON_URL, source: "url" };
+                                    ov.data.icon = { type: "image", data: track.artworkUrl || VINYL_ICON_URL, source: "url" };
                                     replacedWith = displayTxt;
                                     changed = true;
                                 }
