@@ -195,6 +195,8 @@
         var isSpotify = !!(track.platform === "spotify" || track.spotifyId);
         var hasAppleUrl = !!(track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1);
         var hasItunesPreview = !!(track.previewUrl && String(track.previewUrl).indexOf("itunes.apple.com") !== -1);
+        var hasAppleIcon = !!(track.artworkUrl && String(track.artworkUrl).indexOf("mzstatic.com") !== -1);
+        var hasAppleId = !!(track.appleMusicId || (track.appleMusicUrl && /[?&]i=\d+|\/song\/\d+/.test(track.appleMusicUrl)));
         var hasValidPreview = !!(track.previewUrl && (
             String(track.previewUrl).indexOf("p.scdn.co") !== -1 ||
             String(track.previewUrl).indexOf("itunes.apple.com") !== -1 ||
@@ -206,7 +208,7 @@
                 return;
             }
         } else {
-            if (hasAppleUrl && hasItunesPreview && track.title !== "YouTube Music") {
+            if (hasAppleUrl && hasItunesPreview && hasAppleIcon && hasAppleId && track.title !== "YouTube Music") {
                 doneCb(track);
                 return;
             }
@@ -260,7 +262,7 @@
                             var h = res[i];
                             if (h && titleTokenMatch(track.title, h.trackName) && (h.previewUrl || h.trackViewUrl)) {
                                 if (h.previewUrl) track.previewUrl = h.previewUrl;
-                                if (h.artworkUrl100 && (!track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) {
+                                if (h.artworkUrl100 && (!isSpotify || !track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) {
                                     track.artworkUrl = String(h.artworkUrl100).replace("100x100bb", "600x600bb");
                                 }
                                 if (h.trackViewUrl) track.appleMusicUrl = h.trackViewUrl;
@@ -310,7 +312,7 @@
                                     var uh = uRes[ui];
                                     if (uh && titleTokenMatch(track.title, uh.trackName) && (uh.previewUrl || uh.trackViewUrl)) {
                                         if (uh.previewUrl) track.previewUrl = uh.previewUrl;
-                                        if (uh.artworkUrl100 && (!track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) track.artworkUrl = String(uh.artworkUrl100).replace("100x100bb", "600x600bb");
+                                        if (uh.artworkUrl100 && (!isSpotify || !track.artworkUrl || track.artworkUrl.indexOf("ytimg.com") !== -1)) track.artworkUrl = String(uh.artworkUrl100).replace("100x100bb", "600x600bb");
                                         if (uh.trackViewUrl) track.appleMusicUrl = uh.trackViewUrl;
                                         if (uh.trackId) track.appleMusicId = String(uh.trackId);
                                         break;
@@ -366,7 +368,7 @@
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 7 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 8 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -418,7 +420,7 @@
             if (rawExSp) {
                 try {
                     var exSp = JSON.parse(rawExSp);
-                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 7 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
+                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 8 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -471,7 +473,7 @@
             if (rawExAm) {
                 try {
                     var exAm = JSON.parse(rawExAm);
-                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 7 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
+                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 8 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -578,8 +580,18 @@
         };
         if (isSpotifyTrack) {
             payloadObj.spotify_url = track.spotifyUrl || ("https://open.spotify.com/track/" + track.spotifyId);
-        } else if (track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1) {
-            payloadObj.apple_music_url = track.appleMusicUrl;
+        } else {
+            if (track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1) {
+                payloadObj.apple_music_url = track.appleMusicUrl;
+            }
+            var amIdVal = String(track.appleMusicId || "").trim();
+            if (!amIdVal && track.appleMusicUrl) {
+                var amIdM = String(track.appleMusicUrl).match(/[?&]i=(\d+)|\/song\/(\d+)/);
+                if (amIdM) amIdVal = amIdM[1] || amIdM[2] || "";
+            }
+            if (amIdVal) {
+                payloadObj.apple_music_id = amIdVal;
+            }
         }
         ov.data = {
             type: "music",
@@ -608,11 +620,13 @@
                 var resOverlayLists = [];
                 findOverlaysArrays(resObj, resOverlayLists, 0);
                 var captured = [];
+                var overlayIds = [];
                 for (var rl = 0; rl < resOverlayLists.length; rl++) {
                     var rList = resOverlayLists[rl];
                     for (var rk = 0; rk < rList.length; rk++) {
                         var ro = rList[rk];
                         if (!ro || !ro.overlay_id) continue;
+                        overlayIds.push(ro.overlay_id);
                         if (ro.overlay_id === "caption:music" || ro.overlay_id.indexOf("yt_") !== -1) {
                             var rd = ro.data || {};
                             var rp = rd.payload || {};
@@ -623,6 +637,7 @@
                                 text: rd.text || "",
                                 payload_keys: Object.keys(rp),
                                 apple_music_url: rp.apple_music_url || "",
+                                apple_music_id: rp.apple_music_id || "",
                                 spotify_url: rp.spotify_url || "",
                                 isrc: rp.isrc || "",
                                 has_preview: !!rp.preview_url,
@@ -632,7 +647,7 @@
                         }
                     }
                 }
-                if (captured.length > 0 && typeof $httpClient !== "undefined") {
+                if (typeof $httpClient !== "undefined") {
                     var resTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 250) : null;
                     $httpClient.post({
                         url: WORKER_BASE + "/studio/music-schema-log",
@@ -641,7 +656,10 @@
                             phase: "postMoment_res",
                             urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0],
                             status: $response.status || 0,
-                            returnedOverlays: captured
+                            overlayCount: overlayIds.length,
+                            overlayIds: overlayIds,
+                            returnedOverlays: captured,
+                            bodyPreview: captured.length === 0 ? String($response.body || "").slice(0, 320) : ""
                         })
                     }, function () {
                         if (resTimer && typeof clearTimeout !== "undefined") clearTimeout(resTimer);
@@ -704,7 +722,8 @@
                                 var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
                                 if (!isVinylIconMode) {
                                     var isSpUp = !!(track.platform === "spotify" || track.spotifyId);
-                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 7 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : (!track.appleMusicUrl || track.appleMusicUrl.indexOf("music.apple.com") === -1))));
+                                    var hasAmReady = !!(track.appleMusicUrl && track.appleMusicUrl.indexOf("music.apple.com") !== -1 && (track.appleMusicId || /[?&]i=\d+|\/song\/\d+/.test(track.appleMusicUrl)) && track.artworkUrl && String(track.artworkUrl).indexOf("mzstatic.com") !== -1);
+                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 8 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : !hasAmReady)));
                                     if (needsUpgrade) {
                                         cachedTrackForUpgrade = track;
                                         pendingUpgradeOvs.push(ov);
@@ -750,6 +769,10 @@
                 var doneRes = buildDonePayload(updatedBody);
                 if (typeof $httpClient !== "undefined") {
                     var swapTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce(doneRes); }, 250) : null;
+                    var extractHost = function (uStr) {
+                        var hm = String(uStr || "").match(/^https?:\/\/([^\/?#]+)/i);
+                        return hm ? hm[1] : "";
+                    };
                     var logData = {
                         urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0],
                         matched: true,
@@ -758,9 +781,12 @@
                         dataType: mutatedOvRef && mutatedOvRef.data ? mutatedOvRef.data.type : "",
                         hasPreview: !!(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.preview_url),
                         appleMusicUrl: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.apple_music_url) || "",
+                        appleMusicId: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.apple_music_id) || "",
                         spotifyUrl: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.spotify_url) || "",
                         hasSpotify: !!(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.spotify_url),
                         platform: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.spotify_url) ? "spotify" : "apple_music",
+                        iconHost: extractHost(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.icon && mutatedOvRef.data.icon.data),
+                        previewHost: extractHost(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.preview_url),
                         isrc: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.isrc) || ""
                     };
                     $httpClient.post({
@@ -794,7 +820,8 @@
                     }, 1500);
                 };
                 var isSpCached = !!(cachedTrackForUpgrade.platform === "spotify" || cachedTrackForUpgrade.spotifyId);
-                if (cachedTrackForUpgrade.schemaVer === 7 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : (cachedTrackForUpgrade.appleMusicUrl && cachedTrackForUpgrade.appleMusicUrl.indexOf("music.apple.com") !== -1))) {
+                var hasAmCachedReady = !!(cachedTrackForUpgrade.appleMusicUrl && cachedTrackForUpgrade.appleMusicUrl.indexOf("music.apple.com") !== -1 && (cachedTrackForUpgrade.appleMusicId || /[?&]i=\d+|\/song\/\d+/.test(cachedTrackForUpgrade.appleMusicUrl)) && cachedTrackForUpgrade.artworkUrl && String(cachedTrackForUpgrade.artworkUrl).indexOf("mzstatic.com") !== -1);
+                if (cachedTrackForUpgrade.schemaVer === 8 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : hasAmCachedReady)) {
                     finishUpgrade(cachedTrackForUpgrade);
                     return;
                 }

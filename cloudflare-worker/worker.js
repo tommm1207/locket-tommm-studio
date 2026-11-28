@@ -5158,7 +5158,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const amCountry = String(extra?.country || "vn").trim();
   const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 7 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 8 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5316,7 +5316,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
 
   const track = {
-    schemaVer: 7,
+    schemaVer: 8,
     platform,
     videoId: videoId || "",
     spotifyId: spId || "",
@@ -5672,7 +5672,9 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     }
     if (request.method === "POST") {
       const b = await request.json().catch(() => ({}));
-      LAST_MUSIC_SCHEMA = { schema: b, ts: new Date().toISOString() };
+      const prevHist = Array.isArray(LAST_MUSIC_SCHEMA?.history) ? LAST_MUSIC_SCHEMA.history : [];
+      const entry = { schema: b, ts: new Date().toISOString() };
+      LAST_MUSIC_SCHEMA = { schema: b, ts: entry.ts, history: [entry, ...prevHist].slice(0, 8) };
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
