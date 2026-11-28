@@ -1646,6 +1646,35 @@ baseRcEntries["user_cache_max_age_sec"] = "172800";
 baseRcEntries["friends_cache_max_age_sec"] = "2592000";
 baseRcEntries["camera_filter_fetch_cache_max_age_seconds"] = "0";
 baseRcEntries["liquid_glass_navigation_enabled"] = "true";
+baseRcEntries["liquid_glass_camera_enabled"] = "true";
+baseRcEntries["camera_v2_enabled"] = "true";
+baseRcEntries["camera_v2"] = "true";
+baseRcEntries["new_camera_enabled"] = "true";
+baseRcEntries["new_camera_ui_enabled"] = "true";
+baseRcEntries["camera_ui_v2_enabled"] = "true";
+baseRcEntries["camera_redesign_enabled"] = "true";
+baseRcEntries["redesigned_camera_enabled"] = "true";
+baseRcEntries["camera_styles_enabled"] = "true";
+baseRcEntries["camera_style_enabled"] = "true";
+baseRcEntries["camera_style_picker_enabled"] = "true";
+baseRcEntries["camera_presets_enabled"] = "true";
+baseRcEntries["camera_lenses_enabled"] = "true";
+baseRcEntries["camera_modes_enabled"] = "true";
+baseRcEntries["camera_looks_enabled"] = "true";
+baseRcEntries["camera_effects_enabled"] = "true";
+baseRcEntries["camera_zoom_v2_enabled"] = "true";
+baseRcEntries["dazz_cam_enabled"] = "true";
+baseRcEntries["dazz_enabled"] = "true";
+baseRcEntries["retro_camera_enabled"] = "true";
+baseRcEntries["retro_cameras_enabled"] = "true";
+baseRcEntries["vintage_cameras_enabled"] = "true";
+baseRcEntries["digital_cameras_enabled"] = "true";
+baseRcEntries["film_cameras_enabled"] = "true";
+baseRcEntries["film_camera_enabled"] = "true";
+baseRcEntries["instant_cameras_enabled"] = "true";
+baseRcEntries["special_cameras_enabled"] = "true";
+baseRcEntries["live_camera_filters_enabled"] = "true";
+baseRcEntries["live_filters_enabled"] = "true";
 baseRcEntries["v2_refresh"] = "true";
 baseRcEntries["is_testflight"] = "true";
 baseRcEntries["testflight"] = "true";
@@ -2015,7 +2044,9 @@ const TOMMM_FORCE_GATES = [
     "camera_timer", "self_timer", "timer", "countdown_timer",
     "cameras", "camera_picker", "camera_switcher", "camera_selector", "camera_effects", "camera_fx",
     "camera_style", "camera_styles", "camera_styles_enabled", "camera_presets_enabled", "camera_lenses_enabled",
-    "liquid_glass", "liquid_glass_navigation", "camera_v2", "new_camera_ui", "dazz_presets",
+    "liquid_glass", "liquid_glass_navigation", "liquid_glass_camera", "camera_v2", "new_camera_ui", "camera_redesign", "redesigned_camera",
+    "dazz", "dazz_presets", "camera_styles_v2", "camera_looks", "looks", "look_picker", "film_simulations",
+    "zoom_pill", "zoom_controls", "optical_zoom", "camera_zoom_v2", "lens_switcher", "camera_sheet_v2",
     "vintage_cameras", "digital_cameras", "instant_cameras", "special_cameras", "locket_cameras", "retro_cam",
     "capture_modes", "capture_styles", "live_camera_filters", "dazz_camera",
     "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie", "golden_hour", "laptop",
@@ -2047,7 +2078,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "109";
+var RC_VER = "110";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
