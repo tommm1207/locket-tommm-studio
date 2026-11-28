@@ -430,6 +430,46 @@ def main():
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
         json.dump(manifest, f, separators=(",", ":"), ensure_ascii=False)
 
+    # Render crisp 128x128 animated black vinyl disc icon GIF for caption pills
+    anim_dir = os.path.join(ROOT, "assets", "captions_anim")
+    os.makedirs(anim_dir, exist_ok=True)
+    icon_gif_path = os.path.join(anim_dir, "vinyl_disc_icon.gif")
+    gif_frames = []
+    n_frames = 12
+    # Base glossy black disc at 256x256 then rotate center label/highlight subtly per frame
+    base_patch = build_vinyl_disc_patch(
+        118,
+        ((153, 27, 27), (234, 88, 12), (254, 243, 199), (245, 158, 11)),
+        (255, 224, 155),
+    )
+    # Tight crop to 256x256 centered
+    bw, bh = base_patch.size
+    left = (bw - 256) // 2
+    top = (bh - 256) // 2
+    base_sq = base_patch.crop((left, top, left + 256, top + 256))
+    for i in range(n_frames):
+        ang = -(i * (360.0 / n_frames))
+        rot = base_sq.rotate(ang, resample=Image.Resampling.BICUBIC)
+        fr = rot.resize((96, 96), Image.Resampling.LANCZOS)
+        # Convert RGBA -> P keeping clean binary transparency on transparent pixels
+        alpha = fr.getchannel("A")
+        p_fr = fr.convert("RGB").quantize(colors=96, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+        mask = Image.eval(alpha, lambda a: 255 if a <= 64 else 0)
+        p_fr.paste(96, mask=mask)
+        p_fr.info["transparency"] = 96
+        gif_frames.append(p_fr)
+    gif_frames[0].save(
+        icon_gif_path,
+        save_all=True,
+        append_images=gif_frames[1:],
+        duration=75,
+        loop=0,
+        disposal=2,
+        transparency=96,
+        optimize=True,
+    )
+    print(f"Generated spinning black vinyl icon GIF: {icon_gif_path} ({os.path.getsize(icon_gif_path)}B)")
+
     # Render side-by-side preview composite with a simulated portrait backdrop
     sample = Image.new("RGBA", (SIZE * 2 + 24, SIZE), (24, 24, 28, 255))
     backdrop = Image.new("RGBA", (SIZE, SIZE), (48, 56, 72, 255))

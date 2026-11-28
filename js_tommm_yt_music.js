@@ -682,7 +682,8 @@
     }
 
     function isLocketSafeStaticUrl(uStr) {
-        return /^https:\/\/(?:public\.locketcamera\.com|storage\.googleapis\.com|firebasestorage\.googleapis\.com)\//i.test(String(uStr || ""));
+        return /^https:\/\/(?:public\.locketcamera\.com|storage\.googleapis\.com|firebasestorage\.googleapis\.com)\//i.test(String(uStr || "")) ||
+            /^https:\/\/tommm1207\.github\.io\/locket-tommm-studio\/assets\/captions_anim\/vinyl_disc_icon\.gif(?:\?.*)?$/i.test(String(uStr || ""));
     }
 
     function applyNativeMusicOverlay(ov, track, bgCols) {
@@ -929,7 +930,7 @@
                                         colors: bgCols,
                                         image: { type: "image", data: "star_sign_background", source: "local" }
                                     };
-                                    ov.data.icon = { type: "emoji", data: "💿" };
+                                    ov.data.icon = { type: "image", data: VINYL_ICON_URL, source: "url" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -949,7 +950,9 @@
                             didSanitizeThis = true;
                         }
                         if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
-                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && ov.overlay_id.indexOf("vinyl") !== -1) ? "💿" : "✨" };
+                            ov.data.icon = (ov.overlay_id && ov.overlay_id.indexOf("vinyl") !== -1)
+                                ? { type: "image", data: VINYL_ICON_URL, source: "url" }
+                                : { type: "emoji", data: "✨" };
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {
