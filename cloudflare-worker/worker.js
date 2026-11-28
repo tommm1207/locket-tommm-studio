@@ -5003,16 +5003,64 @@ async function resolveSpotifyTrackUrl(title, artist, env = null) {
   return { spotifyUrl: "", spotifyThumb: "" };
 }
 
-async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
-  const cacheKey = videoId || ("q:" + foldNorm(manualQuery));
+async function resolveSpotifyIdMetadata(spotifyId) {
+  const id = String(spotifyId || "").trim();
+  if (!id) return null;
+  try {
+    const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/track/${id}`)}&format=json`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) return null;
+    const oe = await res.json();
+    const author = String(oe?.author_name || "").trim();
+    return {
+      title: String(oe?.title || "").trim(),
+      artist: author && !/^spotify$/i.test(author) ? author : "",
+      artworkUrl: String(oe?.thumbnail_url || "").trim(),
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function resolveAppleIdMetadata(appleId, country = "vn") {
+  const id = String(appleId || "").trim();
+  if (!/^\d+$/.test(id)) return null;
+  const cc = /^[a-zA-Z]{2}$/.test(String(country || "")) ? String(country).toLowerCase() : "vn";
+  try {
+    const res = await fetch(`https://itunes.apple.com/lookup?id=${encodeURIComponent(id)}&country=${encodeURIComponent(cc)}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    const hit = Array.isArray(j?.results) ? j.results[0] : null;
+    return hit && hit.trackName ? hit : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra = null) {
+  const spId = String(extra?.spotifyId || "").trim();
+  const amId = String(extra?.appleId || extra?.appleMusicId || "").trim();
+  const amCountry = String(extra?.country || "vn").trim();
+  const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 4 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 5 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
-  let ytTitle = String(manualQuery || "").trim();
-  let ytAuthor = "";
-  let thumbUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
+  let ytTitle = String(extra?.title || manualQuery || "").trim();
+  let ytAuthor = String(extra?.artist || "").trim();
+  let thumbUrl = String(extra?.artworkUrl || "").trim() || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "");
+  let appleMeta = null;
   if (videoId) {
     try {
       const oeRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`, {
@@ -5020,11 +5068,25 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
       });
       if (oeRes.ok) {
         const oe = await oeRes.json();
-        ytTitle = String(oe?.title || "").trim();
-        ytAuthor = String(oe?.author_name || "").trim();
+        ytTitle = String(oe?.title || "").trim() || ytTitle;
+        ytAuthor = String(oe?.author_name || "").trim() || ytAuthor;
         if (oe?.thumbnail_url) thumbUrl = oe.thumbnail_url;
       }
     } catch (_) {}
+  } else if (amId) {
+    appleMeta = await resolveAppleIdMetadata(amId, amCountry);
+    if (appleMeta) {
+      ytTitle = String(appleMeta.trackName || "").trim() || ytTitle;
+      ytAuthor = String(appleMeta.artistName || "").trim() || ytAuthor;
+      if (appleMeta.artworkUrl100) thumbUrl = String(appleMeta.artworkUrl100).replace("100x100bb", "600x600bb");
+    }
+  } else if (spId) {
+    const spMeta = await resolveSpotifyIdMetadata(spId);
+    if (spMeta) {
+      if (!ytTitle && spMeta.title) ytTitle = spMeta.title;
+      if (!ytAuthor && spMeta.artist) ytAuthor = spMeta.artist;
+      if (!thumbUrl && spMeta.artworkUrl) thumbUrl = spMeta.artworkUrl;
+    }
   }
 
   const { cleanTitle, cleanAuthor } = cleanYoutubeTitle(ytTitle, ytAuthor);
@@ -5110,14 +5172,18 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
     } catch (_) {}
   }
 
+  const effItunes = appleMeta || itunesHit;
   const deezerId = deezerHit?.id ? String(deezerHit.id) : "";
-  const itunesArt = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb");
-  const artworkUrl = itunesArt || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
+  const itunesArt = (effItunes?.artworkUrl100 || "").replace("100x100bb", "600x600bb");
+  const artworkUrl = String(extra?.artworkUrl || "").trim() || itunesArt || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
   const permanentDzPreview = deezerId ? `https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/preview.mp3?dz=${deezerId}` : "";
-  const previewUrl = itunesHit?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
-  const appleMusicUrl = itunesHit?.trackViewUrl || "";
+  const previewUrl = String(extra?.previewUrl || "").trim() || effItunes?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
+  const appleMusicUrl = String(extra?.appleMusicUrl || "").trim() || effItunes?.trackViewUrl || "";
+  const appleMusicId = String(extra?.appleMusicId || effItunes?.trackId || amId || "").trim();
   const spotifyUrl = "";
-  const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerId || (videoId || "query"));
+  const finalTitle = String(appleMeta?.trackName || extra?.title || "").trim() || title;
+  const finalArtist = String(appleMeta?.artistName || extra?.artist || "").trim() || artist;
+  const songId = appleMusicId || (deezerId || (videoId || spId || "query"));
 
   let colors = ["#1E1B4B", "#4C1D95"];
   if (artworkUrl) {
@@ -5130,20 +5196,28 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
     } catch (_) {}
   }
 
+  const resolvedSource = spId
+    ? (effItunes ? "spotify+itunes" : (deezerHit ? "spotify+deezer" : "spotify"))
+    : (amId
+      ? "apple_music+itunes"
+      : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
+
   const track = {
-    schemaVer: 4,
+    schemaVer: 5,
     videoId: videoId || "",
+    spotifyId: spId || "",
     songId,
+    appleMusicId,
     deezerId,
-    title,
-    artist,
+    title: finalTitle,
+    artist: finalArtist,
     artworkUrl,
     previewUrl,
     spotifyUrl,
     appleMusicUrl,
     isrc,
     colors,
-    source: itunesHit ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed"),
+    source: resolvedSource,
     ts: Date.now(),
   };
   if (cacheKey) {
@@ -5191,28 +5265,28 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
   const palette = [];
   // 0..11: 12 smooth gradient shades
   for (let i = 0; i < 12; i++) palette.push(mixRgb(bgA, bgB, i / 11));
-  // 12..21: 10 muted dark vinyl LP shades (capped ~132 RGB so sheen never washes out white text)
+  // 12..21: 10 crisp dark-to-silver specular vinyl LP shades so spinning grooves pop visibly
   palette.push(
-    [9, 9, 12],
-    [14, 14, 18],
-    [20, 21, 27],
+    [10, 10, 14],
+    [18, 19, 24],
     [28, 30, 38],
-    [38, 40, 50],
-    [50, 53, 65],
-    [66, 70, 84],
-    [84, 88, 102],
-    [104, 108, 122],
-    [126, 130, 142]
+    [42, 45, 56],
+    [60, 64, 78],
+    [84, 89, 106],
+    [114, 120, 140],
+    [148, 154, 174],
+    [184, 190, 208],
+    [218, 224, 238]
   );
-  // 22..27: 6 center-label & rotating-notch shades derived from song colors + muted gold
-  const lblLight = mixRgb(rawC1, [235, 220, 180], 0.35);
+  // 22..27: 6 center-label & rotating-notch shades derived from song colors + gold accent + crisp white dot
+  const lblLight = mixRgb(rawC1, [255, 236, 188], 0.45);
   palette.push(
-    mixRgb(rawC0, [18, 18, 22], 0.2),
+    mixRgb(rawC0, [24, 24, 28], 0.12),
     mixRgb(rawC0, rawC1, 0.5),
-    mixRgb(rawC1, [24, 24, 28], 0.15),
+    mixRgb(rawC1, [24, 24, 28], 0.08),
     lblLight,
-    [196, 162, 48],
-    [215, 218, 226]
+    [232, 192, 68],
+    [248, 250, 255]
   );
   // 28..31: 4 bright equalizer bar & soft sparkle tints (distinct against dark gradient, softer than #FFFFFF text)
   const eqBase = mixRgb(rawC1, [255, 255, 255], 0.56);
@@ -5226,9 +5300,9 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
   const W = 200;
   const H = 48;
   const FRAMES = 12;
-  const CX = 196;
+  const CX = 178;
   const CY = 24;
-  const R_DISC = 17.0;
+  const R_DISC = 23.0;
   const out = [];
 
   const pushU16 = (v) => { out.push(v & 0xff, (v >> 8) & 0xff); };
@@ -5320,7 +5394,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     pushU16(H);
     out.push(0x00);
 
-    const eqLimitX = mode === "wave" ? 192 : 164;
+    const eqLimitX = mode === "wave" ? 192 : 150;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         // Base gradient index
@@ -5354,28 +5428,28 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
             }
           }
         } else {
-          // Subtle dark-tinted vinyl disc peeking gently from the far-right edge
+          // Crisp glowing vinyl LP disc spinning visibly on the right side
           const dx = x - CX;
           const dy = y - CY;
           const r = Math.hypot(dx, dy);
           if (r <= R_DISC) {
             const angle = Math.atan2(dy, dx);
-            if (r <= 2.0) {
+            if (r <= 2.4) {
               idx = 12;
-            } else if (r <= 6.5) {
+            } else if (r <= 8.5) {
               const rotNotch = Math.cos(angle - theta);
               const tLbl = 0.5 + 0.5 * Math.sin(angle - theta);
-              if (rotNotch > 0.65 && r > 3.0) {
-                idx = rotNotch > 0.85 ? 27 : 26;
+              if (rotNotch > 0.55 && r > 3.2) {
+                idx = rotNotch > 0.80 ? 27 : 26;
               } else {
                 idx = 22 + Math.min(3, Math.floor(tLbl * 3.99));
               }
             } else {
-              const groove = 0.5 + 0.5 * Math.sin(r * 1.85);
+              const groove = 0.5 + 0.5 * Math.sin(r * 1.95);
               const c = Math.max(0, Math.cos(2 * (angle - theta + 0.55)));
-              const sheen = c * c * c * c;
-              let tone = 0.10 * groove + 0.78 * sheen;
-              if (r > R_DISC - 1.1) tone = Math.max(tone, 0.34);
+              const sheen = c * c * c;
+              let tone = 0.22 * groove + 0.78 * sheen;
+              if (r > R_DISC - 1.3) tone = Math.max(tone, 0.70);
               idx = 12 + Math.min(9, Math.max(0, Math.floor(tone * 9.99)));
             }
           }
@@ -5408,13 +5482,26 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       const b = await request.json().catch(() => ({}));
       const vid = String(b?.videoId || b?.video_id || "").trim();
       const q = String(b?.query || b?.q || "").trim();
-      if (!/^[A-Za-z0-9_-]{11}$/.test(vid) && !q) {
+      const spId = String(b?.spotifyId || b?.spotify_id || "").trim();
+      const amId = String(b?.appleId || b?.apple_id || b?.appleMusicId || "").trim();
+      const validVid = /^[A-Za-z0-9_-]{11}$/.test(vid) ? vid : "";
+      if (!validVid && !q && !spId && !amId) {
         return new Response(JSON.stringify({ ok: false, error: "invalid_video_id" }), {
           status: 400,
           headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
         });
       }
-      const track = await resolveYoutubeTrack(/^[A-Za-z0-9_-]{11}$/.test(vid) ? vid : "", q, env);
+      const track = await resolveYoutubeTrack(validVid, q, env, {
+        spotifyId: spId,
+        appleId: amId,
+        country: String(b?.country || "vn").trim(),
+        title: String(b?.title || "").trim(),
+        artist: String(b?.artist || "").trim(),
+        previewUrl: String(b?.previewUrl || b?.preview_url || "").trim(),
+        appleMusicUrl: String(b?.appleMusicUrl || b?.apple_music_url || "").trim(),
+        appleMusicId: String(b?.appleMusicId || amId || "").trim(),
+        artworkUrl: String(b?.artworkUrl || b?.artwork_url || "").trim(),
+      });
       return new Response(JSON.stringify({ ok: true, track }), {
         status: 200,
         headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
