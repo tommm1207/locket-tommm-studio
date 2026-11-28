@@ -5041,11 +5041,50 @@ async function resolveSpotifyTrackUrl(title, artist, env = null) {
 async function resolveSpotifyIdMetadata(spotifyId) {
   const id = String(spotifyId || "").trim();
   if (!id) return null;
+  const ua = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+  };
+  try {
+    const embRes = await fetch(`https://open.spotify.com/embed/track/${encodeURIComponent(id)}`, {
+      headers: ua,
+      signal: AbortSignal.timeout(3500),
+    });
+    if (embRes.ok) {
+      const html = await embRes.text();
+      const m = html.match(/<script id="__NEXT_DATA__"[^>]*>(\{[\s\S]*?\})<\/script>/);
+      if (m && m[1]) {
+        const parsed = JSON.parse(m[1]);
+        const ent = parsed?.props?.pageProps?.state?.data?.entity;
+        const title = String(ent?.name || ent?.title || "").trim();
+        const artist = Array.isArray(ent?.artists)
+          ? ent.artists.map((a) => String(a?.name || "").trim()).filter(Boolean).join(", ")
+          : "";
+        const previewUrl = String(ent?.audioPreview?.url || "").trim();
+        const imgs = Array.isArray(ent?.visualIdentity?.image) ? ent.visualIdentity.image : [];
+        let bestImg = "";
+        let bestSize = -1;
+        for (const im of imgs) {
+          const sz = Number(im?.maxWidth || im?.maxHeight || 0);
+          if (im?.url && sz >= bestSize) {
+            bestSize = sz;
+            bestImg = String(im.url);
+          }
+        }
+        if (!bestImg && imgs[0]?.url) bestImg = String(imgs[0].url);
+        if (title) {
+          return {
+            title,
+            artist,
+            artworkUrl: bestImg,
+            previewUrl,
+          };
+        }
+      }
+    }
+  } catch (_) {}
   try {
     const res = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/track/${id}`)}&format=json`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-      },
+      headers: ua,
       signal: AbortSignal.timeout(3500),
     });
     if (!res.ok) return null;
@@ -5055,6 +5094,7 @@ async function resolveSpotifyIdMetadata(spotifyId) {
       title: String(oe?.title || "").trim(),
       artist: author && !/^spotify$/i.test(author) ? author : "",
       artworkUrl: String(oe?.thumbnail_url || "").trim(),
+      previewUrl: "",
     };
   } catch (_) {
     return null;
@@ -5118,7 +5158,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const amCountry = String(extra?.country || "vn").trim();
   const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 6 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 7 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5126,6 +5166,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   let ytAuthor = String(extra?.artist || "").trim();
   let thumbUrl = String(extra?.artworkUrl || "").trim() || (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "");
   let appleMeta = null;
+  let spMeta = null;
   if (videoId) {
     try {
       const oeRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`, {
@@ -5146,7 +5187,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       if (appleMeta.artworkUrl100) thumbUrl = String(appleMeta.artworkUrl100).replace("100x100bb", "600x600bb");
     }
   } else if (spId) {
-    const spMeta = await resolveSpotifyIdMetadata(spId);
+    spMeta = await resolveSpotifyIdMetadata(spId);
     if (spMeta) {
       if (!ytTitle && spMeta.title) ytTitle = spMeta.title;
       if (!ytAuthor && spMeta.artist) ytAuthor = spMeta.artist;
@@ -5246,15 +5287,15 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const effItunes = appleMeta || itunesHit;
   const deezerId = deezerHit?.id ? String(deezerHit.id) : "";
   const itunesArt = (effItunes?.artworkUrl100 || "").replace("100x100bb", "600x600bb");
-  const artworkUrl = String(extra?.artworkUrl || "").trim() || itunesArt || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
+  const artworkUrl = String(extra?.artworkUrl || "").trim() || spMeta?.artworkUrl || itunesArt || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
   const permanentDzPreview = deezerId ? `https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/preview.mp3?dz=${deezerId}` : "";
-  const previewUrl = String(extra?.previewUrl || "").trim() || effItunes?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
+  const previewUrl = String(extra?.previewUrl || "").trim() || spMeta?.previewUrl || effItunes?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
   const appleMusicUrl = String(extra?.appleMusicUrl || "").trim() || effItunes?.trackViewUrl || "";
   const appleMusicId = String(extra?.appleMusicId || effItunes?.trackId || amId || "").trim();
   const platform = spId ? "spotify" : (amId ? "apple_music" : "youtube");
   const spotifyUrl = spId ? ("https://open.spotify.com/track/" + spId) : "";
-  const finalTitle = String(appleMeta?.trackName || extra?.title || "").trim() || title;
-  const finalArtist = String(appleMeta?.artistName || extra?.artist || "").trim() || artist;
+  const finalTitle = String(appleMeta?.trackName || spMeta?.title || extra?.title || "").trim() || title;
+  const finalArtist = String(appleMeta?.artistName || spMeta?.artist || extra?.artist || "").trim() || artist;
   const songId = spId || appleMusicId || (deezerId || (videoId || "query"));
 
   let colors = ["#1E1B4B", "#4C1D95"];
@@ -5269,13 +5310,13 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   }
 
   const resolvedSource = spId
-    ? (effItunes ? "spotify+itunes" : (deezerHit ? "spotify+deezer" : "spotify"))
+    ? (spMeta?.previewUrl ? "spotify+embed" : (effItunes ? "spotify+itunes" : (deezerHit ? "spotify+deezer" : "spotify")))
     : (amId
       ? "apple_music+itunes"
       : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
 
   const track = {
-    schemaVer: 6,
+    schemaVer: 7,
     platform,
     videoId: videoId || "",
     spotifyId: spId || "",

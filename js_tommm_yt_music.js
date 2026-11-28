@@ -195,8 +195,13 @@
         var isSpotify = !!(track.platform === "spotify" || track.spotifyId);
         var hasAppleUrl = !!(track.appleMusicUrl && String(track.appleMusicUrl).indexOf("music.apple.com") !== -1);
         var hasItunesPreview = !!(track.previewUrl && String(track.previewUrl).indexOf("itunes.apple.com") !== -1);
+        var hasValidPreview = !!(track.previewUrl && (
+            String(track.previewUrl).indexOf("p.scdn.co") !== -1 ||
+            String(track.previewUrl).indexOf("itunes.apple.com") !== -1 ||
+            String(track.previewUrl).indexOf("/studio/preview.mp3") !== -1
+        ));
         if (isSpotify) {
-            if (hasItunesPreview && (track.spotifyUrl || track.spotifyId) && track.title !== "YouTube Music") {
+            if (hasValidPreview && (track.spotifyUrl || track.spotifyId) && track.title !== "YouTube Music") {
                 doneCb(track);
                 return;
             }
@@ -361,7 +366,7 @@
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 6 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 7 && ex.appleMusicUrl && ex.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -413,7 +418,7 @@
             if (rawExSp) {
                 try {
                     var exSp = JSON.parse(rawExSp);
-                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 6 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
+                    if (exSp && exSp.spotifyId === spId && exSp.title && exSp.schemaVer === 7 && exSp.spotifyUrl && exSp.previewUrl && (Date.now() - Number(exSp.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -466,7 +471,7 @@
             if (rawExAm) {
                 try {
                     var exAm = JSON.parse(rawExAm);
-                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 6 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
+                    if (exAm && exAm.appleMusicId === amId && exAm.title && exAm.schemaVer === 7 && exAm.appleMusicUrl && exAm.appleMusicUrl.indexOf("music.apple.com") !== -1 && (Date.now() - Number(exAm.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -583,12 +588,7 @@
             max_lines: maxLinesVal,
             background: {
                 material_blur: "regular",
-                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"],
-                image: {
-                    type: "image",
-                    data: vinylBgUrl(bgCols, "peek"),
-                    source: "url"
-                }
+                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
             },
             icon: {
                 type: "image",
@@ -704,7 +704,7 @@
                                 var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
                                 if (!isVinylIconMode) {
                                     var isSpUp = !!(track.platform === "spotify" || track.spotifyId);
-                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 6 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : (!track.appleMusicUrl || track.appleMusicUrl.indexOf("music.apple.com") === -1))));
+                                    var needsUpgrade = !!((track.videoId || track.spotifyId || track.appleMusicId) && typeof $httpClient !== "undefined" && (track.schemaVer !== 7 || !track.previewUrl || (isSpUp ? !track.spotifyUrl : (!track.appleMusicUrl || track.appleMusicUrl.indexOf("music.apple.com") === -1))));
                                     if (needsUpgrade) {
                                         cachedTrackForUpgrade = track;
                                         pendingUpgradeOvs.push(ov);
@@ -794,7 +794,7 @@
                     }, 1500);
                 };
                 var isSpCached = !!(cachedTrackForUpgrade.platform === "spotify" || cachedTrackForUpgrade.spotifyId);
-                if (cachedTrackForUpgrade.schemaVer === 6 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : (cachedTrackForUpgrade.appleMusicUrl && cachedTrackForUpgrade.appleMusicUrl.indexOf("music.apple.com") !== -1))) {
+                if (cachedTrackForUpgrade.schemaVer === 7 && cachedTrackForUpgrade.previewUrl && (isSpCached ? cachedTrackForUpgrade.spotifyUrl : (cachedTrackForUpgrade.appleMusicUrl && cachedTrackForUpgrade.appleMusicUrl.indexOf("music.apple.com") !== -1))) {
                     finishUpgrade(cachedTrackForUpgrade);
                     return;
                 }
