@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "95";
+var RC_VER = "96";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -284,11 +284,8 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         if (!amTr && latestTr && !(latestTr.platform === "spotify" || latestTr.spotifyId)) amTr = latestTr;
 
         var vinylColors = (latestTr && Array.isArray(latestTr.colors) && latestTr.colors.length >= 2) ? latestTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
-        var vinylIcon = (latestTr && latestTr.artworkUrl) ? { type: "image", data: latestTr.artworkUrl, source: "url" } : { type: "emoji", data: "💿" };
+        var vinylIcon = { type: "emoji", data: "💿" };
         var vinylText = latestTr ? formatRcTrackLabel(latestTr.title, latestTr.artist, 72) : "Đĩa than • Tự gắn bài đang nghe";
-        var vC0 = String(vinylColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
-        var vC1 = String(vinylColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
-        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + vC0 + "&c1=" + vC1 + "&mode=peek&v=5";
 
         var spColors = (spTr && Array.isArray(spTr.colors) && spTr.colors.length >= 2) ? spTr.colors.slice(0, 2) : ["#14532D", "#166534"];
         var spIcon = (spTr && spTr.artworkUrl) ? { type: "image", data: spTr.artworkUrl, source: "url" } : { type: "emoji", data: "🎧" };
@@ -310,7 +307,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     icon: vinylIcon,
                     background: {
                         colors: vinylColors,
-                        image: { type: "image", data: ytPeekBg, source: "url" }
+                        image: { type: "image", data: "star_sign_background", source: "local" }
                     }
                 }
             },

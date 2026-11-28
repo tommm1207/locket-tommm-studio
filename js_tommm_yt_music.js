@@ -916,7 +916,6 @@
                                     }
                                 } else {
                                     var displayTxt = formatTrackLabel(track.title, track.artist, 72);
-                                    var chosenBg = vinylBgUrl(bgCols, "peek");
                                     var prevVinylMax = ov && ov.data && ov.data.max_lines;
                                     ov.alt_text = displayTxt;
                                     ov.data = ov.data || {};
@@ -928,11 +927,9 @@
                                         : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
                                     ov.data.background = {
                                         colors: bgCols,
-                                        image: { type: "image", data: chosenBg, source: "url" }
+                                        image: { type: "image", data: "star_sign_background", source: "local" }
                                     };
-                                    ov.data.icon = track.artworkUrl
-                                        ? { type: "image", data: track.artworkUrl, source: "url" }
-                                        : { type: "emoji", data: "💿" };
+                                    ov.data.icon = { type: "emoji", data: "💿" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -940,7 +937,7 @@
                             }
                         }
                     }
-                    if (ov.overlay_id !== "caption:music" && ov.overlay_id !== "caption:yt_vinyl_spin" && ov.data && ov.data.type !== "music") {
+                    if (ov.overlay_id !== "caption:music" && ov.data && ov.data.type !== "music") {
                         var didSanitizeThis = false;
                         if (ov.data.background && ov.data.background.image && ov.data.background.image.source === "url" && !isLocketSafeStaticUrl(ov.data.background.image.data)) {
                             var isWinterStatic = /muadong|dong_nho|lanh_|snow/i.test(String(ov.overlay_id || "") + " " + String(ov.data.text || ""));
