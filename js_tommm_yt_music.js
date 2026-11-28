@@ -79,7 +79,7 @@
 
     var isPlaybackUrl = /^https?:\/\/(s|www|music|m)\.youtube\.com\/api\/stats\/(playback|watchtime|qoe)/i.test(u);
     var isPlayerUrl = /(youtubei\.googleapis\.com|music\.youtube\.com)\/youtubei\/v1\/(player|get_watch)/i.test(u);
-    var isSpotifyUrl = /^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/.*(color-lyrics|canvaz|connect-state|metadata\/4\/track|spotify(?::|%3a)track(?::|%3a)|\/track\/)/i.test(u);
+    var isSpotifyUrl = /^https?:\/\/(spclient\.wg\.spotify\.com|[a-z0-9-]+-spclient\.spotify\.com(?::443)?)\/.*(color-lyrics|canvaz|metadata\/4\/track|spotify(?::|%3a)track(?::|%3a)|\/track\/)/i.test(u);
     var amMatch = u.match(/^https?:\/\/amp-api\.music\.apple\.com\/v1\/catalog\/([a-z]{2})\/songs(?:\/(\d+)|\?(?:.*&)?ids=(\d+)(?:&|$))/i);
 
     function isAlnumChar(b) {
@@ -735,18 +735,22 @@
                                 } else {
                                     var displayTxt = formatTrackLabel(track.title, track.artist, 72);
                                     var chosenBg = vinylBgUrl(bgCols, "peek");
+                                    var prevVinylMax = ov && ov.data && ov.data.max_lines;
                                     ov.alt_text = displayTxt;
                                     ov.data = ov.data || {};
                                     if (!ov.data.type) ov.data.type = "static_content";
                                     ov.data.text = displayTxt;
                                     ov.data.text_color = "#FFFFFF";
-                                    ov.data.max_lines = 1;
+                                    ov.data.max_lines = (prevVinylMax && typeof prevVinylMax === "object")
+                                        ? prevVinylMax
+                                        : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
                                     ov.data.background = Object.assign({}, ov.data.background || {}, {
                                         colors: bgCols,
                                         image: { type: "image", data: chosenBg, source: "url" }
                                     });
                                     ov.data.icon = { type: "image", data: track.artworkUrl || VINYL_ICON_URL, source: "url" };
                                     replacedWith = displayTxt;
+                                    mutatedOvRef = ov;
                                     changed = true;
                                 }
                             }

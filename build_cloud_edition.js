@@ -122,7 +122,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
 
     var isPlaybackUrl = /^https?:\\/\\/(s|www|music|m)\\.youtube\\.com\\/api\\/stats\\/(playback|watchtime|qoe)/i.test(u);
     var isPlayerUrl = /(youtubei\\.googleapis\\.com|music\\.youtube\\.com)\\/youtubei\\/v1\\/(player|get_watch)/i.test(u);
-    var isSpotifyUrl = /^https?:\\/\\/(spclient\\.wg\\.spotify\\.com|[a-z0-9-]+-spclient\\.spotify\\.com(?::443)?)\\/.*(color-lyrics|canvaz|connect-state|metadata\\/4\\/track|spotify(?::|%3a)track(?::|%3a)|\\/track\\/)/i.test(u);
+    var isSpotifyUrl = /^https?:\\/\\/(spclient\\.wg\\.spotify\\.com|[a-z0-9-]+-spclient\\.spotify\\.com(?::443)?)\\/.*(color-lyrics|canvaz|metadata\\/4\\/track|spotify(?::|%3a)track(?::|%3a)|\\/track\\/)/i.test(u);
     var amMatch = u.match(/^https?:\\/\\/amp-api\\.music\\.apple\\.com\\/v1\\/catalog\\/([a-z]{2})\\/songs(?:\\/(\\d+)|\\?(?:.*&)?ids=(\\d+)(?:&|$))/i);
 
     function isAlnumChar(b) {
@@ -778,18 +778,22 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                                 } else {
                                     var displayTxt = formatTrackLabel(track.title, track.artist, 72);
                                     var chosenBg = vinylBgUrl(bgCols, "peek");
+                                    var prevVinylMax = ov && ov.data && ov.data.max_lines;
                                     ov.alt_text = displayTxt;
                                     ov.data = ov.data || {};
                                     if (!ov.data.type) ov.data.type = "static_content";
                                     ov.data.text = displayTxt;
                                     ov.data.text_color = "#FFFFFF";
-                                    ov.data.max_lines = 1;
+                                    ov.data.max_lines = (prevVinylMax && typeof prevVinylMax === "object")
+                                        ? prevVinylMax
+                                        : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
                                     ov.data.background = Object.assign({}, ov.data.background || {}, {
                                         colors: bgCols,
                                         image: { type: "image", data: chosenBg, source: "url" }
                                     });
                                     ov.data.icon = { type: "image", data: track.artworkUrl || VINYL_ICON_URL, source: "url" };
                                     replacedWith = displayTxt;
+                                    mutatedOvRef = ov;
                                     changed = true;
                                 }
                             }
@@ -1787,7 +1791,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "85";
+var RC_VER = "86";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2310,19 +2314,19 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 # =====================================================================
 # 1. LOCKET GOLD TOMMM CLOUD 24/7 (CHUẨN 100% FIREBASE REMOTE CONFIG SDK iOS)
 # =====================================================================
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=85, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=85, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=85, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=85, timeout=60
-tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, max-size=524288, timeout=10
-tommm_yt_music_res = type=http-response, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, max-size=524288, timeout=10
-tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters|postMoment|createMoment|changeProfileInfo)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=85, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=85, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=85, requires-body=true, max-size=1048576, timeout=60
-tommm_yt_playback = type=http-request, pattern=^https?:\\/\\/(s|www|music|m)\\.youtube\\.com\\/api\\/stats\\/(playback|watchtime|qoe), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=false, timeout=8
-tommm_yt_music_sniffer = type=http-request, pattern=^https?:\\/\\/(youtubei\\.googleapis\\.com|music\\.youtube\\.com)\\/youtubei\\/v1\\/(player|get_watch), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
-tommm_sp_music_sniffer = type=http-request, pattern=^https?:\\/\\/(spclient\\.wg\\.spotify\\.com|[a-z0-9-]+-spclient\\.spotify\\.com(?::443)?)\\/.*(color-lyrics|canvaz|connect-state|metadata\\/4\\/track|spotify(?::|%3a)track(?::|%3a)|\\/track\\/), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
-tommm_am_music_sniffer = type=http-request, pattern=^https?:\\/\\/amp-api\\.music\\.apple\\.com\\/v1\\/catalog\\/[a-z]{2}\\/songs(?:\\/\\d+|\\?(?:.*&)?ids=\\d+(?:&|$)), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=false, timeout=8
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=86, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=86, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=86, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=86, timeout=60
+tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, max-size=524288, timeout=10
+tommm_yt_music_res = type=http-response, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, max-size=524288, timeout=10
+tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters|postMoment|createMoment|changeProfileInfo)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=86, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=86, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=86, requires-body=true, max-size=1048576, timeout=60
+tommm_yt_playback = type=http-request, pattern=^https?:\\/\\/(s|www|music|m)\\.youtube\\.com\\/api\\/stats\\/(playback|watchtime|qoe), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=false, timeout=8
+tommm_yt_music_sniffer = type=http-request, pattern=^https?:\\/\\/(youtubei\\.googleapis\\.com|music\\.youtube\\.com)\\/youtubei\\/v1\\/(player|get_watch), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
+tommm_sp_music_sniffer = type=http-request, pattern=^https?:\\/\\/(spclient\\.wg\\.spotify\\.com|[a-z0-9-]+-spclient\\.spotify\\.com(?::443)?)\\/.*(color-lyrics|canvaz|metadata\\/4\\/track|spotify(?::|%3a)track(?::|%3a)|\\/track\\/), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
+tommm_am_music_sniffer = type=http-request, pattern=^https?:\\/\\/amp-api\\.music\\.apple\\.com\\/v1\\/catalog\\/[a-z]{2}\\/songs(?:\\/\\d+|\\?(?:.*&)?ids=\\d+(?:&|$)), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=false, timeout=8
 
 # =====================================================================
 # 2. CÁC TIỆN ÍCH PREMIUM KHÁC (CHẠY TỪ GITHUB CỦA TOMMM 100%)
@@ -2401,19 +2405,19 @@ http-request ^https:\\/\\/(spclient\\.wg\\.spotify\\.com|.*-spclient\\.spotify\\
 ^https?:\\/\\/[\\w-]+\\.googlevideo\\.com\\/initplayback.+&oad 'data-type=text data="" status-code=200'
 
 [Script]
-tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=85, requires-body=true, max-size=-1, timeout=60
-tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=85, timeout=60
-tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=85, requires-body=true, max-size=-1, timeout=60
-tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=85, timeout=60
-tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, max-size=524288, timeout=10
-tommm_yt_music_res = type=http-response, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, max-size=524288, timeout=10
-tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters|postMoment|createMoment|changeProfileInfo)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=85, timeout=60
-tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=85, requires-body=true, max-size=131072, timeout=60
-tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=85, requires-body=true, max-size=1048576, timeout=60
-tommm_yt_playback = type=http-request, pattern=^https?:\\/\\/(s|www|music|m)\\.youtube\\.com\\/api\\/stats\\/(playback|watchtime|qoe), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=false, timeout=8
-tommm_yt_music_sniffer = type=http-request, pattern=^https?:\\/\\/(youtubei\\.googleapis\\.com|music\\.youtube\\.com)\\/youtubei\\/v1\\/(player|get_watch), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
-tommm_sp_music_sniffer = type=http-request, pattern=^https?:\\/\\/(spclient\\.wg\\.spotify\\.com|[a-z0-9-]+-spclient\\.spotify\\.com(?::443)?)\\/.*(color-lyrics|canvaz|connect-state|metadata\\/4\\/track|spotify(?::|%3a)track(?::|%3a)|\\/track\\/), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
-tommm_am_music_sniffer = type=http-request, pattern=^https?:\\/\\/amp-api\\.music\\.apple\\.com\\/v1\\/catalog\\/[a-z]{2}\\/songs(?:\\/\\d+|\\?(?:.*&)?ids=\\d+(?:&|$)), script-path=${ghRawBase}/js_tommm_yt_music.js?v=85, requires-body=false, timeout=8
+tommm_gold = type=http-response, pattern=^https:\\/\\/api\\.revenuecat\\.com\\/.+\\/(receipts$|subscribers\\/[^/]+$), script-path=${ghRawBase}/js_tommm_gold.js?v=86, requires-body=true, max-size=-1, timeout=60
+tommm_del_header = type=http-request, pattern=^https:\\/\\/(api\\.revenuecat\\.com\\/.+\\/(receipts|subscribers)|firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a), script-path=${ghRawBase}/js_tommm_deleteHeader.js?v=86, timeout=60
+tommm_rc = type=http-response, pattern=^https:\\/\\/firebaseremoteconfig\\.googleapis\\.com\\/v1\\/projects\\/locket-4252a\\/.+, script-path=${ghRawBase}/js_tommm_rc.js?v=86, requires-body=true, max-size=-1, timeout=60
+tommm_ai_route = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(generateFilteredImage|generateFilter|applyFilter|createFilter|createCustomFilter|generateCustomFilter|createCameraFilter|createAiFilter|generateAiFilter|createUserFilter|saveFilter|saveCustomFilter|createLook|generateLook|customFilter|customFilters|userFilters|validateFilter|checkFilter|generateCaption|ai-filters), script-path=${ghRawBase}/js_tommm_ai_route.js?v=86, timeout=60
+tommm_yt_music_post = type=http-request, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, max-size=524288, timeout=10
+tommm_yt_music_res = type=http-response, pattern=^https?:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*(postMoment|createMoment), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, max-size=524288, timeout=10
+tommm_uid_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters|postMoment|createMoment|changeProfileInfo)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=86, timeout=60
+tommm_badge_req = type=http-request, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/.*changeProfileInfo, script-path=${ghRawBase}/js_tommm_badge.js?v=86, requires-body=true, max-size=131072, timeout=60
+tommm_badge_res = type=http-response, pattern=^https:\\/\\/(us-central1-locket-4252a\\.cloudfunctions\\.net|api\\.locketcamera\\.com)\\/(?!(generateFilteredImage|generateFilter|applyFilter|createFilter|generateCaption|ai-filters)).+, script-path=${ghRawBase}/js_tommm_badge.js?v=86, requires-body=true, max-size=1048576, timeout=60
+tommm_yt_playback = type=http-request, pattern=^https?:\\/\\/(s|www|music|m)\\.youtube\\.com\\/api\\/stats\\/(playback|watchtime|qoe), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=false, timeout=8
+tommm_yt_music_sniffer = type=http-request, pattern=^https?:\\/\\/(youtubei\\.googleapis\\.com|music\\.youtube\\.com)\\/youtubei\\/v1\\/(player|get_watch), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
+tommm_sp_music_sniffer = type=http-request, pattern=^https?:\\/\\/(spclient\\.wg\\.spotify\\.com|[a-z0-9-]+-spclient\\.spotify\\.com(?::443)?)\\/.*(color-lyrics|canvaz|metadata\\/4\\/track|spotify(?::|%3a)track(?::|%3a)|\\/track\\/), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=true, binary-body-mode=true, max-size=65536, timeout=8
+tommm_am_music_sniffer = type=http-request, pattern=^https?:\\/\\/amp-api\\.music\\.apple\\.com\\/v1\\/catalog\\/[a-z]{2}\\/songs(?:\\/\\d+|\\?(?:.*&)?ids=\\d+(?:&|$)), script-path=${ghRawBase}/js_tommm_yt_music.js?v=86, requires-body=false, timeout=8
 
 [MITM]
 hostname = %APPEND%, *.googlevideo.com, youtubei.googleapis.com, music.youtube.com, m.youtube.com, www.youtube.com, s.youtube.com, -redirector*.googlevideo.com, api.revenuecat.com, firebaseremoteconfig.googleapis.com, api.rc-backup.com, us-central1-locket-4252a.cloudfunctions.net, api.locketcamera.com, spclient.wg.spotify.com, *spclient.spotify.com, amp-api.music.apple.com
