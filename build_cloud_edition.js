@@ -725,8 +725,12 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
     }
 
     function isLocketSafeStaticUrl(uStr) {
-        return /^https:\\/\\/(?:public\\.locketcamera\\.com|storage\\.googleapis\\.com|firebasestorage\\.googleapis\\.com)\\//i.test(String(uStr || "")) ||
-            /^https:\\/\\/tommm1207\\.github\\.io\\/locket-tommm-studio\\/assets\\/captions_anim\\/vinyl_disc_icon\\.gif(?:\\?.*)?$/i.test(String(uStr || ""));
+        return /^https:\\/\\/(?:public\\.locketcamera\\.com|storage\\.googleapis\\.com|firebasestorage\\.googleapis\\.com)\\//i.test(String(uStr || ""));
+    }
+
+    function isLocketSafeIconUrl(uStr) {
+        if (isLocketSafeStaticUrl(uStr)) return true;
+        return /^https:\\/\\/(?:i\\.scdn\\.co|mosaic\\.scdn\\.co|is\\d+-ssl\\.mzstatic\\.com|i\\.ytimg\\.com|img\\.youtube\\.com|lh3\\.googleusercontent\\.com|yt3\\.ggpht\\.com)\\//i.test(String(uStr || ""));
     }
 
     function applyNativeMusicOverlay(ov, track, bgCols) {
@@ -754,10 +758,10 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
             ov.data.text_color = "#FFFFFF";
             ov.data.max_lines = maxLinesVal;
             ov.data.background = {
-                material_blur: "regular",
-                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
+                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#991B1B", "#DC2626"],
+                image: { type: "image", data: "star_sign_background", source: "local" }
             };
-            ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
+            ov.data.icon = isLocketSafeIconUrl(track.artworkUrl)
                 ? { type: "image", data: track.artworkUrl, source: "url" }
                 : { type: "emoji", data: "🎵" };
             if (ov.data.payload) delete ov.data.payload;
@@ -973,7 +977,9 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                                         colors: bgCols,
                                         image: { type: "image", data: "star_sign_background", source: "local" }
                                     };
-                                    ov.data.icon = { type: "image", data: VINYL_ICON_URL, source: "url" };
+                                    ov.data.icon = isLocketSafeIconUrl(track.artworkUrl)
+                                        ? { type: "image", data: track.artworkUrl, source: "url" }
+                                        : { type: "emoji", data: "🎵" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -992,10 +998,8 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                             };
                             didSanitizeThis = true;
                         }
-                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
-                            ov.data.icon = (ov.overlay_id && ov.overlay_id.indexOf("vinyl") !== -1)
-                                ? { type: "image", data: VINYL_ICON_URL, source: "url" }
-                                : { type: "emoji", data: "✨" };
+                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeIconUrl(ov.data.icon.data)) {
+                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1)) ? "🎵" : "✨" };
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {
@@ -1478,12 +1482,12 @@ const ANIM_BASE = `${ghRawBase}/assets/captions_anim`;
 const animatedCaptionsSection = {
     section: "✨ Caption Động (Animated) ❄️",
     items: [
-        { overlay_id: "caption:anim_xinchao_muadong", source: "remote", caption: { type: "static_content", text: "Xin Chào Mùa Đông", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "❄️" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
-        { overlay_id: "caption:anim_emy_muadong", source: "remote", caption: { type: "static_content", text: "Em Yêu Mùa Đông", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "⛄" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
-        { overlay_id: "caption:anim_dong_nho_anh", source: "remote", caption: { type: "static_content", text: "Đông Nhớ Anh", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🩵" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
-        { overlay_id: "caption:anim_lanh_ve_lo", source: "remote", caption: { type: "static_content", text: "Lạnh Vê Lờ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🥶" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
-        { overlay_id: "caption:anim_lanh_the_nho", source: "remote", caption: { type: "static_content", text: "Lạnh Thế Nhờ", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🧣" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
-        { overlay_id: "caption:anim_dong_nho_em", source: "remote", caption: { type: "static_content", text: "Đông Nhớ Em", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "✨" }, background: { colors: ["#2A1459", "#7C3AED"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:anim_xinchao_muadong", source: "remote", caption: { type: "static_content", text: "Xin Chào Mùa Đông ❄️", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "❄️" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
+        { overlay_id: "caption:anim_emy_muadong", source: "remote", caption: { type: "static_content", text: "Em Yêu Mùa Đông ❄️", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "⛄" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
+        { overlay_id: "caption:anim_dong_nho_anh", source: "remote", caption: { type: "static_content", text: "Đông Nhớ Anh ❄️", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🩵" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
+        { overlay_id: "caption:anim_lanh_ve_lo", source: "remote", caption: { type: "static_content", text: "Lạnh Vê Lờ ❄️", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🥶" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
+        { overlay_id: "caption:anim_lanh_the_nho", source: "remote", caption: { type: "static_content", text: "Lạnh Thế Nhờ ❄️", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🧣" }, background: { colors: ["#0F3D7A", "#2E90FA"], image: { type: "image", data: "cloud_cover", source: "local" } } } },
+        { overlay_id: "caption:anim_dong_nho_em", source: "remote", caption: { type: "static_content", text: "Đông Nhớ Em ❄️", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "❄️" }, background: { colors: ["#2A1459", "#7C3AED"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
         { overlay_id: "caption:anim_mua_nhan_ma", source: "remote", caption: { type: "static_content", text: "Mùa Nhân Mã", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "🪄" }, background: { colors: ["#2A1459", "#7C3AED"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
         { overlay_id: "caption:anim_yeuthuong_dongday", source: "remote", caption: { type: "static_content", text: "Yêu thương đong đầy", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "💗" }, background: { colors: ["#9D174D", "#F472B6"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
         { overlay_id: "caption:anim_day_qua_yeu", source: "remote", caption: { type: "static_content", text: "Đây Quá Yêu", max_lines: 1, text_color: "#FFFFFF", icon: { type: "emoji", data: "💘" }, background: { colors: ["#9D174D", "#F472B6"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
@@ -1500,8 +1504,8 @@ const animatedCaptionsSection = {
 const musicCaptionsSection = {
     section: "🎵 Phát Nhạc & Mood 🎧",
     items: [
-        { overlay_id: "caption:music_vinyl_chill", source: "remote", caption: { type: "static_content", text: "Đĩa than quay chill", max_lines: 1, text_color: "#FEF08A", icon: { type: "image", data: "https://tommm1207.github.io/locket-tommm-studio/assets/captions_anim/vinyl_disc_icon.gif", source: "url" }, background: { colors: ["#0E0C12", "#4A3219"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
-        { overlay_id: "caption:music_vinyl_late_night", source: "remote", caption: { type: "static_content", text: "Nhạc khuya tâm trạng", max_lines: 1, text_color: "#FFE4E6", icon: { type: "image", data: "https://tommm1207.github.io/locket-tommm-studio/assets/captions_anim/vinyl_disc_icon.gif", source: "url" }, background: { colors: ["#2D0A1B", "#9D174D"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:music_vinyl_chill", source: "remote", caption: { type: "static_content", text: "Nhạc chill tâm trạng", max_lines: 1, text_color: "#FEF08A", icon: { type: "sf_symbol", data: "music.note" }, background: { colors: ["#0E0C12", "#4A3219"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:music_vinyl_late_night", source: "remote", caption: { type: "static_content", text: "Nhạc khuya tâm trạng", max_lines: 1, text_color: "#FFE4E6", icon: { type: "emoji", data: "🌙" }, background: { colors: ["#2D0A1B", "#9D174D"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
         { overlay_id: "caption:music_vinyl_mood", source: "remote", caption: { type: "static_content", text: "Thả trôi theo giai điệu", max_lines: 1, text_color: "#FFFFFF", icon: { type: "sf_symbol", data: "music.note" }, background: { colors: ["#0E0C12", "#4A3219"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
         { overlay_id: "caption:music_now_playing", source: "remote", caption: { type: "static_content", text: "Đang nghe nhạc", max_lines: 1, text_color: "#FFFFFF", icon: { type: "sf_symbol", data: "music.note" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
         { overlay_id: "caption:music_chill_vibes", source: "remote", caption: { type: "static_content", text: "Now Playing • Chill", max_lines: 1, text_color: "#86EFAC", icon: { type: "emoji", data: "🎧" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
@@ -2004,7 +2008,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "98";
+var RC_VER = "99";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2287,10 +2291,6 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         if (!spTr && latestTr && (latestTr.platform === "spotify" || latestTr.spotifyId)) spTr = latestTr;
         if (!amTr && latestTr && !(latestTr.platform === "spotify" || latestTr.spotifyId)) amTr = latestTr;
 
-        var vinylColors = (latestTr && Array.isArray(latestTr.colors) && latestTr.colors.length >= 2) ? latestTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
-        var vinylIcon = { type: "image", data: VINYL_ICON_DEF, source: "url" };
-        var vinylText = latestTr ? formatRcTrackLabel(latestTr.title, latestTr.artist, 72) : "Đĩa than • Tự gắn bài đang nghe";
-
         var spColors = (spTr && Array.isArray(spTr.colors) && spTr.colors.length >= 2) ? spTr.colors.slice(0, 2) : ["#14532D", "#166534"];
         var spIcon = (spTr && spTr.artworkUrl) ? { type: "image", data: spTr.artworkUrl, source: "url" } : { type: "emoji", data: "🎧" };
         var spText = spTr ? formatRcTrackLabel(spTr.title, spTr.artist, 72) : "Spotify • Tự gắn bài đang nghe";
@@ -2299,22 +2299,16 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         var amIcon = (amTr && amTr.artworkUrl) ? { type: "image", data: amTr.artworkUrl, source: "url" } : { type: "emoji", data: "🎵" };
         var amText = amTr ? formatRcTrackLabel(amTr.title, amTr.artist, 72) : "YT / Apple Music • Tự gắn bài đang nghe";
 
+        var spBg = { colors: spColors };
+        if (spTr && !(spTr.previewUrl && String(spTr.previewUrl).indexOf("http") === 0) && !spTr.spotifyUrl && !spTr.spotifyId) {
+            spBg.image = { type: "image", data: "star_sign_background", source: "local" };
+        }
+        var amBg = { colors: amColors };
+        if (amTr && !(amTr.previewUrl && String(amTr.previewUrl).indexOf("http") === 0) && !(amTr.appleMusicUrl && amTr.appleMusicUrl.indexOf("music.apple.com") !== -1)) {
+            amBg.image = { type: "image", data: "star_sign_background", source: "local" };
+        }
+
         rawItems = [
-            {
-                overlay_id: "caption:yt_vinyl_spin",
-                source: "remote",
-                caption: {
-                    type: "static_content",
-                    text: vinylText,
-                    max_lines: 1,
-                    text_color: "#FFFFFF",
-                    icon: vinylIcon,
-                    background: {
-                        colors: vinylColors,
-                        image: { type: "image", data: "star_sign_background", source: "local" }
-                    }
-                }
-            },
             {
                 overlay_id: "caption:sp_now_playing",
                 source: "remote",
@@ -2324,9 +2318,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     max_lines: 1,
                     text_color: "#FFFFFF",
                     icon: spIcon,
-                    background: {
-                        colors: spColors
-                    }
+                    background: spBg
                 }
             },
             {
@@ -2338,9 +2330,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     max_lines: 1,
                     text_color: "#FFFFFF",
                     icon: amIcon,
-                    background: {
-                        colors: amColors
-                    }
+                    background: amBg
                 }
             }
         ].concat(rawItems);

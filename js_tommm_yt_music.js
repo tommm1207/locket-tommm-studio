@@ -682,8 +682,12 @@
     }
 
     function isLocketSafeStaticUrl(uStr) {
-        return /^https:\/\/(?:public\.locketcamera\.com|storage\.googleapis\.com|firebasestorage\.googleapis\.com)\//i.test(String(uStr || "")) ||
-            /^https:\/\/tommm1207\.github\.io\/locket-tommm-studio\/assets\/captions_anim\/vinyl_disc_icon\.gif(?:\?.*)?$/i.test(String(uStr || ""));
+        return /^https:\/\/(?:public\.locketcamera\.com|storage\.googleapis\.com|firebasestorage\.googleapis\.com)\//i.test(String(uStr || ""));
+    }
+
+    function isLocketSafeIconUrl(uStr) {
+        if (isLocketSafeStaticUrl(uStr)) return true;
+        return /^https:\/\/(?:i\.scdn\.co|mosaic\.scdn\.co|is\d+-ssl\.mzstatic\.com|i\.ytimg\.com|img\.youtube\.com|lh3\.googleusercontent\.com|yt3\.ggpht\.com)\//i.test(String(uStr || ""));
     }
 
     function applyNativeMusicOverlay(ov, track, bgCols) {
@@ -711,10 +715,10 @@
             ov.data.text_color = "#FFFFFF";
             ov.data.max_lines = maxLinesVal;
             ov.data.background = {
-                material_blur: "regular",
-                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
+                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#991B1B", "#DC2626"],
+                image: { type: "image", data: "star_sign_background", source: "local" }
             };
-            ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
+            ov.data.icon = isLocketSafeIconUrl(track.artworkUrl)
                 ? { type: "image", data: track.artworkUrl, source: "url" }
                 : { type: "emoji", data: "🎵" };
             if (ov.data.payload) delete ov.data.payload;
@@ -930,7 +934,9 @@
                                         colors: bgCols,
                                         image: { type: "image", data: "star_sign_background", source: "local" }
                                     };
-                                    ov.data.icon = { type: "image", data: VINYL_ICON_URL, source: "url" };
+                                    ov.data.icon = isLocketSafeIconUrl(track.artworkUrl)
+                                        ? { type: "image", data: track.artworkUrl, source: "url" }
+                                        : { type: "emoji", data: "🎵" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -949,10 +955,8 @@
                             };
                             didSanitizeThis = true;
                         }
-                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
-                            ov.data.icon = (ov.overlay_id && ov.overlay_id.indexOf("vinyl") !== -1)
-                                ? { type: "image", data: VINYL_ICON_URL, source: "url" }
-                                : { type: "emoji", data: "✨" };
+                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeIconUrl(ov.data.icon.data)) {
+                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1)) ? "🎵" : "✨" };
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {
