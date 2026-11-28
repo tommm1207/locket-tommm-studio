@@ -2003,8 +2003,10 @@ function applyKawaiiAtmosphere(rgb, w, h, filterId) {
       const bg = blurred[i + 1] > 72 ? (blurred[i + 1] - 72) * bloomAmt : 0;
       const bb = blurred[i + 2] > 72 ? (blurred[i + 2] - 72) * bloomAmt : 0;
 
-      // Delicate upper-left corner pastel light leak
-      const cornerEnv = Math.exp(-((nx * nx + ny * ny) / 0.34)) * glScale;
+      // Fast algebraic upper-left corner pastel glow (zero Math.exp per-pixel overhead)
+      const c2 = (nx * nx + ny * ny) * 1.15;
+      const ct = c2 < 1 ? 1 - c2 : 0;
+      const cornerEnv = ct * ct * ct * glScale;
       let lr = br + gr * cornerEnv;
       let lg = bg + gg * cornerEnv;
       let lb = bb + gb * cornerEnv;
@@ -2012,13 +2014,17 @@ function applyKawaiiAtmosphere(rgb, w, h, filterId) {
       if (hasPrism) {
         const u = nx * 0.72 + ny * 0.69;
         const v = (nx - 0.14) * 0.69 - (ny - 0.11) * 0.72;
-        const beamEnv = Math.exp(-Math.pow((u - 0.25) / 0.16, 2)) * Math.exp(-Math.pow(v / 0.54, 2));
+        const u2 = ((u - 0.25) / 0.22);
+        const v2 = (v / 0.72);
+        const ub = u2 * u2 < 1 ? 1 - u2 * u2 : 0;
+        const vb = v2 * v2 < 1 ? 1 - v2 * v2 : 0;
+        const beamEnv = ub * ub * vb * vb;
         if (beamEnv > 0.01) {
-          const pStr = 0.18 * sceneScale * beamEnv;
-          const p1 = Math.exp(-Math.pow((u - 0.15) / 0.06, 2));
-          const p2 = Math.exp(-Math.pow((u - 0.21) / 0.06, 2));
-          const p3 = Math.exp(-Math.pow((u - 0.27) / 0.06, 2));
-          const p4 = Math.exp(-Math.pow((u - 0.33) / 0.06, 2));
+          const pStr = 0.19 * sceneScale * beamEnv;
+          const d1 = (u - 0.15) / 0.095; const p1 = d1 * d1 < 1 ? (1 - d1 * d1) * (1 - d1 * d1) : 0;
+          const d2 = (u - 0.21) / 0.095; const p2 = d2 * d2 < 1 ? (1 - d2 * d2) * (1 - d2 * d2) : 0;
+          const d3 = (u - 0.27) / 0.095; const p3 = d3 * d3 < 1 ? (1 - d3 * d3) * (1 - d3 * d3) : 0;
+          const d4 = (u - 0.33) / 0.095; const p4 = d4 * d4 < 1 ? (1 - d4 * d4) * (1 - d4 * d4) : 0;
           lr += 255 * pStr * (p1 * 1.0 + p2 * 1.0 + p3 * 0.72 + p4 * 0.65);
           lg += 255 * pStr * (p1 * 0.56 + p2 * 0.85 + p3 * 0.96 + p4 * 0.82);
           lb += 255 * pStr * (p1 * 0.60 + p2 * 0.50 + p3 * 0.90 + p4 * 1.00);
