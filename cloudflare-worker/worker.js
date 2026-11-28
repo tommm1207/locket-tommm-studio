@@ -799,6 +799,10 @@ async function getFrameRgba(filterId) {
   if (!res.ok) throw new Error(`Failed to fetch frame bin for ${filterId}: ${res.status}`);
   const compressed = new Uint8Array(await res.arrayBuffer());
   const rgba = await inflateZlib(compressed);
+  if (FRAME_CACHE.size >= 6) {
+    const oldest = FRAME_CACHE.keys().next().value;
+    if (oldest !== undefined) FRAME_CACHE.delete(oldest);
+  }
   FRAME_CACHE.set(filterId, rgba);
   return rgba;
 }
@@ -1975,47 +1979,69 @@ function applyKawaiiAtmosphere(rgb, w, h, filterId) {
   const avgLum = lumCnt > 0 ? lumSum / lumCnt : 128;
   // Dark-scene guard: keeps pitch-black photos rich dark instead of milky washed-out grey
   const sceneScale = Math.min(1.0, Math.max(0.24, (avgLum - 8) / 80));
-
-  const blurRad = Math.max(6, Math.round(13 * (w / 768)));
-  const blurred = boxBlurRgb(rgb, w, h, blurRad, 1);
-
-  const invW = 1 / w;
-  const invH = 1 / h;
   const lift = mood.lift * sceneScale;
+
+  // Precompute integer LUTs for crisp pastel film color grading (zero per-pixel floats)
+  const rLut = new Uint8Array(256);
+  const gLut = new Uint8Array(256);
+  const bLut = new Uint8Array(256);
+  for (let v = 0; v < 256; v++) {
+    const rr = v * mood.rMul + lift;
+    const gg = v * mood.gMul + lift;
+    const bb = v * mood.bMul + lift;
+    rLut[v] = rr < 0 ? 0 : rr > 255 ? 255 : rr | 0;
+    gLut[v] = gg < 0 ? 0 : gg > 255 ? 255 : gg | 0;
+    bLut[v] = bb < 0 ? 0 : bb > 255 ? 255 : bb | 0;
+  }
+
+  // Compute low-frequency Pro-Mist bloom + corner glow + prism ribbon at 1/4 res (192x192 -> >10x faster CPU)
+  const sw = Math.max(16, w >> 2);
+  const sh = Math.max(16, h >> 2);
+  const small = new Uint8Array(sw * sh * 3);
+  for (let sy = 0; sy < sh; sy++) {
+    const y0 = Math.min(h - 1, sy << 2);
+    const rowSrc = y0 * w * 3;
+    const rowDst = sy * sw * 3;
+    for (let sx = 0; sx < sw; sx++) {
+      const si = rowSrc + (Math.min(w - 1, sx << 2) * 3);
+      const di = rowDst + sx * 3;
+      small[di] = rgb[si];
+      small[di + 1] = rgb[si + 1];
+      small[di + 2] = rgb[si + 2];
+    }
+  }
+  const blurred = boxBlurRgb(small, sw, sh, Math.max(2, Math.round(4 * (w / 768))), 2);
+
+  // Add corner glow + soft prism flare directly onto the 192x192 screen-light buffer
+  const invSw = 1 / sw;
+  const invSh = 1 / sh;
   const bloomAmt = mood.bloom;
   const glScale = mood.glAlpha * sceneScale;
   const [gr, gg, gb] = mood.glowRgb;
   const hasPrism = !!mood.prism;
 
-  for (let y = 0; y < h; y++) {
-    const ny = y * invH;
-    const row = y * w * 3;
-    for (let x = 0; x < w; x++) {
-      const nx = x * invW;
-      const i = row + x * 3;
+  for (let sy = 0; sy < sh; sy++) {
+    const ny = sy * invSh;
+    const row = sy * sw * 3;
+    for (let sx = 0; sx < sw; sx++) {
+      const nx = sx * invSw;
+      const i = row + sx * 3;
+      let lr = blurred[i] > 72 ? (blurred[i] - 72) * bloomAmt : 0;
+      let lg = blurred[i + 1] > 72 ? (blurred[i + 1] - 72) * bloomAmt : 0;
+      let lb = blurred[i + 2] > 72 ? (blurred[i + 2] - 72) * bloomAmt : 0;
 
-      let r = rgb[i] * mood.rMul + lift;
-      let g = rgb[i + 1] * mood.gMul + lift;
-      let b = rgb[i + 2] * mood.bMul + lift;
-
-      // Soft Pro-Mist highlight bloom
-      const br = blurred[i] > 72 ? (blurred[i] - 72) * bloomAmt : 0;
-      const bg = blurred[i + 1] > 72 ? (blurred[i + 1] - 72) * bloomAmt : 0;
-      const bb = blurred[i + 2] > 72 ? (blurred[i + 2] - 72) * bloomAmt : 0;
-
-      // Fast algebraic upper-left corner pastel glow (zero Math.exp per-pixel overhead)
       const c2 = (nx * nx + ny * ny) * 1.15;
       const ct = c2 < 1 ? 1 - c2 : 0;
       const cornerEnv = ct * ct * ct * glScale;
-      let lr = br + gr * cornerEnv;
-      let lg = bg + gg * cornerEnv;
-      let lb = bb + gb * cornerEnv;
+      lr += gr * cornerEnv;
+      lg += gg * cornerEnv;
+      lb += gb * cornerEnv;
 
       if (hasPrism) {
         const u = nx * 0.72 + ny * 0.69;
         const v = (nx - 0.14) * 0.69 - (ny - 0.11) * 0.72;
-        const u2 = ((u - 0.25) / 0.22);
-        const v2 = (v / 0.72);
+        const u2 = (u - 0.25) / 0.22;
+        const v2 = v / 0.72;
         const ub = u2 * u2 < 1 ? 1 - u2 * u2 : 0;
         const vb = v2 * v2 < 1 ? 1 - v2 * v2 : 0;
         const beamEnv = ub * ub * vb * vb;
@@ -2031,16 +2057,45 @@ function applyKawaiiAtmosphere(rgb, w, h, filterId) {
         }
       }
 
-      r = r > 255 ? 255 : r < 0 ? 0 : r;
-      g = g > 255 ? 255 : g < 0 ? 0 : g;
-      b = b > 255 ? 255 : b < 0 ? 0 : b;
-      const sr = lr > 255 ? 255 : lr;
-      const sg = lg > 255 ? 255 : lg;
-      const sb = lb > 255 ? 255 : lb;
+      blurred[i] = lr > 255 ? 255 : lr | 0;
+      blurred[i + 1] = lg > 255 ? 255 : lg | 0;
+      blurred[i + 2] = lb > 255 ? 255 : lb | 0;
+    }
+  }
 
-      rgb[i] = (255 - (((255 - r) * (255 - sr)) / 255)) | 0;
-      rgb[i + 1] = (255 - (((255 - g) * (255 - sg)) / 255)) | 0;
-      rgb[i + 2] = (255 - (((255 - b) * (255 - sb)) / 255)) | 0;
+  // Bilinearly sample smooth 192x192 glow map and integer-screen blend across 768x768
+  const maxSx = sw - 1;
+  const maxSy = sh - 1;
+  for (let y = 0; y < h; y++) {
+    const fsy = y * 0.25;
+    const sy0 = fsy | 0;
+    const sy1 = sy0 < maxSy ? sy0 + 1 : maxSy;
+    const fy = ((fsy - sy0) * 256) | 0;
+    const ify = 256 - fy;
+    const r0 = sy0 * sw * 3;
+    const r1 = sy1 * sw * 3;
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const fsx = x * 0.25;
+      const sx0 = fsx | 0;
+      const sx1 = sx0 < maxSx ? sx0 + 1 : maxSx;
+      const fx = ((fsx - sx0) * 256) | 0;
+      const ifx = 256 - fx;
+      const w00 = ifx * ify, w10 = fx * ify, w01 = ifx * fy, w11 = fx * fy;
+      const b00 = r0 + sx0 * 3, b10 = r0 + sx1 * 3, b01 = r1 + sx0 * 3, b11 = r1 + sx1 * 3;
+
+      const i = row + x * 3;
+      const r = rLut[rgb[i]];
+      const g = gLut[rgb[i + 1]];
+      const b = bLut[rgb[i + 2]];
+
+      const sr = (blurred[b00] * w00 + blurred[b10] * w10 + blurred[b01] * w01 + blurred[b11] * w11) >> 16;
+      const sg = (blurred[b00 + 1] * w00 + blurred[b10 + 1] * w10 + blurred[b01 + 1] * w01 + blurred[b11 + 1] * w11) >> 16;
+      const sb = (blurred[b00 + 2] * w00 + blurred[b10 + 2] * w10 + blurred[b01 + 2] * w01 + blurred[b11 + 2] * w11) >> 16;
+
+      rgb[i] = 255 - (((255 - r) * (255 - sr)) / 255) | 0;
+      rgb[i + 1] = 255 - (((255 - g) * (255 - sg)) / 255) | 0;
+      rgb[i + 2] = 255 - (((255 - b) * (255 - sb)) / 255) | 0;
     }
   }
 }
