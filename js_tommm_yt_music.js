@@ -717,7 +717,7 @@
                 text_color: "#FFFFFF",
                 icon: isLocketSafeStaticUrl(track.artworkUrl)
                     ? { type: "image", data: track.artworkUrl, source: "url" }
-                    : { type: "sf_symbol", data: "music.note" },
+                    : { type: "sf_symbol", data: "waveform" },
                 background: {
                     colors: safeCols,
                     image: { type: "image", data: "star_sign_background", source: "local" }
@@ -941,7 +941,7 @@
                                         },
                                         icon: isLocketSafeStaticUrl(track.artworkUrl)
                                             ? { type: "image", data: track.artworkUrl, source: "url" }
-                                            : { type: "sf_symbol", data: "music.note" }
+                                            : { type: "sf_symbol", data: "waveform" }
                                     };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
@@ -962,8 +962,8 @@
                         }
                         if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
                             ov.data.icon = (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1 || ov.overlay_id.indexOf("now_playing") !== -1))
-                                ? { type: "sf_symbol", data: "music.note" }
-                                : { type: "emoji", data: "✨" };
+                                ? { type: "sf_symbol", data: "waveform" }
+                                : { type: "sf_symbol", data: "sparkles" };
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {
