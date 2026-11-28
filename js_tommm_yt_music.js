@@ -96,7 +96,7 @@
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 2 && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -137,6 +137,43 @@
         }
     }
 
+    function applyNativeMusicOverlay(ov, track, bgCols) {
+        var songTitle = String(track.title || "YouTube Music").trim();
+        var songArtist = String(track.artist || "YouTube").trim();
+        var fullLabel = (songArtist && songArtist !== "YouTube" && songTitle.toLowerCase().indexOf(songArtist.toLowerCase()) === -1)
+            ? (songTitle + " " + songArtist)
+            : songTitle;
+        var prevMax = ov && ov.data && ov.data.max_lines;
+        var maxLinesVal = (prevMax && typeof prevMax === "object")
+            ? prevMax
+            : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
+        ov.overlay_id = "caption:music";
+        ov.alt_text = fullLabel;
+        ov.data = {
+            type: "music",
+            text: fullLabel,
+            text_color: "#FFFFFFE6",
+            max_lines: maxLinesVal,
+            background: {
+                material_blur: "regular",
+                colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
+            },
+            icon: {
+                type: "image",
+                data: track.artworkUrl || VINYL_ICON_URL,
+                source: "url"
+            },
+            payload: {
+                song_title: songTitle,
+                artist: songArtist,
+                preview_url: track.previewUrl || "",
+                spotify_url: track.spotifyUrl || "",
+                isrc: track.isrc || ""
+            }
+        };
+        return formatTrackLabel(songTitle, songArtist, 32);
+    }
+
     // Mode 2: Inspect native caption:music or swap live YouTube track in-place on postMoment / createMoment
     if (/\/(?:postMoment\w*|createMoment\w*)/i.test(u)) {
         try {
@@ -149,6 +186,8 @@
             var changed = false;
             var replacedWith = "";
             var hasNativeMusicLog = false;
+            var pendingUpgradeOvs = [];
+            var cachedTrackForUpgrade = null;
             for (var li = 0; li < overlayLists.length; li++) {
                 var overlays = overlayLists[li];
                 for (var k = 0; k < overlays.length; k++) {
@@ -185,36 +224,45 @@
                             var track = JSON.parse(rawYt);
                             if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
                                 var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
-                                var displayTxt = formatTrackLabel(track.title, track.artist, 28);
-                                var chosenIcon = isVinylIconMode ? VINYL_ICON_URL : (track.artworkUrl || VINYL_ICON_URL);
-                                var chosenBg = vinylBgUrl(bgCols, isVinylIconMode ? "wave" : "peek");
-                                ov.alt_text = displayTxt;
-                                ov.data = ov.data || {};
-                                if (!ov.data.type) ov.data.type = "static_content";
-                                ov.data.text = displayTxt;
-                                ov.data.text_color = "#FFFFFF";
-                                ov.data.max_lines = 1;
-                                ov.data.background = Object.assign({}, ov.data.background || {}, {
-                                    colors: bgCols,
-                                    image: { type: "image", data: chosenBg, source: "url" }
-                                });
-                                ov.data.icon = { type: "image", data: chosenIcon, source: "url" };
-                                replacedWith = displayTxt;
-                                try { console.log("[TommmYT] Swapped postMoment -> " + displayTxt); } catch (_) {}
-                                changed = true;
+                                if (!isVinylIconMode) {
+                                    var needsUpgrade = !!(track.videoId && typeof $httpClient !== "undefined" && (track.schemaVer !== 2 || (!track.spotifyUrl && !track.previewUrl)));
+                                    if (needsUpgrade) {
+                                        cachedTrackForUpgrade = track;
+                                        pendingUpgradeOvs.push(ov);
+                                    } else {
+                                        replacedWith = applyNativeMusicOverlay(ov, track, bgCols);
+                                        changed = true;
+                                    }
+                                } else {
+                                    var displayTxt = formatTrackLabel(track.title, track.artist, 28);
+                                    var chosenBg = vinylBgUrl(bgCols, "wave");
+                                    ov.alt_text = displayTxt;
+                                    ov.data = ov.data || {};
+                                    if (!ov.data.type) ov.data.type = "static_content";
+                                    ov.data.text = displayTxt;
+                                    ov.data.text_color = "#FFFFFF";
+                                    ov.data.max_lines = 1;
+                                    ov.data.background = Object.assign({}, ov.data.background || {}, {
+                                        colors: bgCols,
+                                        image: { type: "image", data: chosenBg, source: "url" }
+                                    });
+                                    ov.data.icon = { type: "image", data: VINYL_ICON_URL, source: "url" };
+                                    replacedWith = displayTxt;
+                                    changed = true;
+                                }
                             }
                         }
                     }
                 }
             }
-            if (changed) {
+            var finalizeBody = function () {
                 var updatedBody = JSON.stringify(bodyObj);
                 if (typeof $httpClient !== "undefined") {
                     var swapTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({ body: updatedBody }); }, 250) : null;
                     $httpClient.post({
                         url: WORKER_BASE + "/studio/music-schema-log",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0], matched: true, replacedWith: replacedWith })
+                        body: JSON.stringify({ urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0], matched: true, replacedWith: replacedWith, nativeMusic: pendingUpgradeOvs.length > 0 })
                     }, function () {
                         if (swapTimer && typeof clearTimeout !== "undefined") clearTimeout(swapTimer);
                         finishOnce({ body: updatedBody });
@@ -222,6 +270,42 @@
                     return;
                 }
                 finishOnce({ body: updatedBody });
+            };
+            if (pendingUpgradeOvs.length > 0 && cachedTrackForUpgrade) {
+                var upgDone = false;
+                var finishUpgrade = function (useTrack) {
+                    if (upgDone) return;
+                    upgDone = true;
+                    var uCols = Array.isArray(useTrack.colors) && useTrack.colors.length >= 2 ? useTrack.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
+                    for (var pi = 0; pi < pendingUpgradeOvs.length; pi++) {
+                        replacedWith = applyNativeMusicOverlay(pendingUpgradeOvs[pi], useTrack, uCols);
+                    }
+                    changed = true;
+                    finalizeBody();
+                };
+                var upgTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishUpgrade(cachedTrackForUpgrade); }, 1800) : null;
+                $httpClient.post({
+                    url: WORKER_BASE + "/studio/yt-now-playing",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ videoId: cachedTrackForUpgrade.videoId })
+                }, function (err, resp, data) {
+                    var picked = cachedTrackForUpgrade;
+                    try {
+                        if (!err && data) {
+                            var parsed = JSON.parse(data);
+                            if (parsed && parsed.ok && parsed.track && parsed.track.title) {
+                                picked = parsed.track;
+                                $persistentStore.write(JSON.stringify(picked), "tommm_yt_now_playing");
+                            }
+                        }
+                    } catch (_) {}
+                    if (upgTimer && typeof clearTimeout !== "undefined") clearTimeout(upgTimer);
+                    finishUpgrade(picked);
+                });
+                return;
+            }
+            if (changed) {
+                finalizeBody();
                 return;
             }
             if (hasNativeMusicLog) return;

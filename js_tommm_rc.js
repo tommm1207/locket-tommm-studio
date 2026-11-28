@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "76";
+var RC_VER = "77";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -256,7 +256,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
             if (sp >= Math.floor(maxLen * 0.55)) cut = cut.slice(0, sp);
             return cut.replace(/[\s(\[\-–•,|/]+$/, "").trim() + "…";
         };
-        var ytLabel = "YouTube • Tự gắn bài đang nghe";
+        var ytLabel = "Nhạc YouTube • Phát nhạc + Spotify";
         var ytVinylLabel = "Đĩa than • Tự gắn bài đang nghe";
         var ytColors = ["#991B1B", "#DC2626"];
         var VINYL_ICON_DEF = "https://tommm1207.github.io/locket-tommm-studio/assets/captions_anim/vinyl_disc_icon.gif";

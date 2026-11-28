@@ -401,9 +401,14 @@ function corsHeaders(extra = {}) {
 // Cache API key PHẢI là URL http(s) hợp lệ cùng kiểu origin thật, nếu không put/match âm thầm fail.
 const CACHE_IMG_PREFIX = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/__imgcache__/";
 const CUSTOM_LOOK_PROMPTS = new Map();
-async function putCustomLookPrompt(id, promptText) {
+async function putCustomLookPrompt(id, promptText, state = null) {
   if (!id || !promptText) return;
   CUSTOM_LOOK_PROMPTS.set(id, promptText);
+  if (state && state.storage) {
+    try {
+      await state.storage.put("clp:" + id, promptText);
+    } catch (_) {}
+  }
   try {
     await caches.default.put(
       new Request(CACHE_IMG_PREFIX + "prompt_" + encodeURIComponent(id)),
@@ -411,10 +416,20 @@ async function putCustomLookPrompt(id, promptText) {
     );
   } catch (_) {}
 }
-async function getCustomLookPrompt(id) {
+async function getCustomLookPrompt(id, state = null) {
   if (!id) return "";
   const ram = CUSTOM_LOOK_PROMPTS.get(id);
   if (ram) return ram;
+  if (state && state.storage) {
+    try {
+      const stored = await state.storage.get("clp:" + id);
+      if (typeof stored === "string" && stored.trim()) {
+        const txt = stored.trim();
+        CUSTOM_LOOK_PROMPTS.set(id, txt);
+        return txt;
+      }
+    } catch (_) {}
+  }
   try {
     const hit = await caches.default.match(new Request(CACHE_IMG_PREFIX + "prompt_" + encodeURIComponent(id)));
     if (hit) {
@@ -2542,11 +2557,47 @@ function applyKiraSparkleLens(rgb, w, h) {
   }
 }
 
+function normalizeAsciiPunct(str) {
+  return String(str || "")
+    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, "-")
+    .replace(/[\u2026]/g, "...")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sanitizePromptForFlux(text, aggressive = false) {
+  let out = normalizeAsciiPunct(text);
+  out = out
+    .replace(/\b(superman|spider-?man|batman|iron\s*man|ultraman|power\s*rangers|avengers|deadpool|wolverine|joker|pikachu|doraemon|naruto|goku)\b/gi, "heroic blue and red outfit")
+    .replace(/\b(skin-?tight|skintight|tight-?fitting|tight|tights|spandex|bodysuit|latex|catsuit|fitted|form-?fitting)\b/gi, "matte casual fabric")
+    .replace(/\bsuperhero\s+costume\b/gi, "heroic royal-blue jacket and red cloth cape outfit")
+    .replace(/\bsuperhero\b/gi, "heroic")
+    .replace(/\bcostume\b/gi, "themed outfit")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (aggressive) {
+    out = out
+      .replace(/\b(police|officer|traffic|uniform|helmet|shopee|grab|logo|badge|brand|suit|armor|weapon|gun|sword|knife|blood|gore|mask|sexy|lingerie|bikini|nude|naked)\b/gi, (m) => {
+        if (/helmet/i.test(m)) return "riding cap";
+        if (/police|officer/i.test(m)) return "attendant";
+        if (/suit|armor/i.test(m)) return "outerwear jacket";
+        if (/mask/i.test(m)) return "accessory";
+        if (/logo|badge|brand/i.test(m)) return "clean trim";
+        return "casual jacket";
+      })
+      .replace(/\s+/g, " ")
+      .trim() + " Everyday safe candid smartphone portrait.";
+  }
+  return out;
+}
+
 async function translateCustomLookPromptToEn(env, rawText) {
   const clean = String(rawText || "").replace(/\s+/g, " ").trim().slice(0, 500);
   if (!clean) return "";
   const sys =
-    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete English image-editing prompt (35-65 words) for an authentic candid smartphone photo. Rules: 1) Always start with: 'Keep the exact same person, face shape, eyes, nose, lips, skin tone, natural skin texture, and expression from input_image_0 completely untouched.' 2) Describe exact clothing, costume, accessories, hairstyle, makeup, props, or background requested using matte realistic fabrics, natural ambient lighting, and natural camera realism (NEVER use plastic, airbrushed, CGI, glossy, or 'ultra-photorealistic' buzzwords; do NOT cover the face with a mask/helmet unless explicitly requested). 3) NEVER use trademarked/copyrighted character or brand names (such as Superman, Spider-Man, Batman, Iron Man, Pikachu, Doraemon) because they trigger output filters — instead describe their iconic outfit/colors generically without emblems (e.g. 'a royal-blue suit with a crimson cloth cape and gold belt'). 4) Keep the original background and pose unless asked to change them. Output ONLY the English prompt.";
+    "You are an expert photo-editing prompt engineer for FLUX.2 image-to-image editing. Convert the user's request (in Vietnamese with or without accents, or English) into ONE concrete English image-editing prompt (35-65 words) for an authentic candid smartphone photo. Rules: 1) Always start with: 'Keep the exact same person, face shape, eyes, nose, lips, skin tone, natural skin texture, and expression from input_image_0 completely untouched.' 2) Describe exact clothing, accessories, hairstyle, makeup, props, or background using loose matte realistic streetwear/outerwear and natural ambient lighting (NEVER use tight, fitted, tights, spandex, bodysuit, superhero, costume, plastic, airbrushed, CGI, glossy, or 'ultra-photorealistic' words; do NOT cover the face with a mask/helmet unless explicitly requested). 3) NEVER use trademarked/copyrighted character or brand names (such as Superman, Spider-Man, Batman, Iron Man, Pikachu, Doraemon) — instead describe loose outerwear colors generically without emblems (e.g. for 'siêu nhân' use 'a matte royal-blue bomber jacket with yellow trim and a red cloth cape draped over the shoulders'). 4) Keep the original background and pose unless asked to change them. Output ONLY plain ASCII English text.";
   for (const k of availableKeys("groq", env && env.GROQ_API_KEY)) {
     try {
       const model = (env && env.GROQ_MODEL) || "openai/gpt-oss-120b";
@@ -2561,36 +2612,40 @@ async function translateCustomLookPromptToEn(env, rawText) {
       });
       if (!r.ok) { if (r.status === 429 || r.status === 402 || r.status === 403) benchKey(k); continue; }
       const j = await r.json();
-      const out = String(j?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[\r\n]+/g, " ").trim();
-      if (out && out.length >= 12 && !/[^\x00-\x7F]/.test(out)) return out;
+      const out = normalizeAsciiPunct(String(j?.choices?.[0]?.message?.content || "").replace(/<think>[\s\S]*?<\/think>/gi, ""));
+      if (out && out.length >= 12 && !/[^\x00-\x7F]/.test(out)) return sanitizePromptForFlux(out, false);
     } catch (_) {}
   }
   if (env && env.NVIDIA_API_KEY) {
     try {
       const nv = await nvidiaTextWriter(env, sys, clean, 160, 0.25);
-      const out = String(nv?.text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/[\r\n]+/g, " ").trim();
-      if (out && out.length >= 12 && !/[^\x00-\x7F]/.test(out)) return out;
+      const out = normalizeAsciiPunct(String(nv?.text || "").replace(/<think>[\s\S]*?<\/think>/gi, ""));
+      if (out && out.length >= 12 && !/[^\x00-\x7F]/.test(out)) return sanitizePromptForFlux(out, false);
     } catch (_) {}
   }
   for (const k of availableKeys("gemini", env && env.GEMINI_API_KEY)) {
     const g = await geminiGenerateCaption(env, sys, clean, null, null, k, 160, true, 0.25);
-    const out = String(g?.text || "").replace(/[\r\n]+/g, " ").trim();
-    if (out && out.length >= 12) return out;
+    const out = normalizeAsciiPunct(g?.text || "");
+    if (out && out.length >= 12) return sanitizePromptForFlux(out, false);
   }
   if (env && (env.AI || env.CF_AI_ACCOUNTS)) {
     try {
       const res = await runCfTextChatPooled(env, [{ role: "system", content: sys }, { role: "user", content: clean }], 160, 0.25);
-      const out = String(res?.text || "").replace(/[\r\n]+/g, " ").trim();
-      if (out && out.length >= 12) return out;
+      const out = normalizeAsciiPunct(res?.text || "");
+      if (out && out.length >= 12) return sanitizePromptForFlux(out, false);
     } catch (_) {}
   }
-  return clean;
+  return sanitizePromptForFlux(clean, false);
 }
 
 function detectAiRequest(dataNode, rawBodyText) {
   let rawFilterId = firstNonEmptyString([
     dataNode?.filterId,
     dataNode?.filter_id,
+    dataNode?.camera_filter_id,
+    dataNode?.cameraFilterId,
+    dataNode?.look_id,
+    dataNode?.lookId,
     dataNode?.uid,
     dataNode?.id,
     dataNode?.filter?.id,
@@ -2611,6 +2666,10 @@ function detectAiRequest(dataNode, rawBodyText) {
     dataNode?.filterPrompt,
     dataNode?.filter_prompt,
     dataNode?.filter?.prompt,
+    dataNode?.filter?.custom_prompt,
+    dataNode?.filter?.user_input,
+    dataNode?.filter?.name,
+    dataNode?.filter?.title,
     dataNode?.text,
     dataNode?.description,
   ]);
@@ -4650,7 +4709,7 @@ async function generateCaptionWithVision(env, captionType, imgBytes, sourceUrl, 
   return { text: fallbackText, source: "fallback_" + (lastErr ? "err" : "static"), aiErr: lastErr };
 }
 
-async function handleStudioRequest(request, env) {
+async function handleStudioRequest(request, env, state = null) {
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
@@ -4811,36 +4870,122 @@ function extractDominantColorsFromJpeg(bytes) {
   }
 }
 
-async function resolveYoutubeTrack(videoId) {
-  const cached = YT_TRACK_CACHE.get(videoId);
-  if (cached && Date.now() - cached.ts < 3600000) {
+function foldNorm(s) {
+  return String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function titleMatchesTrack(queryTitle, candTitle) {
+  const q = foldNorm(queryTitle);
+  const c = foldNorm(candTitle);
+  if (!q || !c) return true;
+  if (c.includes(q) || q.includes(c)) return true;
+  const qWords = q.split(/\s+/).filter((w) => w.length >= 2);
+  if (qWords.length === 0) return true;
+  const cSet = new Set(c.split(/\s+/));
+  let matched = 0;
+  for (const w of qWords) {
+    if (cSet.has(w)) matched++;
+  }
+  return matched >= Math.max(1, Math.ceil(qWords.length * 0.5));
+}
+
+async function resolveSpotifyTrackUrl(title, artist) {
+  const qTitle = String(title || "").trim();
+  const qArtist = String(artist || "").trim();
+  if (!qTitle) return { spotifyUrl: "", spotifyThumb: "" };
+  const queries = [];
+  if (qArtist) queries.push(`site:open.spotify.com/track ${qTitle} ${qArtist}`);
+  queries.push(`site:open.spotify.com/track ${qTitle}`);
+  const hdrs = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml",
+  };
+  for (const dq of queries) {
+    try {
+      const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(dq)}`;
+      const res = await fetch(ddgUrl, { headers: hdrs, signal: AbortSignal.timeout(3200) });
+      if (!res.ok) continue;
+      const html = await res.text();
+      let decoded = html;
+      try { decoded = decodeURIComponent(html); } catch (_) {}
+      const ids = [];
+      const re = /open\.spotify\.com(?:\/intl-[a-z-]+)?\/track\/([A-Za-z0-9]{22})/gi;
+      let m;
+      while ((m = re.exec(decoded)) !== null && ids.length < 3) {
+        if (!ids.includes(m[1])) ids.push(m[1]);
+      }
+      if (ids.length === 0) continue;
+      const verified = await Promise.all(
+        ids.map(async (tid) => {
+          const spUrl = `https://open.spotify.com/track/${tid}`;
+          try {
+            const oRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spUrl)}`, {
+              headers: { "User-Agent": hdrs["User-Agent"] },
+              signal: AbortSignal.timeout(2200),
+            });
+            if (!oRes.ok) return null;
+            const oJson = await oRes.json().catch(() => null);
+            return oJson && oJson.title
+              ? { tid, spotifyUrl: spUrl, spTitle: String(oJson.title), spotifyThumb: String(oJson.thumbnail_url || "") }
+              : null;
+          } catch (_) {
+            return null;
+          }
+        })
+      );
+      const valid = verified.filter(Boolean);
+      const exact = valid.find((v) => titleMatchesTrack(qTitle, v.spTitle)) || valid[0];
+      if (exact) return { spotifyUrl: exact.spotifyUrl, spotifyThumb: exact.spotifyThumb };
+      return { spotifyUrl: `https://open.spotify.com/track/${ids[0]}`, spotifyThumb: "" };
+    } catch (_) {}
+  }
+  return { spotifyUrl: "", spotifyThumb: "" };
+}
+
+async function resolveYoutubeTrack(videoId, manualQuery = "") {
+  const cacheKey = videoId || ("q:" + foldNorm(manualQuery));
+  const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
+  if (cached && cached.schemaVer === 2 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
-  let ytTitle = "";
+  let ytTitle = String(manualQuery || "").trim();
   let ytAuthor = "";
-  let thumbUrl = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
-  try {
-    const oeRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`, {
-      signal: AbortSignal.timeout(3500),
-    });
-    if (oeRes.ok) {
-      const oe = await oeRes.json();
-      ytTitle = String(oe?.title || "").trim();
-      ytAuthor = String(oe?.author_name || "").trim();
-      if (oe?.thumbnail_url) thumbUrl = oe.thumbnail_url;
-    }
-  } catch (_) {}
+  let thumbUrl = videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : "";
+  if (videoId) {
+    try {
+      const oeRes = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`, {
+        signal: AbortSignal.timeout(3500),
+      });
+      if (oeRes.ok) {
+        const oe = await oeRes.json();
+        ytTitle = String(oe?.title || "").trim();
+        ytAuthor = String(oe?.author_name || "").trim();
+        if (oe?.thumbnail_url) thumbUrl = oe.thumbnail_url;
+      }
+    } catch (_) {}
+  }
 
   const { cleanTitle, cleanAuthor } = cleanYoutubeTitle(ytTitle, ytAuthor);
+  let titleQueryForMatch = cleanTitle;
+  const dashSplit = cleanTitle.split(/\s*[-–|]\s*/).filter(Boolean);
+  if (dashSplit.length >= 2) {
+    titleQueryForMatch = dashSplit.reduce((a, b) => (a.length >= b.length ? a : b));
+  }
   const terms = [];
   if (cleanTitle) {
     if (cleanAuthor && !cleanTitle.toLowerCase().includes(cleanAuthor.toLowerCase())) {
       terms.push(`${cleanTitle} ${cleanAuthor}`);
     }
     terms.push(cleanTitle);
-    const dashParts = cleanTitle.split(/\s*[-–|]\s*/).filter(Boolean);
-    if (dashParts.length >= 2) terms.push(`${dashParts[0]} ${dashParts[1]}`);
+    if (dashSplit.length >= 2) terms.push(`${dashSplit[0]} ${dashSplit[1]}`);
   } else if (cleanAuthor) {
     terms.push(cleanAuthor);
   }
@@ -4850,22 +4995,30 @@ async function resolveYoutubeTrack(videoId) {
   const searchHeaders = { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", "Accept": "application/json" };
   for (const term of terms) {
     try {
-      const [itRes, dzRes] = await Promise.all([
-        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=3`, { headers: searchHeaders, signal: AbortSignal.timeout(3500) }).catch(() => null),
-        fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=3`, { headers: searchHeaders, signal: AbortSignal.timeout(3500) }).catch(() => null),
+      const [itVnRes, dzRes] = await Promise.all([
+        fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=VN&media=music&entity=song&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
+        fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
       ]);
-      if (itRes && itRes.ok) {
-        const itJson = await itRes.json().catch(() => null);
-        const hit = (itJson?.results || []).find((x) => x && x.previewUrl) || (itJson?.results || [])[0];
-        if (hit && hit.previewUrl) { itunesHit = hit; break; }
+      const pickItunes = (itJson) => {
+        const list = (itJson?.results || []).filter((x) => x && (titleMatchesTrack(cleanTitle, x.trackName) || titleMatchesTrack(titleQueryForMatch, x.trackName)));
+        return list.find((x) => x.previewUrl) || list[0] || null;
+      };
+      if (itVnRes && itVnRes.ok) {
+        itunesHit = pickItunes(await itVnRes.json().catch(() => null));
+      }
+      if (!itunesHit) {
+        const itUsRes = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&country=US&media=music&entity=song&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3000) }).catch(() => null);
+        if (itUsRes && itUsRes.ok) {
+          itunesHit = pickItunes(await itUsRes.json().catch(() => null));
+        }
       }
       if (dzRes && dzRes.ok && !deezerHit) {
         const dzJson = await dzRes.json().catch(() => null);
-        const dhit = (dzJson?.data || []).find((x) => x && x.preview) || (dzJson?.data || [])[0];
-        if (dhit && dhit.preview) deezerHit = dhit;
+        const dzList = (dzJson?.data || []).filter((x) => x && (titleMatchesTrack(cleanTitle, x.title_short || x.title) || titleMatchesTrack(titleQueryForMatch, x.title_short || x.title)));
+        deezerHit = dzList.find((x) => x.preview) || dzList[0] || (dzJson?.data || [])[0] || null;
       }
+      if (itunesHit && deezerHit) break;
     } catch (_) {}
-    if (deezerHit) break;
   }
 
   let title = (itunesHit?.trackName || deezerHit?.title_short || deezerHit?.title || cleanTitle || "YouTube Music").trim();
@@ -4877,37 +5030,72 @@ async function resolveYoutubeTrack(videoId) {
       artist = dashMatch[2].trim();
     }
   }
-  const artworkUrl = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb") || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
-  const previewUrl = itunesHit?.previewUrl || deezerHit?.preview || "";
+
+  const [dzDetail, spRes] = await Promise.all([
+    deezerHit?.id
+      ? fetch(`https://api.deezer.com/track/${deezerHit.id}`, { headers: searchHeaders, signal: AbortSignal.timeout(2500) })
+          .then((r) => (r.ok ? r.json().catch(() => null) : null))
+          .catch(() => null)
+      : Promise.resolve(null),
+    resolveSpotifyTrackUrl(title, artist),
+  ]);
+
+  let isrc = String(dzDetail?.isrc || "").trim();
+  if (!isrc && title) {
+    try {
+      const mbQ = artist && artist !== "YouTube" ? `${title} ${artist}` : title;
+      const mbRes = await fetch(`https://musicbrainz.org/ws/2/recording/?query=${encodeURIComponent(mbQ)}&fmt=json&limit=2&inc=isrcs`, {
+        headers: { "User-Agent": "LocketTommmStudio/1.0 (https://github.com/tommm1207)" },
+        signal: AbortSignal.timeout(2200),
+      });
+      if (mbRes.ok) {
+        const mbJson = await mbRes.json().catch(() => null);
+        const isrcs = mbJson?.recordings?.[0]?.isrcs;
+        if (Array.isArray(isrcs) && isrcs[0]) isrc = String(isrcs[0]).trim();
+      }
+    } catch (_) {}
+  }
+
+  const itunesArt = (itunesHit?.artworkUrl100 || "").replace("100x100bb", "600x600bb");
+  const artworkUrl = itunesArt || spRes.spotifyThumb || dzDetail?.album?.cover_big || deezerHit?.album?.cover_big || deezerHit?.album?.cover_medium || thumbUrl;
+  const previewUrl = itunesHit?.previewUrl || dzDetail?.preview || deezerHit?.preview || "";
   const appleMusicUrl = itunesHit?.trackViewUrl || deezerHit?.link || "";
-  const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerHit?.id ? String(deezerHit.id) : videoId);
+  const spotifyUrl = spRes.spotifyUrl || "";
+  const songId = itunesHit?.trackId ? String(itunesHit.trackId) : (deezerHit?.id ? String(deezerHit.id) : (videoId || "query"));
 
   let colors = ["#1E1B4B", "#4C1D95"];
-  try {
-    const imgRes = await fetch(artworkUrl, { headers: searchHeaders, signal: AbortSignal.timeout(3500) });
-    if (imgRes.ok) {
-      const buf = new Uint8Array(await imgRes.arrayBuffer());
-      colors = extractDominantColorsFromJpeg(buf);
-    }
-  } catch (_) {}
+  if (artworkUrl) {
+    try {
+      const imgRes = await fetch(artworkUrl, { headers: searchHeaders, signal: AbortSignal.timeout(3000) });
+      if (imgRes.ok) {
+        const buf = new Uint8Array(await imgRes.arrayBuffer());
+        colors = extractDominantColorsFromJpeg(buf);
+      }
+    } catch (_) {}
+  }
 
   const track = {
-    videoId,
+    schemaVer: 2,
+    videoId: videoId || "",
     songId,
     title,
     artist,
     artworkUrl,
     previewUrl,
+    spotifyUrl,
     appleMusicUrl,
+    isrc,
     colors,
     source: itunesHit ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed"),
     ts: Date.now(),
   };
-  if (YT_TRACK_CACHE.size > 50) {
-    const firstKey = YT_TRACK_CACHE.keys().next().value;
-    if (firstKey) YT_TRACK_CACHE.delete(firstKey);
+  if (cacheKey) {
+    if (YT_TRACK_CACHE.size > 50) {
+      const firstKey = YT_TRACK_CACHE.keys().next().value;
+      if (firstKey) YT_TRACK_CACHE.delete(firstKey);
+    }
+    YT_TRACK_CACHE.set(cacheKey, track);
   }
-  YT_TRACK_CACHE.set(videoId, track);
   LAST_YT_TRACK = track;
   return track;
 }
@@ -5157,13 +5345,14 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     if (request.method === "POST") {
       const b = await request.json().catch(() => ({}));
       const vid = String(b?.videoId || b?.video_id || "").trim();
-      if (!/^[A-Za-z0-9_-]{11}$/.test(vid)) {
+      const q = String(b?.query || b?.q || "").trim();
+      if (!/^[A-Za-z0-9_-]{11}$/.test(vid) && !q) {
         return new Response(JSON.stringify({ ok: false, error: "invalid_video_id" }), {
           status: 400,
           headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
         });
       }
-      const track = await resolveYoutubeTrack(vid);
+      const track = await resolveYoutubeTrack(/^[A-Za-z0-9_-]{11}$/.test(vid) ? vid : "", q);
       return new Response(JSON.stringify({ ok: true, track }), {
         status: 200,
         headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
@@ -5610,11 +5799,19 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
           if (upNode && typeof upNode === "object") upKeys = Object.keys(upNode);
           const blocked = !upRes.ok || !upJson || !!upJson.error || !!upJson.result?.error || (typeof upJson.result?.status === "number" && upJson.result.status >= 400) || /requires_gold|permission-denied|unauthenticated|error/i.test(upTxt);
           if (!blocked) {
+            const upIds = [
+              upNode?.id, upNode?.uid, upNode?.filter_id, upNode?.filterId,
+              upJson?.result?.filter?.id, upJson?.result?.filter?.uid, upJson?.id, upJson?.uid,
+            ].filter((v) => typeof v === "string" && v.trim());
+            for (const cid of [...new Set(upIds)]) {
+              await putCustomLookPrompt(cid.trim(), rawPrompt, state);
+            }
             LAST_DEBUG = {
               mode: "create_filter_upstream_ok",
               path: url.pathname,
               upStatus,
               upKeys,
+              savedIds: [...new Set(upIds)],
               reqKeys: dataNode && typeof dataNode === "object" ? Object.keys(dataNode) : [],
               uiKeys: ui && typeof ui === "object" ? Object.keys(ui) : typeof ui,
               ts: new Date().toISOString(),
@@ -5698,7 +5895,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
           tryButtonEnabled: true,
           try_button_enabled: true,
         };
-        await putCustomLookPrompt(newId, rawPrompt);
+        await putCustomLookPrompt(newId, rawPrompt, state);
         LAST_DEBUG = {
           mode: "create_filter_meta_fallback",
           path: url.pathname,
@@ -5999,7 +6196,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     // and fall back to Cloudflare FLUX.2 only for custom AI filters or if Locket server rejects (403/gold/credits)
     const aiReq = detectAiRequest(dataNode, rawBodyText);
     if (aiReq && aiReq.source === "dynamic_filter_id" && aiReq.filterId) {
-      const savedPrompt = await getCustomLookPrompt(aiReq.filterId);
+      const savedPrompt = await getCustomLookPrompt(aiReq.filterId, state);
       if (savedPrompt) {
         aiReq.source = "custom_prompt";
         aiReq.rawUserPrompt = savedPrompt;
@@ -6065,9 +6262,10 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
             ? translateCustomLookPromptToEn(env, aiReq.rawUserPrompt).catch(() => aiReq.rawUserPrompt)
             : Promise.resolve(null),
         ]);
-        const effectivePrompt = translatedCustomEn
+        const rawEffectivePrompt = translatedCustomEn
           ? (/keep the exact same person/i.test(translatedCustomEn) ? translatedCustomEn : CUSTOM_LOOK_LOCK + translatedCustomEn)
           : (aiReq.source === "custom_prompt" && aiReq.rawUserPrompt ? CUSTOM_LOOK_LOCK + aiReq.rawUserPrompt : aiReq.prompt);
+        const effectivePrompt = sanitizePromptForFlux(rawEffectivePrompt, false);
 
         let aiOut = null;
         let usedModel = null;
@@ -6153,15 +6351,25 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
               const errMsg = String(err?.message || err);
               cfErr = (cfErr ? cfErr + " | " : "") + errMsg;
               if (err?.cfCode === 3030 || /flagged|choose another prompt/i.test(errMsg)) {
-                const retryPrompt =
-                  effectivePrompt.replace(/\b(police|officer|traffic|uniform|helmet|shopee|grab|logo|badge|brand)\b/gi, (m) =>
-                    /helmet/i.test(m) ? "riding cap" : /police|officer/i.test(m) ? "attendant" : "service"
-                  ) + " Everyday safe candid portrait photography.";
+                const retryPrompt = sanitizePromptForFlux(effectivePrompt, true);
                 try {
                   aiOut = await runFluxPooled(env, retryPrompt, preparedInput, null, ai3dModel, null, ai3dOpts);
                   usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
                 } catch (retryErr) {
-                  cfErr += " | retry: " + String(retryErr?.message || retryErr);
+                  const rMsg = String(retryErr?.message || retryErr);
+                  cfErr += " | retry1: " + rMsg;
+                  if (retryErr?.cfCode === 3030 || /flagged|choose another prompt/i.test(rMsg)) {
+                    const isHeroLike = /cape|royal-blue|heroic|si[eê]u\s*nh[aâ]n/i.test(effectivePrompt + " " + (aiReq?.rawUserPrompt || ""));
+                    const ultraSafePrompt = isHeroLike
+                      ? "Edit input_image_0 keeping the exact same person, identical face, eyes, expression, hair, and background completely untouched. Dress them in stylish casual matte themed outerwear with a colorful cloth cape and jacket accents matching the requested theme. Raw candid everyday smartphone portrait."
+                      : "Edit input_image_0 keeping the exact same person, identical face, eyes, expression, hair, and background completely untouched. Dress them in stylish casual matte themed outerwear and accessories matching the requested look. Raw candid everyday smartphone portrait.";
+                    try {
+                      aiOut = await runFluxPooled(env, ultraSafePrompt, preparedInput, null, ai3dModel, null, ai3dOpts);
+                      usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
+                    } catch (retry2Err) {
+                      cfErr += " | retry2: " + String(retry2Err?.message || retry2Err);
+                    }
+                  }
                 }
               }
             }
@@ -6233,7 +6441,7 @@ export class StudioRoom {
   }
 
   async fetch(request) {
-    return handleStudioRequest(request, this.env);
+    return handleStudioRequest(request, this.env, this.state);
   }
 }
 
