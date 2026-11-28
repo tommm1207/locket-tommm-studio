@@ -1533,7 +1533,24 @@ const musicCaptionsSection = {
         { overlay_id: "caption:music_bat_nhac_chill", source: "remote", caption: { type: "static_content", text: "Bật nhạc lên chill thôi", max_lines: 1, text_color: "#FFFFFF", icon: { type: "sf_symbol", data: "radio.fill" }, background: { colors: ["#0A1F14", "#14532D"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
     ],
 };
-const customExtraSections = [musicCaptionsSection, animatedCaptionsSection].concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
+const lifestyleCaptionsSection = {
+    section: "✨ Đời Sống & Tâm Trạng 🤍",
+    items: [
+        { overlay_id: "caption:life_nang_luong", source: "remote", caption: { type: "static_content", text: "Nạp đầy năng lượng", max_lines: 1, text_color: "#FEF3C7", icon: { type: "sf_symbol", data: "bolt.fill" }, background: { colors: ["#78350F", "#D97706"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_dem_mat", source: "remote", caption: { type: "static_content", text: "Đêm nay mát trời ghê", max_lines: 1, text_color: "#DBEAFE", icon: { type: "sf_symbol", data: "cloud.moon.fill" }, background: { colors: ["#0F172A", "#2563EB"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_nang_dep", source: "remote", caption: { type: "static_content", text: "Hôm nay trời nắng đẹp", max_lines: 1, text_color: "#FEF3C7", icon: { type: "sf_symbol", data: "sun.max.fill" }, background: { colors: ["#9A3412", "#EA580C"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_ca_phe", source: "remote", caption: { type: "static_content", text: "Đi cà phê chill thôi", max_lines: 1, text_color: "#FDE68A", icon: { type: "sf_symbol", data: "cup.and.saucer.fill" }, background: { colors: ["#451A03", "#92400E"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_tu_suong", source: "remote", caption: { type: "static_content", text: "Lưu giữ khoảnh khắc", max_lines: 1, text_color: "#FFFFFF", icon: { type: "sf_symbol", data: "camera.fill" }, background: { colors: ["#1E293B", "#475569"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_xem_phim", source: "remote", caption: { type: "static_content", text: "Đang cày phim hay", max_lines: 1, text_color: "#E0E7FF", icon: { type: "sf_symbol", data: "movieclapper.fill" }, background: { colors: ["#312E81", "#6366F1"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_choi_game", source: "remote", caption: { type: "static_content", text: "Đang combat căng thẳng", max_lines: 1, text_color: "#D1FAE5", icon: { type: "sf_symbol", data: "gamecontroller.fill" }, background: { colors: ["#064E3B", "#10B981"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_sen_boss", source: "remote", caption: { type: "static_content", text: "Khoảnh khắc cùng boss", max_lines: 1, text_color: "#FFE4E6", icon: { type: "sf_symbol", data: "pawprint.fill" }, background: { colors: ["#831843", "#F43F5E"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_di_ngu", source: "remote", caption: { type: "static_content", text: "Buồn ngủ lắm rồi", max_lines: 1, text_color: "#E0E7FF", icon: { type: "sf_symbol", data: "moon.zzz.fill" }, background: { colors: ["#1E1B4B", "#4338CA"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_dang_hong", source: "remote", caption: { type: "static_content", text: "Đang hóng biến căng", max_lines: 1, text_color: "#F8FAFC", icon: { type: "sf_symbol", data: "eye.fill" }, background: { colors: ["#334155", "#0F172A"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_sinh_nhat", source: "remote", caption: { type: "static_content", text: "Happy Birthday", max_lines: 1, text_color: "#FCE7F3", icon: { type: "sf_symbol", data: "birthday.cake.fill" }, background: { colors: ["#9D174D", "#EC4899"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+        { overlay_id: "caption:life_het_pin", source: "remote", caption: { type: "static_content", text: "Sắp sập nguồn rồi", max_lines: 1, text_color: "#FEE2E2", icon: { type: "sf_symbol", data: "battery.0percent" }, background: { colors: ["#7F1D1D", "#B91C1C"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
+    ],
+};
+const customExtraSections = [musicCaptionsSection, animatedCaptionsSection, lifestyleCaptionsSection].concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
     dvOverlays.filter(s => !s.section.includes("General") && !s.section.includes("Decorative by Locket"))
 );
 
@@ -2022,7 +2039,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "106";
+var RC_VER = "107";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
