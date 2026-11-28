@@ -84,7 +84,7 @@ const FACE_LOCK_KEEP_BG =
   "Edit input_image_0 keeping the exact same person, identical face, eyes, nose, mouth, natural skin texture, expression, head position, hair, and original background untouched. Candid smartphone photo, matte realistic lighting: ";
 
 const FACE_LOCK_SWAP_BG =
-  "Edit input_image_0 keeping the exact same person, identical face, eyes, nose, mouth, natural skin texture, expression, head angle, and exact head position in frame untouched. Candid smartphone photo, matte natural lighting: ";
+  "Edit input_image_0 keeping the exact same person, identical face shape, eyes, exact eye expression, glasses if worn, nose, lips, natural unretouched skin texture, head angle, and exact head position in frame completely untouched. Raw unedited iPhone front-camera selfie, natural matte lighting, slight realistic phone camera grain, zero airbrushing, zero CGI gloss: ";
 
 const FACE_LOCK_STYLIZED =
   "Preserve the person's recognizable facial features, identity, and expression while cleanly rendering this stylized effect: ";
@@ -94,6 +94,7 @@ const CUSTOM_LOOK_LOCK =
 
 const SWAP_BG_AI_IDS = new Set([
   "ai_cong_chua_phong_tro", "ai_hoang_tu_ktx", "ai_di_phu_ho", "ai_ve_que_nuoi_ca",
+  "ai_shipper_giao_hang", "stk_shopee_food", "ai_grab_driver", "ai_xanh_sm",
   "ai_bac_si", "ai_tong_tai", "ai_phu_ba", "ai_thieu_gia", "ai_du_thuyen",
   "ai_hau_gai", "ai_hoang_thuong", "ai_idol_kpop", "ai_cosplay_wibu",
   "ai_masterchef", "ai_csgt", "ai_mua_xuan", "ai_mua_he", "ai_mua_thu", "ai_mua_dong",
@@ -110,10 +111,6 @@ const FOREGROUND_SEG_PROMPT =
   "Create a solid pure black-and-white silhouette matte of this exact photo. Paint the ENTIRE main foreground subject (person including ALL dark hair, bangs, head, face, neck, shoulders, hands, and clothing, or main pet/object/dish) as ONE continuous solid pure white (#FFFFFF) shape with ZERO dark holes or missing hair strands inside. Paint ONLY the distant background pure black (#000000). Keep exact pixel alignment with zero cropping or shifting.";
 
 const BG_PRESERVE_HARMONY = {
-  ai_mua_xuan: { rMul: 1.03, gMul: 1.00, bMul: 1.01, brightness: 3 },
-  ai_mua_he: { rMul: 1.04, gMul: 1.02, bMul: 0.96, brightness: 4 },
-  ai_mua_thu: { rMul: 1.05, gMul: 1.01, bMul: 0.94, brightness: 1 },
-  ai_mua_dong: { rMul: 0.96, gMul: 0.99, bMul: 1.05, brightness: 1 },
   fireworks: { rMul: 1.02, gMul: 1.00, bMul: 0.98, brightness: -4 },
   ocean_underwater: { rMul: 0.94, gMul: 1.01, bMul: 1.07, brightness: 0 },
   volcano_lava: { rMul: 1.07, gMul: 0.99, bMul: 0.93, brightness: -2 },
@@ -156,7 +153,7 @@ const AI_FILTER_PROMPTS = {
   stk_gojo_satoru:
     "Strictly preserve the exact half-body framing, crop, face shape, pose, and background. ONLY replace the hairstyle and outfit with a realistic Satoru Gojo cosplay: natural-textured spiky silver-white hair, a matte black fabric blindfold covering both eyes, and a matte black high-collar Jujutsu jacket with natural fabric folds.",
   stk_shopee_food:
-    "Dress the person in an authentic matte bright orange ShopeeFood delivery rider jacket with white logo on the left chest, front zipper, natural fabric folds, and an orange ShopeeFood motorcycle helmet with natural outdoor lighting.",
+    "Change only the clothing and background. Dress the person in a realistic matte bright orange-red waterproof Vietnamese food-delivery windbreaker jacket with black front zipper and black delivery backpack straps (plain clean fabric with subtle white piping, strictly no text, letters, or logos), wearing a realistic smooth bright orange open-face Vietnamese motorbike half-helmet with black chin strap resting naturally on their head (not a bicycle helmet or hard hat). Softly blurred overcast Saigon street background with natural matching outdoor daylight.",
   fireworks: "Keep the person's exact body position, pose, hair, and original clothes unchanged. Fill ONLY the night sky background behind them with colorful fireworks bursting with warm glowing sparks and natural camera bokeh.",
   harry_potter: "Dress the person in a matte black wool Hogwarts wizard robe with a red-and-gold striped Gryffindor scarf and thin round metal glasses in natural candid lighting.",
   minecraft: "Restyle the background and clothing into blocky 3D Minecraft voxel geometry and pixelated textures while keeping the person's face recognizable.",
@@ -239,13 +236,13 @@ const AI_FILTER_PROMPTS = {
   ai_polaroid_string:
     "Frame the person's untouched real photo cleanly inside a realistic printed instant Polaroid photograph hanging from natural twine string with a tiny wooden clothespin over warm ambient room bokeh.",
   ai_shipper_giao_hang:
-    "Dress the person in an authentic matte red-and-orange express delivery courier jacket with matching delivery helmet and parcel bag in natural street daylight.",
+    "Change only the clothing and background. Dress the person in a realistic matte crimson-red and dark-charcoal Vietnamese express parcel courier windbreaker jacket with front zipper and dark delivery backpack straps (plain fabric, strictly no text, letters, or logos), wearing a realistic smooth matte red open-face Vietnamese motorbike half-helmet with black chin strap resting naturally on their head (not a construction hard hat or bicycle helmet). Softly blurred overcast Vietnamese city street background with natural outdoor daylight.",
   ai_grab_driver:
-    "Dress the person in an authentic matte emerald green GrabBike rider jacket and matching green Grab motorcycle helmet with crisp natural fabric folds in outdoor daylight.",
+    "Change only the clothing and background. Dress the person in a realistic matte emerald-green and black color-blocked motorbike ride-hailing rider windbreaker jacket with front zipper and subtle white reflective stripe (plain fabric, strictly no text, letters, or logos), wearing a realistic smooth emerald-green open-face Vietnamese motorbike half-helmet with black chin strap resting naturally on their head (not a bicycle helmet or hard hat). Softly blurred overcast Vietnamese street with green trees behind in natural outdoor daylight.",
   ai_xanh_sm:
-    "Dress the person in an authentic matte cyan-turquoise Xanh SM electric taxi/bike rider jacket with matching cyan helmet in outdoor daylight.",
+    "Change only the clothing and background. Dress the person in a realistic matte cyan-turquoise motorbike ride-hailing windbreaker jacket with dark-navy collar and front zipper (plain clean fabric, strictly no text, letters, or logos), wearing a realistic smooth solid cyan-turquoise open-face Vietnamese motorbike half-helmet with black chin strap resting naturally on their head (not a vented bicycle helmet). Softly blurred overcast Vietnamese city street background in natural outdoor daylight.",
   ai_bac_si:
-    "Dress the person in a crisp matte white cotton doctor lab coat with a realistic medical stethoscope draped naturally around the neck inside a real bright clinic room with natural indoor light.",
+    "Change only the clothing and background. Dress the person in a realistic slightly wrinkled matte white cotton doctor lab coat worn over a plain casual shirt with a real matte dark-grey medical stethoscope draped naturally around the neck (no text or name tags), inside a genuine everyday hospital clinic room with softly blurred background and natural muted indoor fluorescent and window light.",
   ai_tong_tai:
     "Dress the person in a tailored matte charcoal black wool suit and understated silk tie standing naturally inside a real high-rise office with soft overcast city window daylight behind them, candid smartphone camera realism.",
   ai_phu_ba:
@@ -277,17 +274,17 @@ const AI_FILTER_PROMPTS = {
   nm_faker:
     "Place the person naturally into the iconic League of Legends T1 Faker 'shhh' esports photo, wearing the official matte black-and-red T1 esports jersey with glasses, holding one index finger gently against their lips in real esports arena lighting with authentic handheld camera grain.",
   ai_mua_xuan:
-    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a natural candid spring park path with real pale pink cherry blossom trees, soft overcast morning daylight, a few blurred petals in the air, and realistic natural depth of field.",
+    "Keep the person's exact body position, pose, hair, glasses if worn, and original clothing completely unchanged. Replace ONLY the background behind them with a softly out-of-focus spring park path with real pale pink cherry blossom branches and a few softly blurred falling petals in gentle overcast morning daylight, letting soft natural ambient light wrap subtly onto hair edges and shoulders so they blend realistically into the scene.",
   ai_mua_he:
-    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a natural sunlit summer coastal boardwalk and calm blue sea horizon under realistic afternoon sunlight and soft natural lens blur, no oversaturated colors.",
+    "Keep the person's exact body position, pose, hair, glasses if worn, and original clothing completely unchanged. Replace ONLY the background behind them with a softly out-of-focus sunlit summer coastal boardwalk and calm blue sea horizon under natural afternoon daylight, with subtle realistic warm daylight rim on hair edges and shoulders, muted authentic phone camera colors and natural lens blur, never oversaturated.",
   ai_mua_thu:
-    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a quiet natural autumn tree-lined street with muted amber and brown maple leaves and soft late-afternoon natural daylight, realistic handheld camera depth of field.",
+    "Keep the person's exact body position, pose, hair, glasses if worn, and original clothing completely unchanged. Replace ONLY the background behind them with a softly out-of-focus quiet autumn tree-lined street with muted amber, rust, and golden-brown maple leaves in soft late-afternoon daylight, with gentle warm ambient light blending naturally onto hair edges and shoulders, earthy authentic smartphone tones.",
   ai_mua_dong:
-    "Keep the person's exact body position, pose, hair, and original clothes unchanged. Replace ONLY the background behind them with a quiet overcast winter city street with gentle light falling snow and muted cool winter daylight, authentic candid camera depth of field.",
+    "Keep the person's exact body position, pose, hair, glasses if worn, and original clothing completely unchanged. Replace ONLY the background behind them with a softly out-of-focus quiet overcast winter city street with gentle light falling snow and a few tiny soft snowflakes near the hair and shoulders, subtly cooling the ambient light on hair edges and shoulders so they fit naturally in the winter scene.",
   ai_masterchef:
-    "Dress the person in a real matte white cotton chef coat and chef toque hat standing naturally inside an authentic stainless-steel restaurant kitchen with realistic fluorescent/ambient indoor light and natural smartphone camera texture.",
+    "Change only the clothing and background. Dress the person in a realistic matte white cotton double-breasted chef jacket with a dark apron strap (plain fabric, no text or logos) and a neatly proportioned low-profile matte white chef cap sitting naturally on their head (not an oversized puffy cartoon toque), inside a real lived-in stainless-steel restaurant kitchen with softly blurred background and natural warm indoor kitchen light.",
   ai_csgt:
-    "Dress the person in an authentic matte golden-tan Vietnamese traffic police (CSGT) uniform jacket with neat badges and matching peaked cap on a real sunlit tree-lined city street in candid daylight.",
+    "Change only the clothing and background. Dress the person in a realistic matte khaki-tan cotton Vietnamese traffic officer uniform shirt with natural fabric folds and simple gold-trimmed shoulder epaulets (strictly no name tags, text, or gibberish letters) and a neatly proportioned matte khaki-tan peaked uniform cap resting naturally on their head, on a softly blurred overcast tree-lined Vietnamese city street with muted natural daylight.",
 };
 
 const MEMORY_IMAGES = new Map();
@@ -6153,7 +6150,20 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
               aiOut = await runFluxPooled(env, effectivePrompt, preparedInput, refImg, ai3dModel, null, ai3dOpts);
               usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
             } catch (err) {
-              cfErr = (cfErr ? cfErr + " | " : "") + String(err?.message || err);
+              const errMsg = String(err?.message || err);
+              cfErr = (cfErr ? cfErr + " | " : "") + errMsg;
+              if (err?.cfCode === 3030 || /flagged|choose another prompt/i.test(errMsg)) {
+                const retryPrompt =
+                  effectivePrompt.replace(/\b(police|officer|traffic|uniform|helmet|shopee|grab|logo|badge|brand)\b/gi, (m) =>
+                    /helmet/i.test(m) ? "riding cap" : /police|officer/i.test(m) ? "attendant" : "service"
+                  ) + " Everyday safe candid portrait photography.";
+                try {
+                  aiOut = await runFluxPooled(env, retryPrompt, preparedInput, null, ai3dModel, null, ai3dOpts);
+                  usedModel = (aiOut.via && aiOut.via !== "binding" ? aiOut.via + " " : "") + aiOut.aiModel;
+                } catch (retryErr) {
+                  cfErr += " | retry: " + String(retryErr?.message || retryErr);
+                }
+              }
             }
           }
         }
