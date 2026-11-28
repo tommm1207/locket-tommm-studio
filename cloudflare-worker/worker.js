@@ -795,7 +795,7 @@ async function getFrameRgba(filterId) {
   const cached = FRAME_CACHE.get(filterId);
   if (cached) return cached;
 
-  const res = await fetch(`${GITHUB_FRAMES_BIN_BASE}/${encodeURIComponent(filterId)}.bin?v=74`);
+  const res = await fetch(`${GITHUB_FRAMES_BIN_BASE}/${encodeURIComponent(filterId)}.bin?v=75`);
   if (!res.ok) throw new Error(`Failed to fetch frame bin for ${filterId}: ${res.status}`);
   const compressed = new Uint8Array(await res.arrayBuffer());
   const rgba = await inflateZlib(compressed);
@@ -1947,6 +1947,94 @@ function applyRainOverlayGlass(rgb, w, h) {
         const lum = 190 * (hl * hl * 0.6 + rim * 0.25);
         screenPixel(rgb, (row + x) * 3, lum, lum * 1.03, lum * 1.08);
       }
+    }
+  }
+}
+
+const FX_ATMOSPHERE_MOODS = {
+  fx_ca_cute: { rMul: 0.96, gMul: 1.02, bMul: 1.07, lift: 5, bloom: 0.18, glowRgb: [165, 235, 255], glAlpha: 0.14 },
+  fx_buom_xinh: { rMul: 1.03, gMul: 1.02, bMul: 0.99, lift: 6, bloom: 0.20, glowRgb: [255, 224, 235], glAlpha: 0.14 },
+  fx_canh_hoa: { rMul: 1.05, gMul: 0.99, bMul: 1.02, lift: 7, bloom: 0.22, glowRgb: [255, 212, 230], glAlpha: 0.16 },
+  fx_sticker_doodle: { rMul: 1.03, gMul: 1.01, bMul: 1.02, lift: 6, bloom: 0.16, glowRgb: [255, 228, 240], glAlpha: 0.13 },
+  fx_bong_bong: { rMul: 1.01, gMul: 1.02, bMul: 1.05, lift: 5, bloom: 0.22, glowRgb: [205, 238, 255], glAlpha: 0.15 },
+  fx_cau_vong: { rMul: 1.04, gMul: 1.02, bMul: 0.98, lift: 6, bloom: 0.20, glowRgb: [255, 228, 195], glAlpha: 0.15, prism: true },
+  fx_sao_lap_lanh: { rMul: 1.01, gMul: 1.00, bMul: 1.05, lift: 4, bloom: 0.23, glowRgb: [255, 236, 200], glAlpha: 0.14 },
+};
+
+function applyKawaiiAtmosphere(rgb, w, h, filterId) {
+  const mood = FX_ATMOSPHERE_MOODS[filterId];
+  if (!mood) return;
+  const total = w * h;
+  let lumSum = 0;
+  let lumCnt = 0;
+  for (let p = 0; p < total; p += 17) {
+    const i = p * 3;
+    lumSum += 0.299 * rgb[i] + 0.587 * rgb[i + 1] + 0.114 * rgb[i + 2];
+    lumCnt++;
+  }
+  const avgLum = lumCnt > 0 ? lumSum / lumCnt : 128;
+  // Dark-scene guard: keeps pitch-black photos rich dark instead of milky washed-out grey
+  const sceneScale = Math.min(1.0, Math.max(0.24, (avgLum - 8) / 80));
+
+  const blurRad = Math.max(6, Math.round(13 * (w / 768)));
+  const blurred = boxBlurRgb(rgb, w, h, blurRad, 1);
+
+  const invW = 1 / w;
+  const invH = 1 / h;
+  const lift = mood.lift * sceneScale;
+  const bloomAmt = mood.bloom;
+  const glScale = mood.glAlpha * sceneScale;
+  const [gr, gg, gb] = mood.glowRgb;
+  const hasPrism = !!mood.prism;
+
+  for (let y = 0; y < h; y++) {
+    const ny = y * invH;
+    const row = y * w * 3;
+    for (let x = 0; x < w; x++) {
+      const nx = x * invW;
+      const i = row + x * 3;
+
+      let r = rgb[i] * mood.rMul + lift;
+      let g = rgb[i + 1] * mood.gMul + lift;
+      let b = rgb[i + 2] * mood.bMul + lift;
+
+      // Soft Pro-Mist highlight bloom
+      const br = blurred[i] > 72 ? (blurred[i] - 72) * bloomAmt : 0;
+      const bg = blurred[i + 1] > 72 ? (blurred[i + 1] - 72) * bloomAmt : 0;
+      const bb = blurred[i + 2] > 72 ? (blurred[i + 2] - 72) * bloomAmt : 0;
+
+      // Delicate upper-left corner pastel light leak
+      const cornerEnv = Math.exp(-((nx * nx + ny * ny) / 0.34)) * glScale;
+      let lr = br + gr * cornerEnv;
+      let lg = bg + gg * cornerEnv;
+      let lb = bb + gb * cornerEnv;
+
+      if (hasPrism) {
+        const u = nx * 0.72 + ny * 0.69;
+        const v = (nx - 0.14) * 0.69 - (ny - 0.11) * 0.72;
+        const beamEnv = Math.exp(-Math.pow((u - 0.25) / 0.16, 2)) * Math.exp(-Math.pow(v / 0.54, 2));
+        if (beamEnv > 0.01) {
+          const pStr = 0.18 * sceneScale * beamEnv;
+          const p1 = Math.exp(-Math.pow((u - 0.15) / 0.06, 2));
+          const p2 = Math.exp(-Math.pow((u - 0.21) / 0.06, 2));
+          const p3 = Math.exp(-Math.pow((u - 0.27) / 0.06, 2));
+          const p4 = Math.exp(-Math.pow((u - 0.33) / 0.06, 2));
+          lr += 255 * pStr * (p1 * 1.0 + p2 * 1.0 + p3 * 0.72 + p4 * 0.65);
+          lg += 255 * pStr * (p1 * 0.56 + p2 * 0.85 + p3 * 0.96 + p4 * 0.82);
+          lb += 255 * pStr * (p1 * 0.60 + p2 * 0.50 + p3 * 0.90 + p4 * 1.00);
+        }
+      }
+
+      r = r > 255 ? 255 : r < 0 ? 0 : r;
+      g = g > 255 ? 255 : g < 0 ? 0 : g;
+      b = b > 255 ? 255 : b < 0 ? 0 : b;
+      const sr = lr > 255 ? 255 : lr;
+      const sg = lg > 255 ? 255 : lg;
+      const sb = lb > 255 ? 255 : lb;
+
+      rgb[i] = (255 - (((255 - r) * (255 - sr)) / 255)) | 0;
+      rgb[i + 1] = (255 - (((255 - g) * (255 - sg)) / 255)) | 0;
+      rgb[i + 2] = (255 - (((255 - b) * (255 - sb)) / 255)) | 0;
     }
   }
 }
@@ -5669,6 +5757,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       }
 
       const frameSrcSize = Math.round(Math.sqrt(frameRgba.length / 4)) || SIZE;
+      if (FX_ATMOSPHERE_MOODS[filterId]) applyKawaiiAtmosphere(canvasRgb, HD_SIZE, HD_SIZE, filterId);
       alphaCompositeRgbaScaledOverRgb(canvasRgb, frameRgba, frameSrcSize, HD_SIZE);
       const encoded = await encodeCanvasToImage(canvasRgb, url.origin, tempId, HD_SIZE);
 
