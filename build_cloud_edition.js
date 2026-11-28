@@ -1704,6 +1704,53 @@ baseRcEntries["create_look_enabled"] = "true";
 baseRcEntries["ai_looks_enabled"] = "true";
 baseRcEntries["looks_enabled"] = "true";
 baseRcEntries["camera_filter_looks_enabled"] = "true";
+baseRcEntries["camera_timer"] = "true";
+baseRcEntries["self_timer"] = "true";
+baseRcEntries["countdown_timer"] = "true";
+baseRcEntries["timer_button_enabled"] = "true";
+baseRcEntries["camera_timer_button_enabled"] = "true";
+baseRcEntries["camera_zoom_pill"] = "true";
+baseRcEntries["zoom_pill"] = "true";
+baseRcEntries["zoom_controls"] = "true";
+baseRcEntries["multi_lens_picker_enabled"] = "true";
+baseRcEntries["lens_picker_enabled"] = "true";
+baseRcEntries["camera_lens_picker_enabled"] = "true";
+baseRcEntries["camera_controls_v2"] = "true";
+baseRcEntries["camera_hud_v2"] = "true";
+baseRcEntries["camera_toolbar_v2"] = "true";
+baseRcEntries["camera_ui_v2"] = "true";
+baseRcEntries["new_camera_ui"] = "true";
+baseRcEntries["new_camera_controls"] = "true";
+baseRcEntries["redesigned_camera"] = "true";
+baseRcEntries["camera_redesign"] = "true";
+baseRcEntries["camera_top_bar_v2_enabled"] = "true";
+baseRcEntries["camera_bottom_bar_v2_enabled"] = "true";
+baseRcEntries["camera_layout_v2_enabled"] = "true";
+baseRcEntries["camera_viewfinder_v2_enabled"] = "true";
+baseRcEntries["camera_controls_redesign_enabled"] = "true";
+baseRcEntries["camera_v2_config"] = JSON.stringify({
+    enabled: true,
+    timer: true,
+    timer_button: true,
+    zoom_pill: true,
+    zoom_controls: true,
+    effects: true,
+    filters: true,
+    styles: true,
+    dazz_cam: true,
+    flash_top: true
+});
+baseRcEntries["face_effects_enabled"] = "true";
+baseRcEntries["camera_effects_v2_enabled"] = "true";
+baseRcEntries["ai_camera_effects_enabled"] = "true";
+baseRcEntries["selfie_filters_enabled"] = "true";
+baseRcEntries["beauty_filters_enabled"] = "true";
+baseRcEntries["ar_effects_enabled"] = "true";
+baseRcEntries["create_ai_filter_enabled"] = "true";
+baseRcEntries["custom_ai_filters_enabled"] = "true";
+baseRcEntries["filter_looks_enabled"] = "true";
+baseRcEntries["user_filters_enabled"] = "true";
+baseRcEntries["camera_filter_v2"] = "true";
 baseRcEntries["dazz_cam_enabled"] = "true";
 baseRcEntries["dazz_enabled"] = "true";
 baseRcEntries["retro_camera_enabled"] = "true";
@@ -2096,6 +2143,9 @@ const TOMMM_FORCE_GATES = [
     "dazz", "dazz_presets", "camera_styles_v2", "camera_looks", "looks", "look_picker", "create_look", "ai_looks", "film_simulations",
     "zoom_pill", "camera_zoom_pill", "zoom_controls", "camera_zoom_controls", "multi_lens_zoom", "optical_zoom", "zoom_presets", "zoom_selector", "camera_zoom_v2", "lens_switcher", "camera_sheet_v2",
     "camera_filter_v2", "camera_filter_sheet", "camera_filter_sheet_selection", "reference_image_attachment",
+    "face_effects", "camera_effects_v2", "ai_camera_effects", "selfie_filters", "beauty_filters", "ar_effects",
+    "create_ai_filter", "custom_ai_filters", "filter_looks", "user_filters", "multi_lens_picker", "lens_picker",
+    "camera_lens_picker", "camera_top_bar_v2", "camera_bottom_bar_v2", "camera_layout_v2", "camera_viewfinder_v2", "camera_controls_redesign",
     "vintage_cameras", "digital_cameras", "instant_cameras", "special_cameras", "locket_cameras", "retro_cam",
     "capture_modes", "capture_styles", "live_camera_filters", "dazz_camera",
     "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie", "golden_hour", "laptop",
@@ -2127,7 +2177,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "111";
+var RC_VER = "112";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2208,7 +2258,7 @@ var rcDiagInteresting = {};
 for (var di = 0; di < rcDiagAllKeys.length; di++) {
     var dk0 = rcDiagAllKeys[di];
     if (dk0 === "camera_filter_config" || dk0 === "overlay_items" || dk0 === "feature_gates" || dk0 === "upsell_features") continue;
-    if (/^(flag_|android_flag_|v2_refresh|navigation|liquid|beta|testflight|join_testflight|debug|purchases|zoom|camera|dazz|film|retro|lens|style|preset|live_photos)/i.test(dk0)) {
+    if (/^(flag_|android_flag_|v2_refresh|navigation|liquid|beta|testflight|join_testflight|debug|purchases|zoom|camera|dazz|film|retro|lens|style|preset|live_photos|feature_gates_override|capture_classification|overlays_config|overlays_v2_config|paywall_config)/i.test(dk0)) {
         rcDiagInteresting[dk0] = String(obj.entries[dk0] || "").slice(0, 360);
     }
 }
@@ -2222,6 +2272,15 @@ for (var fgi = 0; fgi < TOMMM_FORCE_GATES.length; fgi++) {
     liveGates[TOMMM_FORCE_GATES[fgi]] = "enabled";
 }
 obj.entries["feature_gates"] = JSON.stringify(liveGates);
+try {
+    var liveGatesOverride = {};
+    try { liveGatesOverride = JSON.parse(obj.entries["feature_gates_override"] || "{}"); } catch (_) { liveGatesOverride = {}; }
+    if (!liveGatesOverride || typeof liveGatesOverride !== "object" || Array.isArray(liveGatesOverride)) liveGatesOverride = {};
+    for (var fgo = 0; fgo < TOMMM_FORCE_GATES.length; fgo++) {
+        liveGatesOverride[TOMMM_FORCE_GATES[fgo]] = "enabled";
+    }
+    obj.entries["feature_gates_override"] = JSON.stringify(liveGatesOverride);
+} catch (_) {}
 
 // Merge động upsell_features: giữ nguyên mọi key live từ server và ép về false (tắt khóa Gold cho mọi tính năng, kể cả Dazz Cam)
 var liveUpsell = {};
@@ -2269,6 +2328,10 @@ try {
         telephoto: true,
         flash_button: true,
         timer_button: true,
+        timer: true,
+        self_timer: true,
+        zoom_controls: true,
+        zoom_pill: true,
         volume_button: true,
         srgb: true,
         lanczos: true,
