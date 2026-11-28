@@ -329,103 +329,103 @@ def build_all_7_kawaii():
 
     # 1. fx_ca_cute: Dainty pastel goldfish/whales/jellyfish + mini water bubbles scattered evenly full-frame
     c_fish = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(6, 5, margin=42, seed=101, keep_prob=0.92, min_dist=96)
+    pts, rng = generate_jittered_positions(8, 7, margin=28, seed=101, keep_prob=0.92, min_dist=68)
     for i, (cx, cy) in enumerate(pts):
         sp = sea[i % len(sea)]
-        sz = float(rng.uniform(46, 68))
+        sz = float(rng.uniform(38, 58))
         ang = float(rng.uniform(-20, 20))
         flp = bool(rng.integers(0, 2))
-        place_sprite(c_fish, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.90)
+        place_sprite(c_fish, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.68)
     bubble_tiny = make_pastel_bubble_sprite(26, 0.4)
-    b_pts, b_rng = generate_jittered_positions(5, 5, margin=28, seed=102, keep_prob=0.72, min_dist=84)
+    b_pts, b_rng = generate_jittered_positions(7, 7, margin=22, seed=102, keep_prob=0.72, min_dist=56)
     for cx, cy in b_pts:
-        place_sprite(c_fish, bubble_tiny, cx, cy, float(b_rng.uniform(14, 24)), opacity=0.82)
+        place_sprite(c_fish, bubble_tiny, cx, cy, float(b_rng.uniform(13, 22)), opacity=0.58)
 
     # 2. fx_buom_xinh: Dainty pastel watercolor butterflies + soft fairy shimmer dots evenly full-frame
     c_bfly = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(6, 5, margin=42, seed=201, keep_prob=0.92, min_dist=94)
+    pts, rng = generate_jittered_positions(8, 7, margin=28, seed=201, keep_prob=0.92, min_dist=68)
     for i, (cx, cy) in enumerate(pts):
         sp = butterflies[i % len(butterflies)]
-        sz = float(rng.uniform(46, 68))
+        sz = float(rng.uniform(38, 58))
         ang = float(rng.uniform(-34, 34))
         flp = bool(rng.integers(0, 2))
-        place_sprite(c_bfly, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.91)
+        place_sprite(c_bfly, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.68)
     dot_cols = [(191, 219, 254), (251, 207, 232), (221, 214, 254), (254, 240, 138)]
-    d_pts, d_rng = generate_jittered_positions(6, 6, margin=24, seed=202, keep_prob=0.68, min_dist=70)
+    d_pts, d_rng = generate_jittered_positions(8, 7, margin=20, seed=202, keep_prob=0.70, min_dist=52)
     for i, (cx, cy) in enumerate(d_pts):
-        place_sprite(c_bfly, make_pastel_dot_sprite(16, dot_cols[i % len(dot_cols)]), cx, cy, float(d_rng.uniform(8, 14)), opacity=0.75)
+        place_sprite(c_bfly, make_pastel_dot_sprite(16, dot_cols[i % len(dot_cols)]), cx, cy, float(d_rng.uniform(7, 13)), opacity=0.55)
 
     # 3. fx_canh_hoa: Dainty hand-painted sakura flowers & swirling blush-pink petals full-frame
     c_sakura = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(6, 6, margin=36, seed=301, keep_prob=0.94, min_dist=82)
+    pts, rng = generate_jittered_positions(8, 8, margin=26, seed=301, keep_prob=0.94, min_dist=60)
     # Weight 65% swirling petals (indices 2,3,4), 35% full blooms (indices 0,1)
     weights = [0, 1, 2, 3, 4, 2, 3, 4]
     for i, (cx, cy) in enumerate(pts):
         sp_idx = weights[i % len(weights)]
         sp = sakura[sp_idx % len(sakura)]
         is_flower = sp_idx < 2
-        sz = float(rng.uniform(44, 62) if is_flower else rng.uniform(34, 52))
+        sz = float(rng.uniform(36, 52) if is_flower else rng.uniform(28, 44))
         ang = float(rng.uniform(-24, 24) if is_flower else rng.uniform(-180, 180))
         blur = 1.6 if (not is_flower and i % 9 == 0) else 0.0
         if blur > 0:
             sz *= 1.25
-        place_sprite(c_sakura, sp, cx, cy, sz, angle_deg=ang, dof_blur=blur, opacity=0.88)
+        place_sprite(c_sakura, sp, cx, cy, sz, angle_deg=ang, dof_blur=blur, opacity=0.66)
 
     # 4. fx_sticker_doodle: Korean pastel hand-drawn crayon doodles scattered evenly full-frame
     c_doodle = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
     doodle_pool = doodles + ([sparkles[0], sparkles[1]] if len(sparkles) >= 2 else [])
-    pts, rng = generate_jittered_positions(6, 5, margin=42, seed=401, keep_prob=0.92, min_dist=92)
+    pts, rng = generate_jittered_positions(8, 7, margin=28, seed=401, keep_prob=0.92, min_dist=66)
     for i, (cx, cy) in enumerate(pts):
         sp = doodle_pool[i % len(doodle_pool)]
-        sz = float(rng.uniform(40, 62))
+        sz = float(rng.uniform(34, 54))
         ang = float(rng.uniform(-22, 22))
         flp = bool(rng.integers(0, 2)) if (i % len(doodle_pool) in (3, 4)) else False
-        place_sprite(c_doodle, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.92)
+        place_sprite(c_doodle, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.68)
 
     # 5. fx_bong_bong: Kawaii anime pastel translucent soap bubbles scattered evenly full-frame
     c_bubble = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
     bubble_variants = [make_pastel_bubble_sprite(88, h) for h in (0.0, 1.4, 2.8, 4.3)]
     mini_star = make_sparkle_4pt_sprite(32, (255, 255, 255), (224, 242, 254))
-    pts, rng = generate_jittered_positions(6, 6, margin=36, seed=501, keep_prob=0.94, min_dist=84)
+    pts, rng = generate_jittered_positions(8, 8, margin=26, seed=501, keep_prob=0.94, min_dist=60)
     for i, (cx, cy) in enumerate(pts):
         sp = bubble_variants[i % len(bubble_variants)]
-        sz = float(rng.uniform(34, 78) if i % 4 != 0 else rng.uniform(22, 34))
+        sz = float(rng.uniform(30, 70) if i % 4 != 0 else rng.uniform(22, 32))
         ang = float(rng.uniform(-18, 18))
-        place_sprite(c_bubble, sp, cx, cy, sz, angle_deg=ang, opacity=0.90)
-        if sz > 54 and i % 3 == 0:
-            place_sprite(c_bubble, mini_star, cx - sz * 0.28, cy - sz * 0.28, sz * 0.26, opacity=0.92)
+        place_sprite(c_bubble, sp, cx, cy, sz, angle_deg=ang, opacity=0.68)
+        if sz > 48 and i % 3 == 0:
+            place_sprite(c_bubble, mini_star, cx - sz * 0.28, cy - sz * 0.28, sz * 0.26, opacity=0.66)
 
     # 6. fx_cau_vong: Pastel macaron rainbows, smiling suns, rainbow hearts & rain clouds full-frame
     c_rainbow = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(5, 5, margin=48, seed=601, keep_prob=0.94, min_dist=104)
+    pts, rng = generate_jittered_positions(7, 7, margin=30, seed=601, keep_prob=0.94, min_dist=74)
     for i, (cx, cy) in enumerate(pts):
         sp = rainbows[i % len(rainbows)]
         # Make wide rainbow arc slightly larger so clouds at ends stay crisp
-        sz = float(rng.uniform(54, 76) if (i % len(rainbows) == 0) else rng.uniform(44, 62))
+        sz = float(rng.uniform(46, 66) if (i % len(rainbows) == 0) else rng.uniform(36, 54))
         ang = float(rng.uniform(-16, 16))
-        place_sprite(c_rainbow, sp, cx, cy, sz, angle_deg=ang, opacity=0.90)
-    r_dots, r_rng = generate_jittered_positions(6, 5, margin=26, seed=602, keep_prob=0.65, min_dist=74)
+        place_sprite(c_rainbow, sp, cx, cy, sz, angle_deg=ang, opacity=0.68)
+    r_dots, r_rng = generate_jittered_positions(7, 7, margin=22, seed=602, keep_prob=0.72, min_dist=54)
     r_cols = [(254, 205, 211), (254, 240, 138), (167, 243, 208), (186, 230, 253), (221, 214, 254)]
     for i, (cx, cy) in enumerate(r_dots):
-        place_sprite(c_rainbow, make_pastel_dot_sprite(16, r_cols[i % len(r_cols)]), cx, cy, float(r_rng.uniform(8, 13)), opacity=0.80)
+        place_sprite(c_rainbow, make_pastel_dot_sprite(16, r_cols[i % len(r_cols)]), cx, cy, float(r_rng.uniform(7, 12)), opacity=0.58)
 
     # 7. fx_sao_lap_lanh: Kawaii pastel stars, crescent moons & bright glowing 4-pt kirakira sparkles full-frame
     c_sparkle = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(6, 6, margin=36, seed=701, keep_prob=0.94, min_dist=80)
+    pts, rng = generate_jittered_positions(8, 8, margin=24, seed=701, keep_prob=0.94, min_dist=58)
     for i, (cx, cy) in enumerate(pts):
         sp = sparkles[i % len(sparkles)]
-        sz = float(rng.uniform(36, 58))
+        sz = float(rng.uniform(30, 50))
         ang = float(rng.uniform(-22, 22))
-        place_sprite(c_sparkle, sp, cx, cy, sz, angle_deg=ang, opacity=0.92)
+        place_sprite(c_sparkle, sp, cx, cy, sz, angle_deg=ang, opacity=0.70)
     kira_gold = make_sparkle_4pt_sprite(44, (255, 250, 220), (254, 215, 170))
     kira_pink = make_sparkle_4pt_sprite(44, (255, 245, 252), (251, 207, 232))
-    k_pts, k_rng = generate_jittered_positions(6, 6, margin=24, seed=702, keep_prob=0.76, min_dist=64)
+    k_pts, k_rng = generate_jittered_positions(8, 8, margin=20, seed=702, keep_prob=0.78, min_dist=48)
     for i, (cx, cy) in enumerate(k_pts):
         # Avoid sitting directly on top of a big sprite if too close
-        if any((cx - px) ** 2 + (cy - py) ** 2 < 34 ** 2 for px, py in pts):
+        if any((cx - px) ** 2 + (cy - py) ** 2 < 28 ** 2 for px, py in pts):
             continue
         sp = kira_gold if i % 2 == 0 else kira_pink
-        place_sprite(c_sparkle, sp, cx, cy, float(k_rng.uniform(16, 28)), angle_deg=float(k_rng.uniform(-12, 12)), opacity=0.90)
+        place_sprite(c_sparkle, sp, cx, cy, float(k_rng.uniform(14, 24)), angle_deg=float(k_rng.uniform(-12, 12)), opacity=0.66)
 
     return [
         ("fx_ca_cute", np.clip(c_fish, 0, 255).astype(np.uint8)),

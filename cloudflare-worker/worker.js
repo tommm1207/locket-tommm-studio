@@ -795,7 +795,7 @@ async function getFrameRgba(filterId) {
   const cached = FRAME_CACHE.get(filterId);
   if (cached) return cached;
 
-  const res = await fetch(`${GITHUB_FRAMES_BIN_BASE}/${encodeURIComponent(filterId)}.bin`);
+  const res = await fetch(`${GITHUB_FRAMES_BIN_BASE}/${encodeURIComponent(filterId)}.bin?v=74`);
   if (!res.ok) throw new Error(`Failed to fetch frame bin for ${filterId}: ${res.status}`);
   const compressed = new Uint8Array(await res.arrayBuffer());
   const rgba = await inflateZlib(compressed);
