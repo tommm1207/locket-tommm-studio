@@ -947,10 +947,9 @@
                     if (ov.overlay_id !== "caption:music" && ov.data && ov.data.type !== "music") {
                         var didSanitizeThis = false;
                         if (ov.data.background && ov.data.background.image && ov.data.background.image.source === "url" && !isLocketSafeStaticUrl(ov.data.background.image.data)) {
-                            var isWinterStatic = /muadong|dong_nho|lanh_|snow/i.test(String(ov.overlay_id || "") + " " + String(ov.data.text || ""));
                             ov.data.background.image = {
                                 type: "image",
-                                data: isWinterStatic ? "cloud_cover" : "star_sign_background",
+                                data: "star_sign_background",
                                 source: "local"
                             };
                             didSanitizeThis = true;
