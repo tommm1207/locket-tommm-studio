@@ -92,13 +92,14 @@ def alpha_composite_rgba(dst_f, src_rgba_u8, x, y, opacity=1.0):
     dst_f[y0:y1, x0:x1, 3:4] = np.clip(out_a * 255.0, 0.0, 255.0)
 
 
-def place_sprite(canvas_f, sprite_u8, cx, cy, target_max_dim, angle_deg=0.0, flip_x=False, dof_blur=0.0, opacity=1.0):
+def place_sprite(canvas_f, sprite_u8, cx, cy, target_max_dim, angle_deg=0.0, flip_x=False, dof_blur=0.0, opacity=1.0, squash_y=1.0):
     sp = sprite_u8
     if flip_x:
         sp = np.ascontiguousarray(sp[:, ::-1, :])
     h, w = sp.shape[:2]
     scale = target_max_dim / max(h, w)
-    nw, nh = max(4, int(round(w * scale))), max(4, int(round(h * scale)))
+    nw = max(4, int(round(w * scale)))
+    nh = max(4, int(round(h * scale * squash_y)))
     interp = cv2.INTER_AREA if scale < 1.0 else cv2.INTER_CUBIC
 
     f = sp.astype(np.float32)
@@ -213,20 +214,34 @@ def extract_row_sprites(img_path, y0_frac, y1_frac, min_gap=22, label=""):
     return sprites
 
 
-def generate_jittered_positions(cols, rows, margin, seed, keep_prob=0.90, min_dist=72.0):
+def generate_organic_scatter(target_count, margin, min_dist, seed, cluster_prob=0.42, wind_flow=False):
+    """Organic non-grid Poisson + loose natural cluster scatter (never looks like a rigid wallpaper grid)."""
     rng = np.random.default_rng(seed)
-    cw = (OUT_SIZE - 2 * margin) / cols
-    ch = (OUT_SIZE - 2 * margin) / rows
     pts = []
-    cells = [(c, r) for r in range(rows) for c in range(cols)]
-    rng.shuffle(cells)
-    for c, r in cells:
-        if rng.random() > keep_prob:
+    min_d2 = min_dist * min_dist
+    span = OUT_SIZE - 2 * margin
+    attempts = 0
+    max_attempts = target_count * 45
+
+    while len(pts) < target_count and attempts < max_attempts:
+        attempts += 1
+        if len(pts) > 0 and rng.random() < cluster_prob:
+            # Spawn near an existing point to create loose organic 2-3 item drifts
+            ax, ay = pts[int(rng.integers(0, len(pts)))]
+            ang = float(rng.uniform(-2.6, -0.3) if wind_flow else rng.uniform(0, 2 * math.pi))
+            if wind_flow and rng.random() < 0.4:
+                ang += math.pi
+            dist = float(rng.uniform(min_dist * 1.05, min_dist * 1.95))
+            cx = ax + math.cos(ang) * dist
+            cy = ay + math.sin(ang) * dist
+        else:
+            cx = float(rng.uniform(margin, OUT_SIZE - margin))
+            cy = float(rng.uniform(margin, OUT_SIZE - margin))
+
+        if cx < margin or cx > OUT_SIZE - margin or cy < margin or cy > OUT_SIZE - margin:
             continue
-        cx = margin + (c + 0.5 + (rng.random() - 0.5) * 0.62) * cw
-        cy = margin + (r + 0.5 + (rng.random() - 0.5) * 0.62) * ch
-        if all((cx - px) ** 2 + (cy - py) ** 2 >= min_dist ** 2 for px, py in pts):
-            pts.append((float(cx), float(cy)))
+        if all((cx - px) ** 2 + (cy - py) ** 2 >= min_d2 for px, py in pts):
+            pts.append((cx, cy))
     return pts, rng
 
 
@@ -504,51 +519,63 @@ def draw_snow_connecting_accents(theme, bokeh_col, accent_cols, seed):
 
 
 def add_dreamy_pastel_frame(canvas_f, tint_rgb):
-    """Add soft whisper-thin Snow/Meitu pastel edge mist + rounded hairline inner border & corner glints."""
-    S = OUT_SIZE * 2
+    """Add ultra-soft seamless pastel atmosphere mist (ZERO boxy border line or corner dots)."""
     yy, xx = np.mgrid[0:OUT_SIZE, 0:OUT_SIZE].astype(np.float32)
     edge_d = np.minimum(np.minimum(xx, OUT_SIZE - 1 - xx), np.minimum(yy, OUT_SIZE - 1 - yy))
-    # Soft pastel mist fading smoothly inward over ~34px (max alpha ~0.14 right at border)
-    mist_a = np.clip((34.0 - edge_d) / 34.0, 0.0, 1.0)
-    mist_a = (mist_a * mist_a) * 0.14
+    mist_a = np.clip((26.0 - edge_d) / 26.0, 0.0, 1.0)
+    mist_a = (mist_a * mist_a) * 0.07
     mist = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
     mist[..., 0] = tint_rgb[0]
     mist[..., 1] = tint_rgb[1]
     mist[..., 2] = tint_rgb[2]
     mist[..., 3] = mist_a * 255.0
-
-    # Composite mist softly underneath/with existing canvas
     alpha_composite_rgba(mist, np.clip(canvas_f, 0, 255).astype(np.uint8), 0, 0, opacity=1.0)
-
-    # 2x supersampled delicate rounded hairline inner border (inset 14px -> 28px at 2x)
-    b = np.zeros((S, S), dtype=np.float32)
-    ins, rad = 28, 64
-    pts = [
-        (ins + rad, ins), (S - ins - rad, ins),
-        (S - ins, ins + rad), (S - ins, S - ins - rad),
-        (S - ins - rad, S - ins), (ins + rad, S - ins),
-        (ins, S - ins - rad), (ins, ins + rad),
-    ]
-    cv2.line(b, pts[0], pts[1], 1.0, 3, cv2.LINE_AA)
-    cv2.line(b, pts[2], pts[3], 1.0, 3, cv2.LINE_AA)
-    cv2.line(b, pts[4], pts[5], 1.0, 3, cv2.LINE_AA)
-    cv2.line(b, pts[6], pts[7], 1.0, 3, cv2.LINE_AA)
-    cv2.ellipse(b, (ins + rad, ins + rad), (rad, rad), 0, 180, 270, 1.0, 3, cv2.LINE_AA)
-    cv2.ellipse(b, (S - ins - rad, ins + rad), (rad, rad), 0, 270, 360, 1.0, 3, cv2.LINE_AA)
-    cv2.ellipse(b, (S - ins - rad, S - ins - rad), (rad, rad), 0, 0, 90, 1.0, 3, cv2.LINE_AA)
-    cv2.ellipse(b, (ins + rad, S - ins - rad), (rad, rad), 0, 90, 180, 1.0, 3, cv2.LINE_AA)
-    # 4 dainty corner sparkle dots just inside corners
-    for cx, cy in [(ins + 24, ins + 24), (S - ins - 24, ins + 24), (ins + 24, S - ins - 24), (S - ins - 24, S - ins - 24)]:
-        cv2.circle(b, (cx, cy), 4, 1.0, -1, cv2.LINE_AA)
-
-    border_rgba = np.zeros((S, S, 4), dtype=np.float32)
-    border_rgba[..., 0] = 255.0
-    border_rgba[..., 1] = 252.0
-    border_rgba[..., 2] = 254.0
-    border_rgba[..., 3] = np.clip(b * 0.28 * 255.0, 0.0, 255.0)
-    border_down = downsample_premul(border_rgba, OUT_SIZE, OUT_SIZE)
-    alpha_composite_rgba(mist, border_down.astype(np.uint8), 0, 0, opacity=1.0)
     return mist
+
+
+def make_sunlit_pastel_rainbow_arc():
+    """Render graceful sweeping optical sunlit pastel rainbow light-arc + secondary faint arc (2x -> 1x)."""
+    S = OUT_SIZE * 2
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float32)
+    cx, cy = 0.86 * S, 1.04 * S
+    dx = (xx - cx) / S
+    dy = (yy - cy) / S
+    r = np.sqrt(dx * dx + dy * dy)
+    ang = np.arctan2(dy, dx)  # upper-left-to-upper-right sweeps ~ -2.65 .. -1.60 rad
+
+    # Smooth angular window centered at ~ -2.18 rad (upper sky arch fading smoothly at both ends)
+    ang_diff = (ang + 2.18) / 0.50
+    ang_env = np.exp(-(ang_diff * ang_diff))
+
+    # Spectral bands across main curved arc r in [0.80 .. 1.00]
+    bands = [
+        (0.968, 0.026, (255, 172, 194)),  # soft coral-rose
+        (0.938, 0.026, (255, 212, 162)),  # warm peach-gold
+        (0.908, 0.026, (255, 244, 186)),  # pale butter-yellow
+        (0.878, 0.026, (182, 245, 222)),  # delicate mint
+        (0.848, 0.026, (172, 220, 255)),  # airy sky-blue
+        (0.818, 0.026, (214, 190, 255)),  # soft lavender
+    ]
+    rgb_acc = np.zeros((S, S, 3), dtype=np.float32)
+    w_sum = np.zeros((S, S), dtype=np.float32)
+    for r0, rw, col in bands:
+        g = np.exp(-(((r - r0) / rw) ** 2))
+        w_sum += g
+        for ch_i, val in enumerate(col):
+            rgb_acc[..., ch_i] += g * val
+
+    # Subtle warm sunlit entry bloom top-left
+    sun_d2 = ((xx / S) ** 2 + (yy / S) ** 2) / 0.16
+    sun_w = np.exp(-sun_d2) * 0.24
+    rgb_acc[..., 0] += sun_w * 255.0
+    rgb_acc[..., 1] += sun_w * 234.0
+    rgb_acc[..., 2] += sun_w * 205.0
+    w_sum += sun_w
+
+    total_a = np.clip((w_sum * 0.30 * ang_env + sun_w * 0.55), 0.0, 0.38)
+    safe_rgb = np.where(w_sum[..., None] > 1e-4, rgb_acc / np.maximum(w_sum[..., None], 1e-4), 255.0)
+    rgba_2x = np.concatenate([np.clip(safe_rgb, 0, 255), (total_a * 255.0)[..., None]], axis=2)
+    return downsample_premul(rgba_2x, OUT_SIZE, OUT_SIZE)
 
 
 def build_all_7_kawaii():
@@ -557,119 +584,148 @@ def build_all_7_kawaii():
     butterflies = extract_row_sprites(ATLAS_NATURE, 0.34, 0.67, min_gap=20, label="Atlas1-Butterflies")
     sakura = extract_row_sprites(ATLAS_NATURE, 0.67, 1.00, min_gap=20, label="Atlas1-Sakura")
 
-    # Atlas 2: Doodles & Sky (Doodles Row 1, Rainbows Row 2, Sparkles Row 3)
+    # Atlas 2: Doodles (Row 1) & Sparkles (Row 3)
     doodles = extract_row_sprites(ATLAS_DOODLE, 0.00, 0.34, min_gap=8, label="Atlas2-Doodles")
-    rainbows = extract_row_sprites(ATLAS_DOODLE, 0.34, 0.67, min_gap=8, label="Atlas2-Rainbows")
     sparkles = extract_row_sprites(ATLAS_DOODLE, 0.67, 1.00, min_gap=10, label="Atlas2-Sparkles")
 
-    def finalize_layer(theme, sprite_f, bokeh_col, accent_cols, glow_rgb, frame_tint, seed):
+    def finalize_layer(theme, sprite_f, bokeh_col, accent_cols, glow_rgb, frame_tint, seed, glow_strength=0.18):
         bg = draw_snow_connecting_accents(theme, bokeh_col, accent_cols, seed)
-        sp_glow = add_luminous_sprite_aura(sprite_f, glow_rgb, sigma=5.5, strength=0.22)
+        sp_glow = add_luminous_sprite_aura(sprite_f, glow_rgb, sigma=5.0, strength=glow_strength)
         alpha_composite_rgba(bg, np.clip(sp_glow, 0, 255).astype(np.uint8), 0, 0, opacity=1.0)
         return add_dreamy_pastel_frame(bg, frame_tint)
 
-    # 1. fx_ca_cute: Dainty pastel goldfish/whales/jellyfish + mini water bubbles + aqua waves/bokeh
+    # 1. fx_ca_cute: Organic non-grid scatter of pastel sea friends + rising bubble dots
     c_fish = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(8, 7, margin=28, seed=101, keep_prob=0.92, min_dist=68)
+    pts, rng = generate_organic_scatter(44, margin=26, min_dist=60, seed=101, cluster_prob=0.46)
     for i, (cx, cy) in enumerate(pts):
         sp = sea[i % len(sea)]
-        sz = float(rng.uniform(38, 58))
-        ang = float(rng.uniform(-20, 20))
+        sz = float(rng.uniform(34, 58))
+        ang = float(rng.uniform(-24, 24))
         flp = bool(rng.integers(0, 2))
-        place_sprite(c_fish, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.68)
+        op = float(rng.uniform(0.48, 0.64))
+        place_sprite(c_fish, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=op)
     bubble_tiny = make_pastel_bubble_sprite(26, 0.4)
-    b_pts, b_rng = generate_jittered_positions(7, 7, margin=22, seed=102, keep_prob=0.72, min_dist=56)
+    b_pts, b_rng = generate_organic_scatter(34, margin=20, min_dist=50, seed=102, cluster_prob=0.50)
     for cx, cy in b_pts:
-        place_sprite(c_fish, bubble_tiny, cx, cy, float(b_rng.uniform(13, 22)), opacity=0.58)
+        place_sprite(c_fish, bubble_tiny, cx, cy, float(b_rng.uniform(11, 20)), opacity=float(b_rng.uniform(0.42, 0.58)))
     f_fish = finalize_layer("ca_cute", c_fish, (186, 230, 253), [(165, 243, 252), (254, 215, 226), (224, 242, 254)], (215, 245, 255), (186, 230, 253), 103)
 
-    # 2. fx_buom_xinh: Dainty pastel watercolor butterflies + dotted flight trails/bokeh
+    # 2. fx_buom_xinh: Softer translucent pastel butterflies (0.38..0.54) in loose diagonal flight drifts
     c_bfly = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(8, 7, margin=28, seed=201, keep_prob=0.92, min_dist=68)
+    pts, rng = generate_organic_scatter(42, margin=26, min_dist=62, seed=201, cluster_prob=0.48, wind_flow=True)
     for i, (cx, cy) in enumerate(pts):
         sp = butterflies[i % len(butterflies)]
-        sz = float(rng.uniform(38, 58))
-        ang = float(rng.uniform(-34, 34))
+        sz = float(rng.uniform(32, 56))
+        ang = float(rng.uniform(-42, 42))
         flp = bool(rng.integers(0, 2))
-        place_sprite(c_bfly, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.68)
+        op = float(rng.uniform(0.38, 0.54))
+        sq = float(rng.uniform(0.76, 1.0))
+        place_sprite(c_bfly, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=op, squash_y=sq)
     dot_cols = [(191, 219, 254), (251, 207, 232), (221, 214, 254), (254, 240, 138)]
-    d_pts, d_rng = generate_jittered_positions(8, 7, margin=20, seed=202, keep_prob=0.70, min_dist=52)
+    d_pts, d_rng = generate_organic_scatter(32, margin=18, min_dist=46, seed=202, cluster_prob=0.45)
     for i, (cx, cy) in enumerate(d_pts):
-        place_sprite(c_bfly, make_pastel_dot_sprite(16, dot_cols[i % len(dot_cols)]), cx, cy, float(d_rng.uniform(7, 13)), opacity=0.55)
-    f_bfly = finalize_layer("buom_xinh", c_bfly, (221, 214, 254), [(251, 207, 232), (191, 219, 254), (254, 240, 180)], (250, 232, 255), (233, 213, 255), 203)
+        place_sprite(c_bfly, make_pastel_dot_sprite(16, dot_cols[i % len(dot_cols)]), cx, cy, float(d_rng.uniform(7, 12)), opacity=float(d_rng.uniform(0.38, 0.52)))
+    f_bfly = finalize_layer("buom_xinh", c_bfly, (221, 214, 254), [(251, 207, 232), (191, 219, 254), (254, 240, 180)], (250, 232, 255), (233, 213, 255), 203, glow_strength=0.15)
 
-    # 3. fx_canh_hoa: Dainty hand-painted sakura flowers & swirling petals + blush breeze/bokeh
+    # 3. fx_canh_hoa: True windblown falling sakura (82% tumbling 3D petals + 18% blooms in 3 depth tiers)
     c_sakura = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(8, 8, margin=26, seed=301, keep_prob=0.94, min_dist=60)
-    weights = [0, 1, 2, 3, 4, 2, 3, 4]
+    pts, rng = generate_organic_scatter(52, margin=20, min_dist=48, seed=301, cluster_prob=0.52, wind_flow=True)
+    # 82% petals (indices 2, 3, 4), 18% small whole blossoms (indices 0, 1)
+    weights = [2, 3, 4, 2, 3, 4, 2, 3, 4, 0, 1]
     for i, (cx, cy) in enumerate(pts):
-        sp_idx = weights[i % len(weights)]
+        sp_idx = weights[int(rng.integers(0, len(weights)))]
         sp = sakura[sp_idx % len(sakura)]
         is_flower = sp_idx < 2
-        sz = float(rng.uniform(36, 52) if is_flower else rng.uniform(28, 44))
-        ang = float(rng.uniform(-24, 24) if is_flower else rng.uniform(-180, 180))
-        blur = 1.6 if (not is_flower and i % 9 == 0) else 0.0
-        if blur > 0:
-            sz *= 1.25
-        place_sprite(c_sakura, sp, cx, cy, sz, angle_deg=ang, dof_blur=blur, opacity=0.66)
+        if is_flower:
+            sz = float(rng.uniform(30, 44))
+            ang = float(rng.uniform(-28, 28))
+            sq = float(rng.uniform(0.84, 1.0))
+            op = float(rng.uniform(0.46, 0.62))
+            blur = 0.0
+        elif i % 10 == 0:
+            # Tier 3: close-to-lens bokeh foreground petal
+            sz = float(rng.uniform(58, 82))
+            ang = float(-38 + rng.uniform(-65, 65))
+            sq = float(rng.uniform(0.68, 0.96))
+            op = float(rng.uniform(0.40, 0.50))
+            blur = 2.6
+        elif i % 3 == 0:
+            # Tier 1: tiny distant softly-blurred falling petal
+            sz = float(rng.uniform(18, 28))
+            ang = float(-38 + rng.uniform(-80, 80))
+            sq = float(rng.uniform(0.62, 0.94))
+            op = float(rng.uniform(0.34, 0.48))
+            blur = 0.7
+        else:
+            # Tier 2: crisp mid-air tumbling sakura petal
+            sz = float(rng.uniform(28, 46))
+            ang = float(-38 + rng.uniform(-75, 75))
+            sq = float(rng.uniform(0.64, 1.0))
+            op = float(rng.uniform(0.48, 0.64))
+            blur = 0.0
+        place_sprite(c_sakura, sp, cx, cy, sz, angle_deg=ang, flip_x=bool(rng.integers(0, 2)), dof_blur=blur, opacity=op, squash_y=sq)
     f_sakura = finalize_layer("canh_hoa", c_sakura, (251, 207, 232), [(254, 205, 211), (255, 228, 238)], (255, 222, 235), (251, 207, 232), 303)
 
-    # 4. fx_sticker_doodle: Korean pastel doodles + Purikura mini hearts/crosses/squiggles
+    # 4. fx_sticker_doodle: Organic Purikura non-grid scatter
     c_doodle = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
     doodle_pool = doodles + ([sparkles[0], sparkles[1]] if len(sparkles) >= 2 else [])
-    pts, rng = generate_jittered_positions(8, 7, margin=28, seed=401, keep_prob=0.92, min_dist=66)
+    pts, rng = generate_organic_scatter(44, margin=26, min_dist=58, seed=401, cluster_prob=0.42)
     for i, (cx, cy) in enumerate(pts):
         sp = doodle_pool[i % len(doodle_pool)]
-        sz = float(rng.uniform(34, 54))
-        ang = float(rng.uniform(-22, 22))
+        sz = float(rng.uniform(30, 52))
+        ang = float(rng.uniform(-24, 24))
         flp = bool(rng.integers(0, 2)) if (i % len(doodle_pool) in (3, 4)) else False
-        place_sprite(c_doodle, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=0.68)
+        place_sprite(c_doodle, sp, cx, cy, sz, angle_deg=ang, flip_x=flp, opacity=float(rng.uniform(0.48, 0.64)))
     f_doodle = finalize_layer("sticker_doodle", c_doodle, (254, 215, 226), [(251, 207, 232), (186, 230, 253), (254, 240, 175)], (255, 235, 245), (253, 210, 228), 403)
 
-    # 5. fx_bong_bong: Kawaii anime pastel translucent soap bubbles + background bokeh/sparkles
+    # 5. fx_bong_bong: Organic drifting bubbles across entire canvas
     c_bubble = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
     bubble_variants = [make_pastel_bubble_sprite(88, h) for h in (0.0, 1.4, 2.8, 4.3)]
     mini_star = make_sparkle_4pt_sprite(32, (255, 255, 255), (224, 242, 254))
-    pts, rng = generate_jittered_positions(8, 8, margin=26, seed=501, keep_prob=0.94, min_dist=60)
+    pts, rng = generate_organic_scatter(48, margin=24, min_dist=54, seed=501, cluster_prob=0.45, wind_flow=True)
     for i, (cx, cy) in enumerate(pts):
         sp = bubble_variants[i % len(bubble_variants)]
-        sz = float(rng.uniform(30, 70) if i % 4 != 0 else rng.uniform(22, 32))
+        sz = float(rng.uniform(26, 70) if i % 4 != 0 else rng.uniform(18, 30))
         ang = float(rng.uniform(-18, 18))
-        place_sprite(c_bubble, sp, cx, cy, sz, angle_deg=ang, opacity=0.68)
-        if sz > 48 and i % 3 == 0:
-            place_sprite(c_bubble, mini_star, cx - sz * 0.28, cy - sz * 0.28, sz * 0.26, opacity=0.66)
+        place_sprite(c_bubble, sp, cx, cy, sz, angle_deg=ang, opacity=float(rng.uniform(0.48, 0.66)))
+        if sz > 46 and i % 3 == 0:
+            place_sprite(c_bubble, mini_star, cx - sz * 0.28, cy - sz * 0.28, sz * 0.25, opacity=0.60)
     f_bubble = finalize_layer("bong_bong", c_bubble, (207, 235, 255), [(224, 242, 254), (245, 208, 254)], (228, 244, 255), (205, 232, 255), 503)
 
-    # 6. fx_cau_vong: Pastel macaron rainbows, smiling suns + warm bokeh & shimmer arcs
-    c_rainbow = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(7, 7, margin=30, seed=601, keep_prob=0.94, min_dist=74)
-    for i, (cx, cy) in enumerate(pts):
-        sp = rainbows[i % len(rainbows)]
-        sz = float(rng.uniform(46, 66) if (i % len(rainbows) == 0) else rng.uniform(36, 54))
-        ang = float(rng.uniform(-16, 16))
-        place_sprite(c_rainbow, sp, cx, cy, sz, angle_deg=ang, opacity=0.68)
-    r_dots, r_rng = generate_jittered_positions(7, 7, margin=22, seed=602, keep_prob=0.72, min_dist=54)
+    # 6. fx_cau_vong: Aesthetic curved sunlit pastel rainbow arc + bokeh + crisp micro-sparkles (NO goofy cartoon icons!)
+    rainbow_arc = make_sunlit_pastel_rainbow_arc()
+    c_rainbow_sp = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
+    kira_gold = make_sparkle_4pt_sprite(44, (255, 250, 224), (254, 220, 175))
+    kira_white = make_sparkle_4pt_sprite(40, (255, 255, 255), (220, 238, 255))
+    r_pts, r_rng = generate_organic_scatter(32, margin=24, min_dist=58, seed=601, cluster_prob=0.45)
     r_cols = [(254, 205, 211), (254, 240, 138), (167, 243, 208), (186, 230, 253), (221, 214, 254)]
-    for i, (cx, cy) in enumerate(r_dots):
-        place_sprite(c_rainbow, make_pastel_dot_sprite(16, r_cols[i % len(r_cols)]), cx, cy, float(r_rng.uniform(7, 12)), opacity=0.58)
-    f_rainbow = finalize_layer("cau_vong", c_rainbow, (254, 230, 190), r_cols, (255, 245, 220), (254, 224, 200), 603)
+    for i, (cx, cy) in enumerate(r_pts):
+        sp = kira_gold if i % 2 == 0 else kira_white
+        place_sprite(c_rainbow_sp, sp, cx, cy, float(r_rng.uniform(14, 28)), angle_deg=float(r_rng.uniform(-14, 14)), opacity=float(r_rng.uniform(0.46, 0.72)))
+    d_pts, d_rng = generate_organic_scatter(24, margin=20, min_dist=50, seed=602, cluster_prob=0.40)
+    for i, (cx, cy) in enumerate(d_pts):
+        place_sprite(c_rainbow_sp, make_pastel_dot_sprite(16, r_cols[i % len(r_cols)]), cx, cy, float(d_rng.uniform(6, 11)), opacity=float(d_rng.uniform(0.38, 0.56)))
+    f_rainbow = draw_snow_connecting_accents("cau_vong", (254, 232, 198), r_cols, 603)
+    alpha_composite_rgba(f_rainbow, np.clip(rainbow_arc, 0, 255).astype(np.uint8), 0, 0, opacity=1.0)
+    sp_rb_glow = add_luminous_sprite_aura(c_rainbow_sp, (255, 244, 220), sigma=4.5, strength=0.20)
+    alpha_composite_rgba(f_rainbow, np.clip(sp_rb_glow, 0, 255).astype(np.uint8), 0, 0, opacity=1.0)
+    f_rainbow = add_dreamy_pastel_frame(f_rainbow, (254, 224, 200))
 
-    # 7. fx_sao_lap_lanh: Kawaii pastel stars, crescent moons + fairy-dust sparkles & bokeh
+    # 7. fx_sao_lap_lanh: Organic starry sky of pastel stars, crescent moons & glowing 4-pt sparkles
     c_sparkle = np.zeros((OUT_SIZE, OUT_SIZE, 4), dtype=np.float32)
-    pts, rng = generate_jittered_positions(8, 8, margin=24, seed=701, keep_prob=0.94, min_dist=58)
+    pts, rng = generate_organic_scatter(48, margin=22, min_dist=54, seed=701, cluster_prob=0.42)
     for i, (cx, cy) in enumerate(pts):
         sp = sparkles[i % len(sparkles)]
-        sz = float(rng.uniform(30, 50))
-        ang = float(rng.uniform(-22, 22))
-        place_sprite(c_sparkle, sp, cx, cy, sz, angle_deg=ang, opacity=0.70)
-    kira_gold = make_sparkle_4pt_sprite(44, (255, 250, 220), (254, 215, 170))
+        sz = float(rng.uniform(26, 48))
+        ang = float(rng.uniform(-24, 24))
+        place_sprite(c_sparkle, sp, cx, cy, sz, angle_deg=ang, opacity=float(rng.uniform(0.50, 0.70)))
     kira_pink = make_sparkle_4pt_sprite(44, (255, 245, 252), (251, 207, 232))
-    k_pts, k_rng = generate_jittered_positions(8, 8, margin=20, seed=702, keep_prob=0.78, min_dist=48)
+    k_pts, k_rng = generate_organic_scatter(40, margin=18, min_dist=42, seed=702, cluster_prob=0.45)
     for i, (cx, cy) in enumerate(k_pts):
-        if any((cx - px) ** 2 + (cy - py) ** 2 < 28 ** 2 for px, py in pts):
+        if any((cx - px) ** 2 + (cy - py) ** 2 < 24 ** 2 for px, py in pts):
             continue
         sp = kira_gold if i % 2 == 0 else kira_pink
-        place_sprite(c_sparkle, sp, cx, cy, float(k_rng.uniform(14, 24)), angle_deg=float(k_rng.uniform(-12, 12)), opacity=0.66)
+        place_sprite(c_sparkle, sp, cx, cy, float(k_rng.uniform(12, 24)), angle_deg=float(k_rng.uniform(-14, 14)), opacity=float(k_rng.uniform(0.46, 0.68)))
     f_sparkle = finalize_layer("sao_lap_lanh", c_sparkle, (254, 240, 195), [(251, 207, 232), (221, 214, 254), (255, 248, 215)], (255, 246, 214), (250, 232, 210), 703)
 
     return [

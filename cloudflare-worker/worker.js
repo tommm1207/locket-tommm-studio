@@ -75,6 +75,7 @@ const SPECIAL_FX_IDS = new Set([
   "cctv_camera",
   "triple_clone",
   "fx_giot_nuoc",
+  "fx_giot_nuoc_ro",
   "fx_mua_roi",
   "fx_tuyet_roi",
 ]);
@@ -795,7 +796,7 @@ async function getFrameRgba(filterId) {
   const cached = FRAME_CACHE.get(filterId);
   if (cached) return cached;
 
-  const res = await fetch(`${GITHUB_FRAMES_BIN_BASE}/${encodeURIComponent(filterId)}.bin?v=75`);
+  const res = await fetch(`${GITHUB_FRAMES_BIN_BASE}/${encodeURIComponent(filterId)}.bin?v=76`);
   if (!res.ok) throw new Error(`Failed to fetch frame bin for ${filterId}: ${res.status}`);
   const compressed = new Uint8Array(await res.arrayBuffer());
   const rgba = await inflateZlib(compressed);
@@ -1684,11 +1685,21 @@ function applyPortraitBokeh(rgb, w, h) {
   }
 }
 
-function applyWaterDropletsGlass(rgb, w, h) {
+function applyWaterDropletsGlass(rgb, w, h, sharpBg = false) {
   const orig = new Uint8Array(rgb);
   const s = w / 768;
-  const blurRad = Math.max(2, Math.round(4 * s));
-  const blur = boxBlurRgb(orig, w, h, blurRad, 2);
+  let blur;
+  if (sharpBg) {
+    // Crisp photo behind glass with only a whisper of soft condensation haze (fx_giot_nuoc_ro)
+    const blur1 = boxBlurRgb(orig, w, h, 1, 1);
+    blur = new Uint8Array(w * h * 3);
+    for (let i = 0; i < blur.length; i++) {
+      blur[i] = (orig[i] * 0.72 + blur1[i] * 0.28) | 0;
+    }
+  } else {
+    const blurRad = Math.max(2, Math.round(4 * s));
+    blur = boxBlurRgb(orig, w, h, blurRad, 2);
+  }
 
   const total = w * h;
   const field = new Float32Array(total);
@@ -1961,7 +1972,7 @@ const FX_ATMOSPHERE_MOODS = {
   fx_canh_hoa: { rMul: 1.05, gMul: 0.99, bMul: 1.02, lift: 7, bloom: 0.22, glowRgb: [255, 212, 230], glAlpha: 0.16 },
   fx_sticker_doodle: { rMul: 1.03, gMul: 1.01, bMul: 1.02, lift: 6, bloom: 0.16, glowRgb: [255, 228, 240], glAlpha: 0.13 },
   fx_bong_bong: { rMul: 1.01, gMul: 1.02, bMul: 1.05, lift: 5, bloom: 0.22, glowRgb: [205, 238, 255], glAlpha: 0.15 },
-  fx_cau_vong: { rMul: 1.04, gMul: 1.02, bMul: 0.98, lift: 6, bloom: 0.20, glowRgb: [255, 228, 195], glAlpha: 0.15, prism: true },
+  fx_cau_vong: { rMul: 1.04, gMul: 1.02, bMul: 0.98, lift: 6, bloom: 0.20, glowRgb: [255, 228, 195], glAlpha: 0.14 },
   fx_sao_lap_lanh: { rMul: 1.01, gMul: 1.00, bMul: 1.05, lift: 4, bloom: 0.23, glowRgb: [255, 236, 200], glAlpha: 0.14 },
 };
 
@@ -2198,11 +2209,17 @@ function applySoapBubblesOptical(rgb, w, h) {
 function applyBokehSnowfall(rgb, w, h) {
   const s = w / 768;
   const total = w * h;
-  // Crisp cool winter daylight balance
+  // Cool winter daylight balance with subtle highlight roll-off so white snow shows clearly on bright walls
   for (let p = 0, i = 0; p < total; p++, i += 3) {
-    rgb[i] = Math.min(255, (rgb[i] * 0.96) | 0);
-    rgb[i + 1] = Math.min(255, (rgb[i + 1] * 0.99) | 0);
-    rgb[i + 2] = Math.min(255, (rgb[i + 2] * 1.05 + 2) | 0);
+    let r = rgb[i] * 0.90;
+    let g = rgb[i + 1] * 0.94;
+    let b = rgb[i + 2] * 1.01 + 2;
+    if (r > 205) r = 205 + (r - 205) * 0.56;
+    if (g > 205) g = 205 + (g - 205) * 0.56;
+    if (b > 210) b = 210 + (b - 210) * 0.60;
+    rgb[i] = r > 255 ? 255 : r | 0;
+    rgb[i + 1] = g > 255 ? 255 : g | 0;
+    rgb[i + 2] = b > 255 ? 255 : b | 0;
   }
   const rnd = makeFxRng(0x5000f411);
 
@@ -2225,30 +2242,83 @@ function applyBokehSnowfall(rgb, w, h) {
         if (d2 >= 1) continue;
         const f = Math.pow(1 - d2, softPow);
         const a = alpha * f;
-        screenPixel(rgb, (row + x) * 3, 246 * a, 250 * a, 255 * a);
+        screenPixel(rgb, (row + x) * 3, 248 * a, 251 * a, 255 * a);
       }
     }
   };
 
-  // Layer 1: ~18 large soft out-of-focus foreground bokeh discs (outer frame bias)
-  for (let k = 0; k < 18; k++) {
-    let cx = rnd() * w;
-    let cy = rnd() * h;
-    if (cx > w * 0.25 && cx < w * 0.75 && cy > h * 0.22 && cy < h * 0.78) {
-      cx = rnd() < 0.5 ? rnd() * w * 0.22 : w * (0.78 + rnd() * 0.22);
+  // Softly blurred tiny 6-point snowflake crystal helper
+  const segDist2 = (px, py, ax, ay, bx, by) => {
+    const abx = bx - ax, aby = by - ay;
+    const apx = px - ax, apy = py - ay;
+    const ab2 = abx * abx + aby * aby;
+    let t = ab2 > 1e-6 ? (apx * abx + apy * aby) / ab2 : 0;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    const dx = apx - abx * t, dy = apy - aby * t;
+    return dx * dx + dy * dy;
+  };
+  const splatCrystal = (cx, cy, rad, rot, alpha) => {
+    const segs = [];
+    const brPos = rad * 0.56;
+    const brLen = rad * 0.34;
+    for (let k = 0; k < 6; k++) {
+      const a = rot + k * 1.04719755;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      segs.push([0, 0, ca * rad, sa * rad]);
+      const bx0 = ca * brPos, by0 = sa * brPos;
+      for (const sgn of (-0.65, 0.65)) {
+        const ba = a + sgn;
+        segs.push([bx0, by0, bx0 + Math.cos(ba) * brLen, by0 + Math.sin(ba) * brLen]);
+      }
     }
-    const r = (16 + rnd() * 18) * s;
-    splatFlake(cx, cy, r, r * (0.94 + rnd() * 0.14), 0.14 + rnd() * 0.14, 1.35);
+    const sigma = 1.38 * s;
+    const invSig2 = 1 / (sigma * sigma);
+    const pad = rad + 4 * s;
+    const x0 = Math.max(0, Math.floor(cx - pad));
+    const x1 = Math.min(w - 1, Math.ceil(cx + pad));
+    const y0 = Math.max(0, Math.floor(cy - pad));
+    const y1 = Math.min(h - 1, Math.ceil(cy + pad));
+    for (let y = y0; y <= y1; y++) {
+      const dy = y - cy;
+      const row = y * w;
+      for (let x = x0; x <= x1; x++) {
+        const dx = x - cx;
+        if (dx * dx + dy * dy > pad * pad) continue;
+        let minD2 = 1e9;
+        for (let si = 0; si < segs.length; si++) {
+          const sg = segs[si];
+          const d2 = segDist2(dx, dy, sg[0], sg[1], sg[2], sg[3]);
+          if (d2 < minD2) minD2 = d2;
+        }
+        const g = Math.exp(-minD2 * invSig2);
+        if (g < 0.03) continue;
+        const a = alpha * g;
+        screenPixel(rgb, (row + x) * 3, 248 * a, 252 * a, 255 * a);
+      }
+    }
+  };
+
+  // Layer 1: ~24 large soft out-of-focus foreground bokeh discs
+  for (let k = 0; k < 24; k++) {
+    const cx = (0.04 + rnd() * 0.92) * w;
+    const cy = (0.04 + rnd() * 0.92) * h;
+    const r = (13 + rnd() * 15) * s;
+    splatFlake(cx, cy, r, r * (0.94 + rnd() * 0.14), 0.24 + rnd() * 0.16, 1.35);
   }
-  // Layer 2: ~65 mid-ground softly blurred snowflakes
-  for (let k = 0; k < 65; k++) {
-    const r = (4.2 + rnd() * 5.8) * s;
-    splatFlake(rnd() * w, rnd() * h, r, r * (0.88 + rnd() * 0.26), 0.42 + rnd() * 0.30, 1.8);
+  // Layer 2: ~95 mid-ground soft round snowballs
+  for (let k = 0; k < 95; k++) {
+    const r = (3.8 + rnd() * 4.2) * s;
+    splatFlake(rnd() * w, rnd() * h, r, r * (0.88 + rnd() * 0.24), 0.54 + rnd() * 0.28, 1.7);
   }
-  // Layer 3: ~160 fine distant crisp snow grains
-  for (let k = 0; k < 160; k++) {
-    const r = (1.6 + rnd() * 2.1) * s;
-    splatFlake(rnd() * w, rnd() * h, r, r * (0.9 + rnd() * 0.2), 0.30 + rnd() * 0.32, 1.6);
+  // Layer 3: ~28 tiny softly-blurred 6-point snowflake crystals
+  for (let k = 0; k < 28; k++) {
+    const rad = (7.5 + rnd() * 8.5) * s;
+    splatCrystal((0.05 + rnd() * 0.90) * w, (0.05 + rnd() * 0.90) * h, rad, rnd() * Math.PI, 0.44 + rnd() * 0.28);
+  }
+  // Layer 4: ~200 fine crisp snow grains
+  for (let k = 0; k < 200; k++) {
+    const r = (1.5 + rnd() * 1.6) * s;
+    splatFlake(rnd() * w, rnd() * h, r, r * (0.9 + rnd() * 0.2), 0.40 + rnd() * 0.30, 1.5);
   }
 }
 
@@ -5721,7 +5791,8 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
       else if (specialFxId === "clock_weekday_overlay") applyClockWeekdayOverlay(canvasRgb, HD_SIZE, HD_SIZE, clockAtlas);
       else if (specialFxId === "triple_clone") applyTripleClone(canvasRgb, HD_SIZE, HD_SIZE);
       else if (specialFxId === "portrait_bokeh") applyPortraitBokeh(canvasRgb, HD_SIZE, HD_SIZE);
-      else if (specialFxId === "fx_giot_nuoc") applyWaterDropletsGlass(canvasRgb, HD_SIZE, HD_SIZE);
+      else if (specialFxId === "fx_giot_nuoc") applyWaterDropletsGlass(canvasRgb, HD_SIZE, HD_SIZE, false);
+      else if (specialFxId === "fx_giot_nuoc_ro") applyWaterDropletsGlass(canvasRgb, HD_SIZE, HD_SIZE, true);
       else if (specialFxId === "fx_mua_roi") applyRainOverlayGlass(canvasRgb, HD_SIZE, HD_SIZE);
       else if (specialFxId === "fx_tuyet_roi") applyBokehSnowfall(canvasRgb, HD_SIZE, HD_SIZE);
 
