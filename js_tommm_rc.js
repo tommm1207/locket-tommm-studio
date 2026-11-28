@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "78";
+var RC_VER = "79";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -279,8 +279,8 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         } catch (_) {}
         var c0Hex = String(ytColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
         var c1Hex = String(ytColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
-        var ytWaveBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=wave&v=2";
-        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=peek&v=2";
+        var ytWaveBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=wave&v=3";
+        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + c0Hex + "&c1=" + c1Hex + "&mode=peek&v=3";
         rawItems = [
             {
                 overlay_id: "caption:yt_vinyl_spin",

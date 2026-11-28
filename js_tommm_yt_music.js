@@ -11,7 +11,7 @@
         var c0 = String((cols && cols[0]) || "#1E1B4B").replace(/[^0-9a-fA-F]/g, "") || "1E1B4B";
         var c1 = String((cols && cols[1]) || "#4C1D95").replace(/[^0-9a-fA-F]/g, "") || "4C1D95";
         var m = mode === "wave" ? "wave" : "peek";
-        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&mode=" + m + "&v=2";
+        return WORKER_BASE + "/studio/vinyl-bg.gif?c0=" + c0 + "&c1=" + c1 + "&mode=" + m + "&v=3";
     }
 
     function formatTrackLabel(title, artist, maxLen) {
@@ -160,7 +160,7 @@
             $httpClient.get({
                 url: "https://itunes.apple.com/search?term=" + encodeURIComponent(qBase) + "&country=VN&media=music&entity=song&limit=3",
                 headers: {
-                    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
                     "Accept": "application/json"
                 }
             }, function (err, resp, body) {
@@ -202,7 +202,7 @@
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
-                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 2 && ex.spotifyUrl && (Date.now() - Number(ex.ts || 0)) < 300000) {
+                    if (ex && ex.videoId === vid && ex.title && ex.schemaVer === 3 && ex.spotifyUrl && (Date.now() - Number(ex.ts || 0)) < 300000) {
                         finishOnce({});
                         return;
                     }
@@ -304,6 +304,7 @@
             var hasNativeMusicLog = false;
             var pendingUpgradeOvs = [];
             var cachedTrackForUpgrade = null;
+            var mutatedOvRef = null;
             for (var li = 0; li < overlayLists.length; li++) {
                 var overlays = overlayLists[li];
                 for (var k = 0; k < overlays.length; k++) {
@@ -341,12 +342,13 @@
                             if (track && track.title && (!track.ts || (Date.now() - track.ts) < 2700000)) {
                                 var bgCols = Array.isArray(track.colors) && track.colors.length >= 2 ? track.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
                                 if (!isVinylIconMode) {
-                                    var needsUpgrade = !!(track.videoId && typeof $httpClient !== "undefined" && (track.schemaVer !== 2 || !track.spotifyUrl || !track.previewUrl));
+                                    var needsUpgrade = !!(track.videoId && typeof $httpClient !== "undefined" && (track.schemaVer !== 3 || !track.spotifyUrl || !track.previewUrl));
                                     if (needsUpgrade) {
                                         cachedTrackForUpgrade = track;
                                         pendingUpgradeOvs.push(ov);
                                     } else {
                                         replacedWith = applyNativeMusicOverlay(ov, track, bgCols);
+                                        mutatedOvRef = ov;
                                         changed = true;
                                     }
                                 } else {
@@ -371,21 +373,42 @@
                     }
                 }
             }
+            var buildDonePayload = function (updatedBody) {
+                var resObj = { body: updatedBody };
+                if (req && req.headers && typeof req.headers === "object") {
+                    var cleanHdrs = Object.assign({}, req.headers);
+                    delete cleanHdrs["Content-Length"];
+                    delete cleanHdrs["content-length"];
+                    resObj.headers = cleanHdrs;
+                }
+                return resObj;
+            };
             var finalizeBody = function () {
                 var updatedBody = JSON.stringify(bodyObj);
+                var doneRes = buildDonePayload(updatedBody);
                 if (typeof $httpClient !== "undefined") {
-                    var swapTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({ body: updatedBody }); }, 250) : null;
+                    var swapTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce(doneRes); }, 250) : null;
+                    var logData = {
+                        urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0],
+                        matched: true,
+                        replacedWith: replacedWith,
+                        overlayId: mutatedOvRef ? mutatedOvRef.overlay_id : "",
+                        dataType: mutatedOvRef && mutatedOvRef.data ? mutatedOvRef.data.type : "",
+                        hasPreview: !!(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.preview_url),
+                        spotifyUrl: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.spotify_url) || "",
+                        isrc: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.isrc) || ""
+                    };
                     $httpClient.post({
                         url: WORKER_BASE + "/studio/music-schema-log",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ urlPath: u.replace(/\?.*$/, "").split("/").slice(-1)[0], matched: true, replacedWith: replacedWith, nativeMusic: pendingUpgradeOvs.length > 0 })
+                        body: JSON.stringify(logData)
                     }, function () {
                         if (swapTimer && typeof clearTimeout !== "undefined") clearTimeout(swapTimer);
-                        finishOnce({ body: updatedBody });
+                        finishOnce(doneRes);
                     });
                     return;
                 }
-                finishOnce({ body: updatedBody });
+                finishOnce(doneRes);
             };
             if (pendingUpgradeOvs.length > 0 && cachedTrackForUpgrade) {
                 var upgDone = false;
@@ -395,6 +418,7 @@
                     var uCols = Array.isArray(useTrack.colors) && useTrack.colors.length >= 2 ? useTrack.colors.slice(0, 2) : ["#1E1B4B", "#4C1D95"];
                     for (var pi = 0; pi < pendingUpgradeOvs.length; pi++) {
                         replacedWith = applyNativeMusicOverlay(pendingUpgradeOvs[pi], useTrack, uCols);
+                        mutatedOvRef = pendingUpgradeOvs[pi];
                     }
                     changed = true;
                     finalizeBody();
@@ -404,8 +428,8 @@
                         finishUpgrade(enriched || baseTrack);
                     }, 1500);
                 };
-                if (cachedTrackForUpgrade.schemaVer === 2 && cachedTrackForUpgrade.previewUrl) {
-                    enrichAndFinish(cachedTrackForUpgrade);
+                if (cachedTrackForUpgrade.schemaVer === 3 && cachedTrackForUpgrade.previewUrl && cachedTrackForUpgrade.spotifyUrl) {
+                    finishUpgrade(cachedTrackForUpgrade);
                     return;
                 }
                 var upgTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { enrichAndFinish(cachedTrackForUpgrade); }, 1800) : null;

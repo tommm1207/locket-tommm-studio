@@ -4896,17 +4896,54 @@ function titleMatchesTrack(queryTitle, candTitle) {
   return matched >= Math.max(1, Math.ceil(qWords.length * 0.5));
 }
 
-async function resolveSpotifyTrackUrl(title, artist) {
+async function resolveSpotifyTrackUrl(title, artist, env = null) {
   const qTitle = String(title || "").trim();
   const qArtist = String(artist || "").trim();
   if (!qTitle) return { spotifyUrl: "", spotifyThumb: "" };
   const queries = [];
-  if (qArtist) queries.push(`site:open.spotify.com/track ${qTitle} ${qArtist}`);
+  if (qArtist && qArtist !== "YouTube") queries.push(`site:open.spotify.com/track ${qTitle} ${qArtist}`);
   queries.push(`site:open.spotify.com/track ${qTitle}`);
   const hdrs = {
     "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
     "Accept": "text/html,application/xhtml+xml",
   };
+  const extractSpotifyIds = (txt) => {
+    let decoded = String(txt || "");
+    try { decoded = decodeURIComponent(decoded); } catch (_) {}
+    const ids = [];
+    const re = /open\.spotify\.com(?:\/intl-[a-z-]+)?\/track\/([A-Za-z0-9]{22})/gi;
+    let m;
+    while ((m = re.exec(decoded)) !== null && ids.length < 3) {
+      if (!ids.includes(m[1])) ids.push(m[1]);
+    }
+    return ids;
+  };
+  const verifySpotifyIds = async (ids) => {
+    if (!ids || ids.length === 0) return null;
+    const verified = await Promise.all(
+      ids.map(async (tid) => {
+        const spUrl = `https://open.spotify.com/track/${tid}`;
+        try {
+          const oRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spUrl)}`, {
+            headers: { "User-Agent": hdrs["User-Agent"] },
+            signal: AbortSignal.timeout(2200),
+          });
+          if (!oRes.ok) return null;
+          const oJson = await oRes.json().catch(() => null);
+          return oJson && oJson.title
+            ? { tid, spotifyUrl: spUrl, spTitle: String(oJson.title), spotifyThumb: String(oJson.thumbnail_url || "") }
+            : null;
+        } catch (_) {
+          return null;
+        }
+      })
+    );
+    const valid = verified.filter(Boolean);
+    const exact = valid.find((v) => titleMatchesTrack(qTitle, v.spTitle)) || valid[0];
+    if (exact) return { spotifyUrl: exact.spotifyUrl, spotifyThumb: exact.spotifyThumb };
+    return null;
+  };
+
   for (const dq of queries) {
     const endpoints = [
       `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(dq)}`,
@@ -4914,50 +4951,62 @@ async function resolveSpotifyTrackUrl(title, artist) {
     ];
     for (const ddgUrl of endpoints) {
       try {
-        const res = await fetch(ddgUrl, { headers: hdrs, signal: AbortSignal.timeout(3000) });
+        const res = await fetch(ddgUrl, { headers: hdrs, signal: AbortSignal.timeout(2600) });
         if (!res.ok) continue;
-        const html = await res.text();
-        let decoded = html;
-        try { decoded = decodeURIComponent(html); } catch (_) {}
-        const ids = [];
-        const re = /open\.spotify\.com(?:\/intl-[a-z-]+)?\/track\/([A-Za-z0-9]{22})/gi;
-        let m;
-        while ((m = re.exec(decoded)) !== null && ids.length < 3) {
-          if (!ids.includes(m[1])) ids.push(m[1]);
-        }
+        const ids = extractSpotifyIds(await res.text());
         if (ids.length === 0) continue;
-        const verified = await Promise.all(
-          ids.map(async (tid) => {
-            const spUrl = `https://open.spotify.com/track/${tid}`;
-            try {
-              const oRes = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(spUrl)}`, {
-                headers: { "User-Agent": hdrs["User-Agent"] },
-                signal: AbortSignal.timeout(2200),
-              });
-              if (!oRes.ok) return null;
-              const oJson = await oRes.json().catch(() => null);
-              return oJson && oJson.title
-                ? { tid, spotifyUrl: spUrl, spTitle: String(oJson.title), spotifyThumb: String(oJson.thumbnail_url || "") }
-                : null;
-            } catch (_) {
-              return null;
-            }
-          })
-        );
-        const valid = verified.filter(Boolean);
-        const exact = valid.find((v) => titleMatchesTrack(qTitle, v.spTitle)) || valid[0];
-        if (exact) return { spotifyUrl: exact.spotifyUrl, spotifyThumb: exact.spotifyThumb };
+        const hit = await verifySpotifyIds(ids);
+        if (hit) return hit;
         return { spotifyUrl: `https://open.spotify.com/track/${ids[0]}`, spotifyThumb: "" };
       } catch (_) {}
+    }
+  }
+
+  // Fallback: Gemini Google Search Grounding (verified via open.spotify.com/oembed)
+  if (env && env.GEMINI_API_KEY) {
+    const gKeys = availableKeys("gemini", env.GEMINI_API_KEY).slice(0, 2);
+    const gModels = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+    const promptQ = `Find the official Spotify track URL (https://open.spotify.com/track/...) for the song "${qTitle}"${qArtist && qArtist !== "YouTube" ? ` by "${qArtist}"` : ""}. Reply ONLY with the URL.`;
+    for (const gk of gKeys) {
+      for (const gm of gModels) {
+        try {
+          const gUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(gm)}:generateContent?key=${encodeURIComponent(gk)}`;
+          const r = await fetch(gUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              tools: [{ google_search: {} }],
+              contents: [{ role: "user", parts: [{ text: promptQ }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 120 },
+            }),
+            signal: AbortSignal.timeout(3800),
+          });
+          if (!r.ok) {
+            if (r.status === 429 || r.status === 403) { benchKey(gk); break; }
+            continue;
+          }
+          const gj = await r.json().catch(() => null);
+          const cand = gj?.candidates?.[0];
+          const partTxt = (cand?.content?.parts || []).map((p) => p?.text || "").join(" ");
+          const metaTxt = JSON.stringify(cand?.groundingMetadata || {});
+          const ids = extractSpotifyIds(partTxt + " " + metaTxt);
+          if (ids.length > 0) {
+            const hit = await verifySpotifyIds(ids);
+            if (hit) return hit;
+            return { spotifyUrl: `https://open.spotify.com/track/${ids[0]}`, spotifyThumb: "" };
+          }
+          break;
+        } catch (_) {}
+      }
     }
   }
   return { spotifyUrl: "", spotifyThumb: "" };
 }
 
-async function resolveYoutubeTrack(videoId, manualQuery = "") {
+async function resolveYoutubeTrack(videoId, manualQuery = "", env = null) {
   const cacheKey = videoId || ("q:" + foldNorm(manualQuery));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 2 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 3 && cached.spotifyUrl && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -4997,7 +5046,10 @@ async function resolveYoutubeTrack(videoId, manualQuery = "") {
 
   let itunesHit = null;
   let deezerHit = null;
-  const searchHeaders = { "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)", "Accept": "application/json" };
+  const searchHeaders = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+  };
   for (const term of terms) {
     try {
       const [itVnRes, dzRes] = await Promise.all([
@@ -5042,7 +5094,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "") {
           .then((r) => (r.ok ? r.json().catch(() => null) : null))
           .catch(() => null)
       : Promise.resolve(null),
-    resolveSpotifyTrackUrl(title, artist),
+    resolveSpotifyTrackUrl(title, artist, env),
   ]);
 
   let isrc = String(dzDetail?.isrc || "").trim();
@@ -5082,7 +5134,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "") {
   }
 
   const track = {
-    schemaVer: 2,
+    schemaVer: 3,
     videoId: videoId || "",
     songId,
     deezerId,
@@ -5165,13 +5217,13 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     [196, 162, 48],
     [215, 218, 226]
   );
-  // 28..31: 4 micro equalizer bar & soft sparkle tints
-  const eqBase = mixRgb(rawC1, [255, 255, 255], 0.42);
+  // 28..31: 4 bright equalizer bar & soft sparkle tints (distinct against dark gradient, softer than #FFFFFF text)
+  const eqBase = mixRgb(rawC1, [255, 255, 255], 0.56);
   palette.push(
-    mixRgb(bgB, eqBase, 0.42),
-    mixRgb(bgB, eqBase, 0.60),
-    mixRgb(bgB, eqBase, 0.78),
-    mixRgb(eqBase, [255, 255, 255], 0.25)
+    mixRgb(bgB, eqBase, 0.50),
+    mixRgb(bgB, eqBase, 0.72),
+    mixRgb(eqBase, [255, 255, 255], 0.30),
+    mixRgb(eqBase, [255, 255, 255], 0.65)
   );
 
   const W = 200;
@@ -5271,22 +5323,27 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     pushU16(H);
     out.push(0x00);
 
-    const eqLimitX = mode === "wave" ? 190 : 162;
+    const eqLimitX = mode === "wave" ? 192 : 164;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         // Base gradient index
         const gx = Math.min(11, Math.max(0, Math.round((x / (W - 1)) * 9 + (y / (H - 1)) * 2)));
         let idx = gx;
 
-        // Micro equalizer shimmer along bottom edge
-        if (x >= 10 && x < eqLimitX && y >= H - 7 && y < H - 2) {
-          const mod = (x - 10) % 6;
+        // Multi-harmonic equalizer bars (6..20px tall) rising from bottom edge
+        if (x >= 8 && x < eqLimitX && y >= H - 22 && y < H - 2) {
+          const mod = (x - 8) % 5;
           if (mod < 3) {
-            const barId = Math.floor((x - 10) / 6);
-            const wave = 0.5 + 0.5 * Math.sin(theta + barId * 0.58);
-            const barH = 2 + Math.round(wave * 3.5);
-            if (y >= H - 2 - barH) {
-              idx = 28 + Math.min(3, Math.floor(wave * 3.9));
+            const barId = Math.floor((x - 8) / 5);
+            const w1 = Math.sin(theta + barId * 0.72);
+            const w2 = Math.sin(2 * theta - barId * 1.15);
+            const w3 = Math.cos(theta + barId * 2.1);
+            const wave = Math.max(0, Math.min(1, 0.5 + 0.30 * w1 + 0.14 * w2 + 0.06 * w3));
+            const barH = 6 + Math.round(wave * 14);
+            const topY = H - 2 - barH;
+            if (y >= topY) {
+              const distFromTop = y - topY;
+              idx = distFromTop < 3 ? 31 : (distFromTop < 7 ? 30 : (distFromTop < 12 ? 29 : 28));
             }
           }
         }
@@ -5360,7 +5417,7 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
           headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
         });
       }
-      const track = await resolveYoutubeTrack(/^[A-Za-z0-9_-]{11}$/.test(vid) ? vid : "", q);
+      const track = await resolveYoutubeTrack(/^[A-Za-z0-9_-]{11}$/.test(vid) ? vid : "", q, env);
       return new Response(JSON.stringify({ ok: true, track }), {
         status: 200,
         headers: corsHeaders({ "Content-Type": "application/json; charset=utf-8" }),
