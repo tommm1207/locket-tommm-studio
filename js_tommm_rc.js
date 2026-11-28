@@ -267,10 +267,20 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
             } catch (_) {}
             return null;
         };
-        var latestTr = readValidTrack("tommm_yt_now_playing");
-        var spTr = readValidTrack("tommm_sp_now_playing");
+        // Đồng bộ CÙNG bộ key với ytMusicJs (saveTrackStores) -> picker hiện trùng với lúc đăng.
+        var latestTr = readValidTrack("tommm_yt_now_playing"); // Đĩa than = mới nhất mọi nguồn
+        var spTr = readValidTrack("tommm_sp_now_playing");     // ô Spotify = chỉ Spotify
+        // ô YT / Apple Music = bài mới nhất giữa yt_only & am_only (KHÔNG trộn Spotify)
+        var ytOnlyTr = readValidTrack("tommm_yt_only");
+        var amOnlyTr = readValidTrack("tommm_am_only");
+        var amTr = null;
+        if (ytOnlyTr && amOnlyTr) {
+            amTr = (Number(ytOnlyTr.ts || 0) >= Number(amOnlyTr.ts || 0)) ? ytOnlyTr : amOnlyTr;
+        } else {
+            amTr = ytOnlyTr || amOnlyTr;
+        }
+        // Fallback tương thích ngược khi các key mới còn trống (script cũ chưa ghi)
         if (!spTr && latestTr && (latestTr.platform === "spotify" || latestTr.spotifyId)) spTr = latestTr;
-        var amTr = readValidTrack("tommm_am_now_playing");
         if (!amTr && latestTr && !(latestTr.platform === "spotify" || latestTr.spotifyId)) amTr = latestTr;
 
         var vinylColors = (latestTr && Array.isArray(latestTr.colors) && latestTr.colors.length >= 2) ? latestTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];

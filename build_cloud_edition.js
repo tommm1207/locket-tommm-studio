@@ -233,10 +233,20 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
     function saveTrackStores(tr) {
         if (!tr || !tr.title || typeof $persistentStore === "undefined") return;
         try {
+            if (!tr.ts) tr.ts = Date.now();
             var serialized = JSON.stringify(tr);
+            // tommm_yt_now_playing = LATEST (bài mới nhất bất kể nguồn, giữ tên cũ cho tương thích ngược).
             $persistentStore.write(serialized, "tommm_yt_now_playing");
+            // Tách KEY RIÊNG theo đúng nguồn -> 3 ô nhạc (Spotify / YouTube / Apple Music) không đè chéo nhau.
             var isSp = !!(tr.platform === "spotify" || tr.spotifyId);
-            $persistentStore.write(serialized, isSp ? "tommm_sp_now_playing" : "tommm_am_now_playing");
+            var isYt = !!(tr.platform === "youtube" || tr.videoId);
+            if (isSp) {
+                $persistentStore.write(serialized, "tommm_sp_now_playing");
+            } else if (isYt) {
+                $persistentStore.write(serialized, "tommm_yt_only");
+            } else {
+                $persistentStore.write(serialized, "tommm_am_only");
+            }
         } catch (_) {}
     }
 
@@ -413,7 +423,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 finishOnce({});
                 return;
             }
-            var rawExisting = $persistentStore.read("tommm_am_now_playing") || $persistentStore.read("tommm_yt_now_playing");
+            var rawExisting = $persistentStore.read("tommm_yt_only") || $persistentStore.read("tommm_yt_now_playing");
             if (rawExisting) {
                 try {
                     var ex = JSON.parse(rawExisting);
@@ -522,7 +532,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 finishOnce({});
                 return;
             }
-            var rawExAm = $persistentStore.read("tommm_am_now_playing") || $persistentStore.read("tommm_yt_now_playing");
+            var rawExAm = $persistentStore.read("tommm_am_only") || $persistentStore.read("tommm_yt_now_playing");
             if (rawExAm) {
                 try {
                     var exAm = JSON.parse(rawExAm);
@@ -768,19 +778,31 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                 for (var k = 0; k < overlays.length; k++) {
                     var ov = overlays[k];
                     if (!ov) continue;
-                    if ((ov.overlay_id === "caption:music" || ov.overlay_id === "caption:yt_vinyl_spin") && typeof $httpClient !== "undefined") {
+                    var describeVal = function (v, d) {
+                        if (d > 4 || v == null) return v === null ? "null" : typeof v;
+                        if (Array.isArray(v)) return v.length ? [describeVal(v[0], d + 1)] : [];
+                        if (typeof v === "object") {
+                            var out = {};
+                            var ks = Object.keys(v);
+                            for (var x = 0; x < ks.length; x++) out[ks[x]] = describeVal(v[ks[x]], d + 1);
+                            return out;
+                        }
+                        return typeof v;
+                    };
+                    // FIRE-AND-FORGET log cho vinyl (static_content): CHỈ gửi schema, KHÔNG finishOnce,
+                    // KHÔNG set hasNativeMusicLog -> luồng chạy tiếp xuống mutate + finalizeBody (tránh race
+                    // nuốt mất request làm Đĩa than không bao giờ được gắn nội dung -> overlayCount:0).
+                    if (ov.overlay_id === "caption:yt_vinyl_spin" && typeof $httpClient !== "undefined") {
+                        try {
+                            $httpClient.post({
+                                url: WORKER_BASE + "/studio/music-schema-log",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ tag: "vinyl_static", overlaySchema: describeVal(ov, 0) })
+                            }, function () {});
+                        } catch (_) {}
+                    }
+                    if (ov.overlay_id === "caption:music" && typeof $httpClient !== "undefined") {
                         hasNativeMusicLog = true;
-                        var describeVal = function (v, d) {
-                            if (d > 4 || v == null) return v === null ? "null" : typeof v;
-                            if (Array.isArray(v)) return v.length ? [describeVal(v[0], d + 1)] : [];
-                            if (typeof v === "object") {
-                                var out = {};
-                                var ks = Object.keys(v);
-                                for (var x = 0; x < ks.length; x++) out[ks[x]] = describeVal(v[ks[x]], d + 1);
-                                return out;
-                            }
-                            return typeof v;
-                        };
                         var logTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 800) : null;
                         $httpClient.post({
                             url: WORKER_BASE + "/studio/music-schema-log",
@@ -797,21 +819,36 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                     var isYtOv = isVinylIconMode || isSpOv || isYtAmOv;
                     if (isYtOv && typeof $persistentStore !== "undefined") {
                         var rawYt = null;
+                        // So ts giữa 2 key, lấy raw của bài MỚI NHẤT (không trộn nguồn khác).
+                        var pickNewerRaw = function (keyA, keyB) {
+                            var rA = $persistentStore.read(keyA);
+                            var rB = $persistentStore.read(keyB);
+                            if (!rA) return rB || null;
+                            if (!rB) return rA || null;
+                            var tsA = 0, tsB = 0;
+                            try { tsA = Number(JSON.parse(rA).ts || 0); } catch (_) {}
+                            try { tsB = Number(JSON.parse(rB).ts || 0); } catch (_) {}
+                            return tsA >= tsB ? rA : rB;
+                        };
                         if (isVinylIconMode) {
+                            // Đĩa than = bài mới nhất bất kể nguồn (key latest giữ tên cũ).
                             rawYt = $persistentStore.read("tommm_yt_now_playing");
                         } else if (isSpOv) {
+                            // Ô Spotify CHỈ đọc store Spotify (không để YouTube/AM lọt vào).
                             rawYt = $persistentStore.read("tommm_sp_now_playing");
+                        } else {
+                            // Ô YT / Apple Music: so ts giữa yt_only và am_only, KHÔNG đụng Spotify.
+                            rawYt = pickNewerRaw("tommm_yt_only", "tommm_am_only");
                             if (!rawYt) {
-                                var fbSp = $persistentStore.read("tommm_yt_now_playing");
-                                if (fbSp) {
+                                // Fallback tương thích ngược: latest nếu không phải Spotify.
+                                var fbLatest = $persistentStore.read("tommm_yt_now_playing");
+                                if (fbLatest) {
                                     try {
-                                        var fbSpObj = JSON.parse(fbSp);
-                                        if (fbSpObj && (fbSpObj.platform === "spotify" || fbSpObj.spotifyId)) rawYt = fbSp;
+                                        var fbObj = JSON.parse(fbLatest);
+                                        if (fbObj && !(fbObj.platform === "spotify" || fbObj.spotifyId)) rawYt = fbLatest;
                                     } catch (_) {}
                                 }
                             }
-                        } else {
-                            rawYt = $persistentStore.read("tommm_am_now_playing") || $persistentStore.read("tommm_yt_now_playing");
                         }
                         if (rawYt) {
                             var track = JSON.parse(rawYt);
@@ -2112,10 +2149,20 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
             } catch (_) {}
             return null;
         };
-        var latestTr = readValidTrack("tommm_yt_now_playing");
-        var spTr = readValidTrack("tommm_sp_now_playing");
+        // Đồng bộ CÙNG bộ key với ytMusicJs (saveTrackStores) -> picker hiện trùng với lúc đăng.
+        var latestTr = readValidTrack("tommm_yt_now_playing"); // Đĩa than = mới nhất mọi nguồn
+        var spTr = readValidTrack("tommm_sp_now_playing");     // ô Spotify = chỉ Spotify
+        // ô YT / Apple Music = bài mới nhất giữa yt_only & am_only (KHÔNG trộn Spotify)
+        var ytOnlyTr = readValidTrack("tommm_yt_only");
+        var amOnlyTr = readValidTrack("tommm_am_only");
+        var amTr = null;
+        if (ytOnlyTr && amOnlyTr) {
+            amTr = (Number(ytOnlyTr.ts || 0) >= Number(amOnlyTr.ts || 0)) ? ytOnlyTr : amOnlyTr;
+        } else {
+            amTr = ytOnlyTr || amOnlyTr;
+        }
+        // Fallback tương thích ngược khi các key mới còn trống (script cũ chưa ghi)
         if (!spTr && latestTr && (latestTr.platform === "spotify" || latestTr.spotifyId)) spTr = latestTr;
-        var amTr = readValidTrack("tommm_am_now_playing");
         if (!amTr && latestTr && !(latestTr.platform === "spotify" || latestTr.spotifyId)) amTr = latestTr;
 
         var vinylColors = (latestTr && Array.isArray(latestTr.colors) && latestTr.colors.length >= 2) ? latestTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
