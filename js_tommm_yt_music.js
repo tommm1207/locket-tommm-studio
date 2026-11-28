@@ -715,7 +715,7 @@
             };
             ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
                 ? { type: "image", data: track.artworkUrl, source: "url" }
-                : { type: "emoji", data: (track.platform === "spotify" || track.spotifyId) ? "🎧" : "🎵" };
+                : { type: "sf_symbol", data: "music.note" };
             if (ov.data.payload) delete ov.data.payload;
             return formatTrackLabel(songTitle, songArtist, 72);
         }
@@ -931,7 +931,7 @@
                                     };
                                     ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
                                         ? { type: "image", data: track.artworkUrl, source: "url" }
-                                        : { type: "emoji", data: "🎵" };
+                                        : { type: "sf_symbol", data: "music.note" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -950,7 +950,9 @@
                             didSanitizeThis = true;
                         }
                         if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
-                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1 || ov.overlay_id.indexOf("now_playing") !== -1)) ? "🎵" : "✨" };
+                            ov.data.icon = (ov.overlay_id && (ov.overlay_id.indexOf("music") !== -1 || ov.overlay_id.indexOf("vinyl") !== -1 || ov.overlay_id.indexOf("now_playing") !== -1))
+                                ? { type: "sf_symbol", data: "music.note" }
+                                : { type: "emoji", data: "✨" };
                             didSanitizeThis = true;
                         }
                         if (didSanitizeThis) {

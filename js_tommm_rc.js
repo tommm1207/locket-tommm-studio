@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "102";
+var RC_VER = "103";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -288,7 +288,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         var spText = spTr ? formatRcTrackLabel(spTr.title, spTr.artist, 72) : "Spotify • Tự gắn bài đang nghe";
 
         var amColors = (amTr && Array.isArray(amTr.colors) && amTr.colors.length >= 2) ? amTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
-        var amIcon = (amTr && amTr.artworkUrl) ? { type: "image", data: amTr.artworkUrl, source: "url" } : { type: "emoji", data: "🎵" };
+        var amIcon = (amTr && amTr.artworkUrl) ? { type: "image", data: amTr.artworkUrl, source: "url" } : { type: "sf_symbol", data: "music.note" };
         var amText = amTr ? formatRcTrackLabel(amTr.title, amTr.artist, 72) : "YT / Apple Music • Tự gắn bài đang nghe";
 
         var WORKER_VINYL_BG = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif";
