@@ -1766,6 +1766,55 @@ baseRcEntries["camera_filter_bar_enabled"] = "true";
 baseRcEntries["inline_filter_picker_enabled"] = "true";
 baseRcEntries["filter_carousel_enabled"] = "true";
 baseRcEntries["quick_filter_picker_enabled"] = "true";
+baseRcEntries["camera_chrome_v2_enabled"] = "true";
+baseRcEntries["camera_overlay_v2_enabled"] = "true";
+baseRcEntries["camera_screen_v2_enabled"] = "true";
+baseRcEntries["camera_view_v2_enabled"] = "true";
+baseRcEntries["camera_interface_v2_enabled"] = "true";
+baseRcEntries["new_camera_interface_enabled"] = "true";
+baseRcEntries["modern_camera_ui_enabled"] = "true";
+baseRcEntries["unified_camera_controls_enabled"] = "true";
+baseRcEntries["redesigned_camera_controls_enabled"] = "true";
+baseRcEntries["viewfinder_controls_v2_enabled"] = "true";
+baseRcEntries["viewfinder_toolbar_v2_enabled"] = "true";
+baseRcEntries["capture_ui_v2_enabled"] = "true";
+baseRcEntries["capture_toolbar_v2_enabled"] = "true";
+baseRcEntries["capture_view_v2_enabled"] = "true";
+baseRcEntries["capture_screen_v2_enabled"] = "true";
+baseRcEntries["new_capture_ui_enabled"] = "true";
+baseRcEntries["capture_redesign_enabled"] = "true";
+baseRcEntries["camera_v3_enabled"] = "true";
+baseRcEntries["shutter_controls_v2_enabled"] = "true";
+baseRcEntries["camera_timer_ui_enabled"] = "true";
+baseRcEntries["self_timer_button_enabled"] = "true";
+baseRcEntries["timer_picker_enabled"] = "true";
+baseRcEntries["shutter_timer_enabled"] = "true";
+baseRcEntries["photo_countdown_enabled"] = "true";
+baseRcEntries["zoom_pill_v2_enabled"] = "true";
+baseRcEntries["bottom_zoom_pill_enabled"] = "true";
+baseRcEntries["segmented_zoom_enabled"] = "true";
+baseRcEntries["zoom_buttons_enabled"] = "true";
+baseRcEntries["camera_zoom_picker_enabled"] = "true";
+baseRcEntries["ultra_wide_button_enabled"] = "true";
+baseRcEntries["front_wide_angle_enabled"] = "true";
+baseRcEntries["selfie_zoom_enabled"] = "true";
+baseRcEntries["camera_lens_switcher_enabled"] = "true";
+baseRcEntries["camera_multi_lens_enabled"] = "true";
+baseRcEntries["effects_button_v2_enabled"] = "true";
+baseRcEntries["camera_effects_button_enabled"] = "true";
+baseRcEntries["effects_v2_enabled"] = "true";
+baseRcEntries["camera_looks_v2_enabled"] = "true";
+baseRcEntries["looks_v2_enabled"] = "true";
+baseRcEntries["create_look_v2_enabled"] = "true";
+baseRcEntries["custom_looks_enabled"] = "true";
+baseRcEntries["user_looks_enabled"] = "true";
+baseRcEntries["look_creation_enabled"] = "true";
+baseRcEntries["face_effects_v2_enabled"] = "true";
+baseRcEntries["filter_button_v2_enabled"] = "true";
+baseRcEntries["filters_v2_enabled"] = "true";
+baseRcEntries["camera_filters_v2_enabled"] = "true";
+baseRcEntries["effects_picker_enabled"] = "true";
+baseRcEntries["camera_looks_config"] = JSON.stringify({ enabled: true, create_enabled: true, inline_picker: true });
 baseRcEntries["dazz_cam_enabled"] = "true";
 baseRcEntries["dazz_enabled"] = "true";
 baseRcEntries["retro_camera_enabled"] = "true";
@@ -2162,6 +2211,9 @@ const TOMMM_FORCE_GATES = [
     "face_effects", "camera_effects_v2", "ai_camera_effects", "selfie_filters", "beauty_filters", "ar_effects",
     "create_ai_filter", "custom_ai_filters", "filter_looks", "user_filters", "multi_lens_picker", "lens_picker",
     "camera_lens_picker", "camera_top_bar_v2", "camera_bottom_bar_v2", "camera_layout_v2", "camera_viewfinder_v2", "camera_controls_redesign",
+    "camera_chrome_v2", "camera_overlay_v2", "camera_screen_v2", "camera_view_v2", "camera_interface_v2", "capture_ui_v2", "capture_toolbar_v2",
+    "capture_view_v2", "shutter_timer", "camera_timer_ui", "self_timer_button", "timer_picker", "zoom_pill_v2", "bottom_zoom_pill", "segmented_zoom",
+    "effects_button_v2", "camera_effects_button", "effects_v2", "camera_looks_v2", "looks_v2", "create_look_v2", "custom_looks", "user_looks", "look_creation", "face_effects_v2", "filter_button_v2", "filters_v2", "camera_filters_v2", "effects_picker",
     "vintage_cameras", "digital_cameras", "instant_cameras", "special_cameras", "locket_cameras", "retro_cam",
     "capture_modes", "capture_styles", "live_camera_filters", "dazz_camera",
     "point_and_shoot", "disposable", "vhs", "noir", "fisheye", "daydream", "bubblegum", "lofi", "atlas_35mm", "home_movie", "golden_hour", "laptop",
@@ -2193,7 +2245,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "113";
+var RC_VER = "114";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2704,6 +2756,14 @@ activeFilterCfg.reference_image_attachment_enabled = true;
 activeFilterCfg.referenceImageAttachmentEnabled = true;
 activeFilterCfg.open_sheet_immediately = false;
 activeFilterCfg.openSheetImmediately = false;
+activeFilterCfg.looks_enabled = true;
+activeFilterCfg.looksEnabled = true;
+activeFilterCfg.create_look_enabled = true;
+activeFilterCfg.createLookEnabled = true;
+activeFilterCfg.inline_picker_enabled = true;
+activeFilterCfg.inlinePickerEnabled = true;
+activeFilterCfg.v2_enabled = true;
+activeFilterCfg.v2Enabled = true;
 
 var existingSheets = Array.isArray(activeFilterCfg.sheet_filters) ? activeFilterCfg.sheet_filters : [];
 var seenGroupIds = {};
@@ -2752,6 +2812,7 @@ obj.entries["camera_filter_config"] = JSON.stringify(activeFilterCfg);
 writeRcStore(RC_VER, "tommm_rc_applied_ver");
 postRcDebugAndFinish({
     rcVer: RC_VER,
+    userAgent: (typeof $request !== "undefined" && $request && $request.headers) ? ($request.headers["User-Agent"] || $request.headers["user-agent"] || "") : "",
     rawState: rawState,
     entryKeysCount: rcDiagAllKeys.length,
     entryKeys: rcDiagAllKeys,
