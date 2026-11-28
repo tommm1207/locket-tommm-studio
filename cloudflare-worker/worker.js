@@ -4881,19 +4881,54 @@ function foldNorm(s) {
     .trim();
 }
 
+const TRACK_NOISE_WORDS = new Set([
+  "remix", "mix", "edit", "version", "ver", "live", "cover", "official", "mv",
+  "audio", "video", "lyrics", "lyric", "feat", "ft", "prod", "dj", "vinahouse",
+  "lofi", "sped", "up", "slowed", "reverb", "acoustic", "karaoke", "instrumental",
+  "media", "music", "channel", "records", "entertainment", "studio", "ost",
+  "tik", "tok", "tiktok", "mashup", "medley", "extended", "radio", "full", "hd", "4k",
+]);
+
+function stripTrackBrackets(s) {
+  return String(s || "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\[[^\]]*\]/g, " ")
+    .replace(/【[^】]*】/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isNoisyChannelName(s) {
+  return /\b(media|music|channel|official|tv|records|ent|entertainment|studio|remix|dj|audio|lyrics?|vpop|nhac|youtube|topic)\b/i.test(foldNorm(s));
+}
+
 function titleMatchesTrack(queryTitle, candTitle) {
-  const q = foldNorm(queryTitle);
-  const c = foldNorm(candTitle);
-  if (!q || !c) return true;
-  if (c.includes(q) || q.includes(c)) return true;
-  const qWords = q.split(/\s+/).filter((w) => w.length >= 2);
-  if (qWords.length === 0) return true;
-  const cSet = new Set(c.split(/\s+/));
+  const qCore = foldNorm(stripTrackBrackets(queryTitle) || queryTitle);
+  const cCore = foldNorm(stripTrackBrackets(candTitle) || candTitle);
+  if (!qCore || !cCore) return false;
+  if (
+    qCore.length >= 4 &&
+    (cCore === qCore ||
+      cCore.includes(qCore) ||
+      (cCore.length >= 4 && qCore.includes(cCore) && cCore.length >= Math.ceil(qCore.length * 0.65)))
+  ) {
+    return true;
+  }
+  let qWords = qCore.split(/\s+/).filter((w) => w.length >= 2 && !TRACK_NOISE_WORDS.has(w));
+  if (qWords.length === 0) {
+    qWords = foldNorm(queryTitle).split(/\s+/).filter((w) => w.length >= 2);
+  }
+  if (qWords.length === 0) return false;
+  let cWords = cCore.split(/\s+/).filter((w) => w.length >= 2 && !TRACK_NOISE_WORDS.has(w));
+  if (cWords.length === 0) {
+    cWords = foldNorm(candTitle).split(/\s+/).filter((w) => w.length >= 2);
+  }
+  const cSet = new Set(cWords);
   let matched = 0;
   for (const w of qWords) {
     if (cSet.has(w)) matched++;
   }
-  return matched >= Math.max(1, Math.ceil(qWords.length * 0.5));
+  return matched >= Math.ceil(qWords.length * 0.65) && (qWords.length < 2 || matched >= 2);
 }
 
 async function resolveSpotifyTrackUrl(title, artist, env = null) {
@@ -5083,7 +5118,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const amCountry = String(extra?.country || "vn").trim();
   const cacheKey = videoId || (spId ? "sp:" + spId : (amId ? "am:" + amId : ("q:" + foldNorm(manualQuery))));
   const cached = cacheKey ? YT_TRACK_CACHE.get(cacheKey) : null;
-  if (cached && cached.schemaVer === 5 && Date.now() - cached.ts < 3600000) {
+  if (cached && cached.schemaVer === 6 && Date.now() - cached.ts < 3600000) {
     LAST_YT_TRACK = { ...cached, ts: Date.now() };
     return LAST_YT_TRACK;
   }
@@ -5120,21 +5155,27 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   }
 
   const { cleanTitle, cleanAuthor } = cleanYoutubeTitle(ytTitle, ytAuthor);
-  let titleQueryForMatch = cleanTitle;
+  const coreClean = stripTrackBrackets(cleanTitle) || cleanTitle;
+  let titleQueryForMatch = coreClean || cleanTitle;
   const dashSplit = cleanTitle.split(/\s*[-–|]\s*/).filter(Boolean);
   if (dashSplit.length >= 2) {
     titleQueryForMatch = dashSplit.reduce((a, b) => (a.length >= b.length ? a : b));
   }
-  const terms = [];
-  if (cleanTitle) {
-    if (cleanAuthor && !cleanTitle.toLowerCase().includes(cleanAuthor.toLowerCase())) {
-      terms.push(`${cleanTitle} ${cleanAuthor}`);
+  const rawTerms = [];
+  if (coreClean) {
+    if (cleanAuthor && !isNoisyChannelName(cleanAuthor) && !coreClean.toLowerCase().includes(cleanAuthor.toLowerCase())) {
+      rawTerms.push(`${coreClean} ${cleanAuthor}`);
     }
-    terms.push(cleanTitle);
-    if (dashSplit.length >= 2) terms.push(`${dashSplit[0]} ${dashSplit[1]}`);
+    if (/\bremix\b/i.test(cleanTitle)) {
+      rawTerms.push(`${coreClean} Remix`);
+    }
+    rawTerms.push(coreClean);
+    if (cleanTitle && cleanTitle !== coreClean) rawTerms.push(cleanTitle);
+    if (dashSplit.length >= 2) rawTerms.push(`${dashSplit[0]} ${dashSplit[1]}`);
   } else if (cleanAuthor) {
-    terms.push(cleanAuthor);
+    rawTerms.push(cleanAuthor);
   }
+  const terms = Array.from(new Set(rawTerms.filter(Boolean)));
 
   let itunesHit = null;
   let deezerHit = null;
@@ -5149,7 +5190,7 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
         fetch(`https://api.deezer.com/search?q=${encodeURIComponent(term)}&limit=5`, { headers: searchHeaders, signal: AbortSignal.timeout(3200) }).catch(() => null),
       ]);
       const pickItunes = (itJson) => {
-        const list = (itJson?.results || []).filter((x) => x && (titleMatchesTrack(cleanTitle, x.trackName) || titleMatchesTrack(titleQueryForMatch, x.trackName)));
+        const list = (itJson?.results || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.trackName) || titleMatchesTrack(titleQueryForMatch, x.trackName)));
         return list.find((x) => x.previewUrl) || list[0] || null;
       };
       if (itVnRes && itVnRes.ok) {
@@ -5163,8 +5204,8 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       }
       if (dzRes && dzRes.ok && !deezerHit) {
         const dzJson = await dzRes.json().catch(() => null);
-        const dzList = (dzJson?.data || []).filter((x) => x && (titleMatchesTrack(cleanTitle, x.title_short || x.title) || titleMatchesTrack(titleQueryForMatch, x.title_short || x.title)));
-        deezerHit = dzList.find((x) => x.preview) || dzList[0] || (dzJson?.data || [])[0] || null;
+        const dzList = (dzJson?.data || []).filter((x) => x && (titleMatchesTrack(coreClean || cleanTitle, x.title_short || x.title) || titleMatchesTrack(titleQueryForMatch, x.title_short || x.title)));
+        deezerHit = dzList.find((x) => x.preview) || dzList[0] || null;
       }
       if (itunesHit && deezerHit) break;
     } catch (_) {}
@@ -5210,10 +5251,11 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
   const previewUrl = String(extra?.previewUrl || "").trim() || effItunes?.previewUrl || permanentDzPreview || dzDetail?.preview || deezerHit?.preview || "";
   const appleMusicUrl = String(extra?.appleMusicUrl || "").trim() || effItunes?.trackViewUrl || "";
   const appleMusicId = String(extra?.appleMusicId || effItunes?.trackId || amId || "").trim();
-  const spotifyUrl = "";
+  const platform = spId ? "spotify" : (amId ? "apple_music" : "youtube");
+  const spotifyUrl = spId ? ("https://open.spotify.com/track/" + spId) : "";
   const finalTitle = String(appleMeta?.trackName || extra?.title || "").trim() || title;
   const finalArtist = String(appleMeta?.artistName || extra?.artist || "").trim() || artist;
-  const songId = appleMusicId || (deezerId || (videoId || spId || "query"));
+  const songId = spId || appleMusicId || (deezerId || (videoId || "query"));
 
   let colors = ["#1E1B4B", "#4C1D95"];
   if (artworkUrl) {
@@ -5233,7 +5275,8 @@ async function resolveYoutubeTrack(videoId, manualQuery = "", env = null, extra 
       : (effItunes ? "youtube+itunes" : (deezerHit ? "youtube+deezer" : "youtube_oembed")));
 
   const track = {
-    schemaVer: 5,
+    schemaVer: 6,
+    platform,
     videoId: videoId || "",
     spotifyId: spId || "",
     songId,

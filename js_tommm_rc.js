@@ -1,6 +1,6 @@
 // Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "81";
+var RC_VER = "82";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -293,7 +293,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     icon: { type: "image", data: VINYL_ICON_DEF, source: "url" },
                     background: {
                         colors: ytColors,
-                        image: { type: "image", data: ytWaveBg, source: "url" }
+                        image: { type: "image", data: ytPeekBg, source: "url" }
                     }
                 }
             },
