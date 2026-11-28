@@ -1727,6 +1727,8 @@ const nmFrameMeta = {
     nm_locket_camera: { name: "Locket Camera", colors: ["#111827", "#EF4444"], emoji: "📷", sfSymbol: "viewfinder" },
     nm_spotify_pc: { name: "Spotify PC", colors: ["#121212", "#1ED760"], emoji: "🎧", sfSymbol: "music.note" },
     nm_spotify_hong: { name: "Spotify Hồng", colors: ["#FDE2EE", "#EC4899"], emoji: "💗", sfSymbol: "music.note" },
+    nm_dia_than_classic: { name: "Đĩa Than Classic", colors: ["#121115", "#F5C451"], emoji: "💿", sfSymbol: "opticaldisc" },
+    nm_dia_than_hong: { name: "Đĩa Than Chill", colors: ["#2A143D", "#F472B6"], emoji: "💿", sfSymbol: "opticaldisc" },
     nm_fuji_film: { name: "Fuji Film", colors: ["#101212", "#22C55E"], emoji: "🎞️", sfSymbol: "film" },
     nm_gay_meter: { name: "Gay Meter Random", colors: ["#EC4899", "#3B82F6"], emoji: "🌈", sfSymbol: "sparkles" },
     nm_chua_som: { name: "Chưa Sớm", colors: ["#0F172A", "#6366F1"], emoji: "🌙", sfSymbol: "moon.stars.fill" },
@@ -1865,7 +1867,7 @@ const customFrameGroups = [
     { id: "group_retro_lut", title: { en: "📷 Máy Ảnh Retro & Màu Film", vi: "📷 Máy Ảnh Retro & Màu Film" }, filter_ids: ["cctv_camera", "nm_nau_co_dien", "nm_dem_xanh", "nm_film_35mm", "nm_xam_matte", "dazz_cpm35", "dazz_classic_u", "dazz_fqs", "dazz_inst_c", "dazz_grd", "warp_fisheye_dazz", "warp_fisheye", "lut_kodak_portra", "lut_fuji_superia", "lut_kodak_gold", "lut_cinestill_800t", "lut_kodak_am", "lut_fuji_chrome", "lut_vintage"] },
     { id: "group_beauty_lut", title: { en: "🌸 Làm Đẹp & Tone Da", vi: "🌸 Làm Đẹp & Tone Da" }, filter_ids: ["portrait_bokeh", "lut_iphone_beauty", "lut_film_han", "lut_trang_sua", "lut_phim_nhat", "lut_hong_dao", "lut_matcha", "lut_ulzzang_pink", "lut_nang_ban_mai", "lut_tone_lanh", "lut_kem_bo"] },
     { id: "group_nm_cdm", title: { en: "💬 Cư Dân Mạng Nói Gì", vi: "💬 Cư Dân Mạng Nói Gì" }, filter_ids: ["nm_son_tung_mtp", "nm_ronaldo_siuuu", "nm_phai_luon_tu_te", "nm_chi_can_mot_vet_xuoc", "nm_trend_tic_toc", "nm_ai_cho_xinh_vay", "nm_tam_cuoi_dang_dang"] },
-    { id: "group_nm_khung_hot", title: { en: "🖼️ Khung Viền Hot Trend", vi: "🖼️ Khung Viền Hot Trend" }, filter_ids: ["nm_locket_camera", "nm_spotify_pc", "nm_spotify_hong", "nm_fuji_film", "nm_polaroid_vintage", "nm_soulmate", "nm_love_postcard"] },
+    { id: "group_nm_khung_hot", title: { en: "🖼️ Khung Viền Hot Trend", vi: "🖼️ Khung Viền Hot Trend" }, filter_ids: ["nm_dia_than_classic", "nm_dia_than_hong", "nm_locket_camera", "nm_spotify_pc", "nm_spotify_hong", "nm_fuji_film", "nm_polaroid_vintage", "nm_soulmate", "nm_love_postcard"] },
     { id: "group_nm_trend_hot", title: { en: "🔥 Trend Hot", vi: "🔥 Trend Hot" }, filter_ids: ["nm_gay_meter", "nm_chua_som", "nm_bang_tin_khan", "nm_ve_gui_xe", "nm_vo_hoc_sinh", "nm_giao_vien_cham_bai", "nm_nhiem_vu_hom_nay", "nm_hoa_don_di_choi"] },
     { id: "group_nm_tam_trang", title: { en: "😏 Tâm Trạng & Cà Khịa", vi: "😏 Tâm Trạng & Cà Khịa" }, filter_ids: ["nm_khong_can_ai_duyet", "nm_ban_la_gi", "nm_ong_troi_that_bat_cong", "nm_yeu_giau_chu_co_phai", "nm_me_con_em_don_anh_ve"] },
     { id: "group_nm_rap_xiec", title: { en: "🤡 Rạp Xiếc Trung Ương", vi: "🤡 Rạp Xiếc Trung Ương" }, filter_ids: ["nm_meo_meme", "nm_faker", "nm_hai_trai_cay", "nm_mona_lisa"] },
@@ -1875,7 +1877,7 @@ const customFrameGroups = [
 ];
 const frameOnlyIds = photoboothIds.concat(singleFrameIds, nmFrameIds);
 const customFrameIds = [
-    "nm_son_tung_mtp", "nm_spotify_pc", "nm_polaroid_vintage", "nm_bang_tin_khan",
+    "nm_dia_than_classic", "nm_dia_than_hong", "nm_son_tung_mtp", "nm_spotify_pc", "nm_polaroid_vintage", "nm_bang_tin_khan",
     "clock_weekday_overlay", "portrait_bokeh", "cctv_camera", "triple_clone",
     "warp_fisheye", "warp_fisheye_dazz",
     "weekday_depth", "weekday_depth_en", "weekday_depth_zh", "weekday_depth_tw", "weekday_depth_ja", "weekday_depth_ko", "weekday_depth_es", "weekday_depth_fr", "weekday_depth_de",
@@ -1999,7 +2001,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "96";
+var RC_VER = "97";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
