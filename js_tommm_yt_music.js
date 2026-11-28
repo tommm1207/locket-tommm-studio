@@ -926,7 +926,8 @@
                                         ? prevVinylMax
                                         : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
                                     ov.data.background = {
-                                        colors: bgCols
+                                        colors: bgCols,
+                                        image: { type: "image", data: "star_sign_background", source: "local" }
                                     };
                                     ov.data.icon = { type: "emoji", data: "💿" };
                                     replacedWith = displayTxt;
@@ -939,7 +940,12 @@
                     if (ov.overlay_id !== "caption:music" && ov.data && ov.data.type !== "music") {
                         var didSanitizeThis = false;
                         if (ov.data.background && ov.data.background.image && ov.data.background.image.source === "url" && !isLocketSafeStaticUrl(ov.data.background.image.data)) {
-                            delete ov.data.background.image;
+                            var isWinterStatic = /muadong|dong_nho|lanh_|snow/i.test(String(ov.overlay_id || "") + " " + String(ov.data.text || ""));
+                            ov.data.background.image = {
+                                type: "image",
+                                data: isWinterStatic ? "cloud_cover" : "star_sign_background",
+                                source: "local"
+                            };
                             didSanitizeThis = true;
                         }
                         if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {

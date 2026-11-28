@@ -5891,15 +5891,16 @@ function renderDynamicVinylGif(hex0, hex1, rawMode) {
     }
   }
 
-  if (url.pathname === "/studio/vinyl-bg.gif" && request.method === "GET") {
+  if (url.pathname === "/studio/vinyl-bg.gif" && (request.method === "GET" || request.method === "HEAD")) {
     const c0 = url.searchParams.get("c0") || "1E1B4B";
     const c1 = url.searchParams.get("c1") || "4C1D95";
     const mode = url.searchParams.get("mode") || "peek";
     const gifBytes = renderDynamicVinylGif(c0, c1, mode);
-    return new Response(gifBytes, {
+    return new Response(request.method === "HEAD" ? null : gifBytes, {
       status: 200,
       headers: corsHeaders({
         "Content-Type": "image/gif",
+        "Content-Length": String(gifBytes.byteLength),
         "Cache-Control": "public, max-age=86400",
       }),
     });
