@@ -1550,7 +1550,263 @@ const lifestyleCaptionsSection = {
         { overlay_id: "caption:life_het_pin", source: "remote", caption: { type: "static_content", text: "Sắp sập nguồn rồi", max_lines: 1, text_color: "#FEE2E2", icon: { type: "sf_symbol", data: "battery.0percent" }, background: { colors: ["#7F1D1D", "#B91C1C"], image: { type: "image", data: "star_sign_background", source: "local" } } } },
     ],
 };
-const customExtraSections = [musicCaptionsSection, animatedCaptionsSection, lifestyleCaptionsSection].concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
+let nmsCapIdx = 0;
+function makeVideoCapSec(title, specs) {
+    const out = [];
+    for (const [emoji, text, c0, c1, tc] of specs) {
+        const key = text.trim().toLowerCase();
+        if (existingTexts.has(key)) continue;
+        existingTexts.add(key);
+        nmsCapIdx++;
+        out.push({
+            overlay_id: `caption:custom_vid_${nmsCapIdx}`,
+            source: "remote",
+            caption: {
+                type: "static_content",
+                text,
+                max_lines: 1,
+                text_color: tc || "#FFFFFF",
+                icon: { type: "emoji", data: emoji },
+                background: { colors: [c0, c1] }
+            }
+        });
+    }
+    return { section: title, items: out };
+}
+const videoExtraSections = [
+    makeVideoCapSec("💘 Thả Thính & Flex Người Yêu Gen Z", [
+        ["💍", "Em là ngoại lệ duy nhất 💍", "#78350F", "#B45309"],
+        ["🥹", "Người yêu bảo không được xỉu", "#831843", "#BE185D"],
+        ["📞", "Đang bận iu nhau, đừng ai gọi", "#9D174D", "#EC4899"],
+        ["🥣", "Đi ăn với người thương 🥣🧡", "#7C2D12", "#EA580C"],
+        ["🥺", "Nhìn ảnh này là thấy nhớ rồi đó", "#1E3A8A", "#3B82F6"],
+        ["🧋", "Trà sữa có trân châu, anh có em", "#365314", "#65A30D"],
+        ["💘", "Chốt đơn trái tim này chưa?", "#9F1239", "#F43F5E"],
+        ["✨", "Góc nghiêng thần thánh gửi cậu", "#312E81", "#6366F1"],
+        ["🎀", "Em bé hôm nay ngoan lắm luôn", "#831843", "#F472B6"],
+        ["☕", "Say cà phê không bằng say em", "#451A03", "#92400E"],
+        ["🧡", "Đánh dấu chủ quyền nhẹ 🚩", "#7C2D12", "#C2410C"],
+        ["💯", "Tình yêu 10 điểm không có nhưng", "#7F1D1D", "#DC2626"],
+        ["⚡", "Cần nạp vitamin người yêu gấp", "#4C1D95", "#8B5CF6"],
+        ["💌", "Gửi một chiếc ảnh xinh cho người ấy", "#881337", "#E11D48"],
+        ["🍕", "Anh ơi em đói, dẫn em đi ăn đi", "#9A3412", "#F59E0B"],
+        ["😜", "Độc thân vui tính, ai thích thì nhích", "#065F46", "#10B981"],
+        ["📱", "Ngắm em đi đừng ngắm điện thoại", "#581C87", "#A855F7"],
+        ["🔥", "Nhớ người yêu phát điên mất", "#991B1B", "#EF4444"],
+        ["💍", "Chỉ yêu mình em thôi nha", "#713F12", "#CA8A04"],
+        ["🥣", "Vợ gọi về ăn cơm không được từ chối", "#3F6212", "#84CC16"],
+        ["🫶", "Mai đẹt ti ni của đời em 💖", "#831843", "#DB2777"],
+        ["🥺", "Bắt đền người ta đó nha", "#3730A3", "#6366F1"],
+        ["🌹", "Yêu em 3000 lần 🌹✨", "#881337", "#BE123C"],
+        ["💋", "Hôn một cái nà em iu 💋", "#9D174D", "#E11D48"],
+        ["🏆", "Người yêu tuyệt vời nhất quả đất", "#713F12", "#D97706"],
+        ["👀", "Nhìn thấy em là thấy hạnh phúc", "#4C1D95", "#9333EA"],
+        ["🔒", "Trái tim này thuộc về em 🧡", "#9A3412", "#EA580C"],
+        ["✈️", "Đi đâu cũng nhớ em ✈️💌", "#1E3A8A", "#0284C7"],
+        ["💎", "Cục cưng số một trong lòng anh", "#0F766E", "#14B8A6"],
+        ["💒", "Cưới em ngay và luôn 💒", "#701A75", "#D946EF"]
+    ]),
+    makeVideoCapSec("😜 Hài Hước, Vô Tri & Tấu Hài Gen Z", [
+        ["🌀", "Não đang loading 99%... 🌀", "#1E293B", "#475569"],
+        ["😜", "Đẹp nhưng hơi khùng một xíu", "#7C2D12", "#D97706"],
+        ["🍷", "Nghèo nhưng không bao giờ thiếu tự tin", "#312E81", "#4F46E5"],
+        ["🫡", "Hôm nay tui xin phép vô tri 🫡", "#14532D", "#16A34A"],
+        ["😴", "Mắt nhắm mắt mở vẫn phải chụp", "#1E3A8A", "#2563EB"],
+        ["🤑", "Sắp giàu rồi, thiếu mỗi tiền thôi", "#065F46", "#059669"],
+        ["📚", "Đi học là phụ, chụp Locket là chính", "#0F766E", "#0D9488"],
+        ["💅", "Ủa alo, ai mượn đẹp dữ vậy? 💅", "#701A75", "#A21CAF"],
+        ["🪫", "Pin điện thoại 1%, pin xã hội 0%", "#450A0A", "#991B1B"],
+        ["🛏️", "Ngủ nướng là một bộ môn nghệ thuật", "#1E1B4B", "#4338CA"],
+        ["🍗", "Đang diet nhưng thấy đồ ăn ngon quá", "#78350F", "#B45309"],
+        ["💁‍♀️", "Tóc đẹp, mặt xinh, mỗi tội ví mỏng", "#581C87", "#7E22CE"],
+        ["😤", "Hơi quạu nhưng cho trà sữa là hết", "#7C2D12", "#C2410C"],
+        ["📸", "Chụp đại một tấm mà vẫn cuốn", "#0F172A", "#334155"],
+        ["🍜", "Đời cho gì thì ăn nấy, trừ hành", "#365314", "#4D7C0F"],
+        ["⏳", "Chủ nhật sao trôi nhanh như một cơn gió", "#1E3A8A", "#1D4ED8"],
+        ["💤", "Tình trạng hiện tại: Thèm ngủ", "#0F172A", "#1E40AF"],
+        ["😁", "Cười lên cho đời bớt vô tri 😁", "#713F12", "#A16207"]
+    ]),
+    makeVideoCapSec("🔥 Đỉnh Nóc Kịch Trần & Trend Quốc Dân", [
+        ["🚀", "Đỉnh nóc, kịch trần, bay phấp phới", "#831843", "#C026D3"],
+        ["🔮", "Đúng nhận, sai cãi 🔮🍉", "#4C1D95", "#7C3AED"],
+        ["🥭", "Mãi mận, mãi keo 🥭", "#713F12", "#CA8A04"],
+        ["🧋", "Keo lì, tái châu 🧋", "#365314", "#65A30D"],
+        ["💅", "Slay quá! 💅✨", "#581C87", "#9333EA"],
+        ["🙏", "Xin vía", "#78350F", "#D97706"],
+        ["🫶", "Mai đẹt ti ni 💖", "#9D174D", "#EC4899"],
+        ["🎉", "Bất ngờ chưa bà già? 😨", "#701A75", "#C026D3"],
+        ["🍦", "Bing chilling 🍦", "#1E3A8A", "#38BDF8"],
+        ["⛰️", "À lôi ⛰️", "#064E3B", "#10B981"],
+        ["🥣", "Lần đầu tiên trái thanh long có trong mì tôm", "#881337", "#E11D48"],
+        ["🍚", "Cơm nước gì chưa người đẹp", "#7C2D12", "#EA580C"],
+        ["🐐", "Cái loại trốc tru 🐐💨", "#1E3A8A", "#0EA5E9"],
+        ["🚨", "Ní ơi, cứu ní! SOS 🧯", "#7F1D1D", "#DC2626"],
+        ["🎶", "Gwenchana ding ding ding", "#334155", "#64748B"],
+        ["😒", "Hay ra dẻ quá à! 🤢", "#831843", "#BE185D"],
+        ["🖐️", "Thân chưa mà giỡn? 🤨", "#713F12", "#B45309"],
+        ["🤡", "Ăn nói xà lơ quá chừng 🤡", "#4C1D95", "#6D28D9"],
+        ["🌿", "Đúng còn đúng cái nịt 🌿", "#14532D", "#15803D"],
+        ["⛰️", "À lôi, noọng ơi à lôi ⛰️", "#065F46", "#059669"],
+        ["🍜", "Thanh long trong mì tôm", "#9F1239", "#F43F5E"],
+        ["🥭", "Mãi mận, mãi keo, mãi mọi người", "#854D0E", "#EAB308"],
+        ["💅", "Tôi tưởng ai cũng có chứ?", "#3730A3", "#4F46E5"],
+        ["🙅‍♀️", "Hông bé ơi! 🍪", "#7C2D12", "#D97706"],
+        ["💢", "Tao thấy mà tao tức á! 😡", "#991B1B", "#EF4444"],
+        ["🍦", "Bing chilling mát lạnh ❄️", "#0369A1", "#0EA5E9"],
+        ["🎯", "Không trượt phát nào 🎯", "#065F46", "#10B981"],
+        ["😱", "Á đù ghê chưa 😱✨", "#9A3412", "#F97316"],
+        ["❓", "Ủa em làm sao zợ? 🤷‍♀️", "#581C87", "#9333EA"],
+        ["🕶️", "Cũng ra gì và này nọ đấy", "#111827", "#374151"]
+    ]),
+    makeVideoCapSec("🌸 4 Mùa: Xuân - Hạ - Thu - Đông & Thời Tiết", [
+        ["🌸", "Mùa xuân hoa nở dịu dàng", "#831843", "#F472B6"],
+        ["🏮", "Tết đến xuân về rộn ràng", "#7F1D1D", "#DC2626"],
+        ["🌸", "Hoa đào nở đón tết sang", "#9D174D", "#EC4899"],
+        ["🌱", "Mưa xuân lất phất đầu năm", "#0F766E", "#2DD4BF"],
+        ["🧧", "Vạn sự như ý phát tài 💰", "#78350F", "#D97706"],
+        ["☀️", "Mùa hè rực rỡ nắng vàng", "#854D0E", "#EAB308"],
+        ["🌊", "Vitamin Sea đi biển thôi 🌊", "#0369A1", "#0EA5E9"],
+        ["🍉", "Trốn nóng ngày hè oi ả 🍉", "#065F46", "#10B981"],
+        ["🍨", "Kem lạnh xua tan oi bức", "#1E3A8A", "#38BDF8"],
+        ["🌅", "Hoàng hôn mùa hạ rực rỡ", "#9A3412", "#F97316"],
+        ["🍂", "Mùa thu lá bay lãng mạn", "#713F12", "#B45309"],
+        ["🌼", "Thu Hà Nội hương hoa sữa", "#3F6212", "#84CC16"],
+        ["🍁", "Gió thu se lạnh qua từng phố", "#7C2D12", "#C2410C"],
+        ["☕", "Cà phê ấm ngày thu vắng", "#451A03", "#78350F"],
+        ["🌕", "Trăng tròn thu rằm tỏa sáng", "#854D0E", "#CA8A04"],
+        ["❄️", "Mùa đông lạnh giá đắp chăn", "#1E3A8A", "#2563EB"],
+        ["🎄", "Giáng sinh an lành ấm áp", "#14532D", "#15803D"],
+        ["☃️", "Tuyết rơi trắng xóa bầu trời", "#1E293B", "#475569"],
+        ["🫂", "Cần một cái ôm mùa đông", "#831843", "#BE185D"],
+        ["🍲", "Nồi lẩu ấm cúng đêm đông", "#991B1B", "#DC2626"],
+        ["🌧️", "Hôm nay trời đổ cơn mưa", "#1E293B", "#334155"],
+        ["🌈", "Cầu vồng sau cơn mưa tan", "#0F766E", "#14B8A6"],
+        ["☀️", "Nắng sớm mai ngập tràn phòng", "#854D0E", "#D97706"],
+        ["👽", "Về kể không ai tin 🛸", "#1E293B", "#475569"]
+    ]),
+    makeVideoCapSec("🎬 Tuyệt Đối Điện Ảnh & Deep Vibe", [
+        ["🎬", "Tuyệt đối điện ảnh 🎬", "#0F172A", "#334155"],
+        ["🖼️", "Nếu cả đời không rực rỡ thì sao", "#451A03", "#78350F"],
+        ["🍷", "Cổ điển, tôn trọng 🍷", "#111827", "#374151"],
+        ["🎨", "Khá niche 🎨", "#1E293B", "#475569"],
+        ["💡", "Thế mà lại hay ho phết ☕", "#451A03", "#92400E"],
+        ["🎧", "Hướng nội hết phần đời còn lại", "#1E3A8A", "#1D4ED8"],
+        ["✨", "Suy nghĩ tích cực, đời bớt tiêu cực", "#064E3B", "#059669"],
+        ["👀", "Có nhiều cái chưa muốn nói đâu", "#4C1D95", "#6D28D9"]
+    ]),
+    makeVideoCapSec("💼 Deadline & Đi Làm Công Ty", [
+        ["🎯", "Nhiệm vụ hệ thống 🎯", "#1E293B", "#334155"],
+        ["🏢", "Đi làm công ty không, em xin chào thua", "#1E3A8A", "#2563EB"],
+        ["🔥", "+1 máy bị deadline dí sát nút", "#7C2D12", "#EA580C"],
+        ["💳", "Đọc số tài khoản đi 💳", "#365314", "#4D7C0F"],
+        ["🌿", "Còn cái nịt 🌿", "#14532D", "#16A34A"],
+        ["🎙️", "Dịch cabin 🎙️", "#312E81", "#4F46E5"],
+        ["⚠️", "Cảnh báo có hát 🎤", "#78350F", "#B45309"],
+        ["🫠", "Tôi là nạn nhân của tư bản", "#1E293B", "#475569"],
+        ["🛡️", "Giảm sức mạnh con tướng này ngay", "#451A03", "#92400E"],
+        ["🆘", "Hết tiền rồi cứu với mẹ ơi", "#9A3412", "#EA580C"],
+        ["😴", "Thứ 2 là ngày đầu tuần mệt xỉu", "#1E3A8A", "#1E40AF"],
+        ["⏰", "Sắp được tan làm về nhà rồi", "#065F46", "#10B981"],
+        ["☕", "Uống cốc cà phê lấy lại linh hồn", "#451A03", "#78350F"],
+        ["🙏", "Xin sếp cho em nghỉ phép", "#713F12", "#A16207"]
+    ]),
+    makeVideoCapSec("😏 Cà Khịa & Hay Ra Dẻ", [
+        ["❓", "Ai hỏi?", "#1E293B", "#334155"],
+        ["💅", "Ai mượn? 💅", "#831843", "#BE185D"],
+        ["🚪", "Ai sợ thì đi về 🚪", "#312E81", "#4338CA"],
+        ["🙄", "Làm quá nó ô dề 🙏", "#713F12", "#CA8A04"],
+        ["😱", "Mắc cỡ quá hai ơi! 😱", "#065F46", "#059669"],
+        ["🪭", "Thua Gia Cát Lượng đúng cây quạt", "#3730A3", "#6366F1"],
+        ["🫠", "Bạn nói thế thì tôi chịu 🫠", "#111827", "#374151"],
+        ["👀", "Ê, ý là... 👀", "#065F46", "#10B981"],
+        ["👉", "Không ấy thì mình... 🤫", "#1E3A8A", "#3B82F6"]
+    ]),
+    makeVideoCapSec("🧯 Cứu Ní & Kiếp Nạn Thứ 82", [
+        ["🚑", "Ét ô ét! ✨", "#881337", "#E11D48"],
+        ["🚑", "Cứu được thì cứu 🚑", "#7C2D12", "#EA580C"],
+        ["🕯️", "Kiếp nạn thứ 82 🙏", "#713F12", "#CA8A04"],
+        ["🎟️", "Bốc trúng sít rịt 🥶", "#0F766E", "#14B8A6"],
+        ["📱", "Ủa alo? 📞", "#1E293B", "#475569"],
+        ["⚡", "Gì vậy trời? ⚡", "#78350F", "#D97706"],
+        ["❓", "Cái quái gì vậy? ❓", "#0F172A", "#334155"],
+        ["🤦‍♀️", "Chịu luôn á 🤦‍♀️", "#14532D", "#15803D"],
+        ["🏳️", "Em chịu, em chịu thật 🏳️", "#334155", "#64748B"],
+        ["🥺", "Xin lỗi được chưa? 🥺", "#4C1D95", "#7C3AED"],
+        ["💀", "Hết cứu nổi ca này rồi vĩnh biệt", "#090D16", "#1E293B"],
+        ["😤", "Nín ngay và luôn cấm cãi!", "#713F12", "#B45309"],
+        ["🥀", "Tự nhiên cái trầm cảm ngang", "#0F172A", "#1E293B"],
+        ["🍀", "Xui xẻo bay đi may mắn bay tới", "#14532D", "#16A34A"]
+    ]),
+    makeVideoCapSec("🌸 Dễ Thương, Em Bé & Ngoan Xinh Yêu", [
+        ["🎀", "Cutie Pie 🌸", "#831843", "#F472B6"],
+        ["🧸", "Baby Love 💖", "#365314", "#84CC16"],
+        ["☁️", "Sweet Dream ✨", "#1E3A8A", "#60A5FA"],
+        ["🌸", "Hello Kitty 🐱", "#9D174D", "#FB7185"],
+        ["🍵", "Matcha Latte ☕", "#14532D", "#22C55E"],
+        ["🎀", "Ngoan xinh yêu của anh đây", "#831843", "#EC4899"],
+        ["🧸", "Em bé của anh mãi thôi 🧡", "#7C2D12", "#F97316"]
+    ]),
+    makeVideoCapSec("🌙 Vibe Chill & Đêm Muộn", [
+        ["🌌", "Night Vibes 🌌", "#1E1B4B", "#4338CA"],
+        ["🌙", "2:00 AM Thoughts 🌙", "#0F172A", "#1E293B"],
+        ["🌧️", "Rainy Day ☕🌧️", "#1E293B", "#475569"],
+        ["✨", "Golden Hour ✨", "#713F12", "#D97706"],
+        ["🌙", "2:00 AM Thoughts miên man", "#0F172A", "#1E40AF"],
+        ["🌧️", "Đang suy tình giữa màn đêm", "#1E293B", "#334155"],
+        ["🧠", "Overthinking lúc nửa đêm", "#4C1D95", "#7C3AED"],
+        ["☕", "Cà phê một mình ngắm mưa rơi", "#334155", "#475569"],
+        ["💤", "Buồn ngủ xíu ngang không chịu nổi", "#1E3A8A", "#2563EB"],
+        ["🏙️", "Thành phố lên đèn em nhớ anh", "#0F172A", "#1D4ED8"],
+        ["🍂", "Một thoáng nhớ nhung ngẩn ngơ", "#451A03", "#92400E"]
+    ]),
+    makeVideoCapSec("🌿 Chữa Lành & Bình Yên", [
+        ["🍵", "Chữa lành tâm hồn bình yên", "#14532D", "#15803D"],
+        ["🧘‍♂️", "Tâm bất biến giữa dòng đời vạn biến", "#3F6212", "#65A30D"],
+        ["🌻", "Sống chậm lại, yêu thương nhiều hơn", "#166534", "#22C55E"],
+        ["🍵", "Uống miếng trà, ngắm mây trời trôi", "#334155", "#64748B"],
+        ["🏡", "Một ngày bình yên không âu lo", "#1E293B", "#475569"],
+        ["🌅", "Biết ơn mỗi sớm mai thức dậy", "#78350F", "#D97706"],
+        ["🍃", "Thả trôi mọi muộn phiền âu lo", "#0F766E", "#14B8A6"],
+        ["🧭", "Tìm lại chính mình giữa bộn bề", "#312E81", "#6366F1"],
+        ["🕊️", "Cứ an yên rồi mọi chuyện sẽ ổn", "#1E293B", "#475569"]
+    ]),
+    makeVideoCapSec("💎 Luxury VIP & Rich Kid", [
+        ["🏆", "BILLIONAIRE MINDSET 💰", "#713F12", "#CA8A04"],
+        ["💎", "BLACK CARD MEMBER 💳", "#0F172A", "#334155"],
+        ["✨", "EMERALD GLOW ✨", "#065F46", "#10B981"],
+        ["🕶️", "OOTD VIP 🕶️", "#111827", "#374151"],
+        ["👑", "Rich Kid phố cổ chánh hiệu", "#78350F", "#D97706"],
+        ["🏰", "Bảo bối của nhà tài phiệt", "#713F12", "#B45309"],
+        ["⌚", "Rolex sáng loáng trên cổ tay", "#14532D", "#15803D"],
+        ["🏎️", "Siêu xe lướt gió đại lộ", "#7F1D1D", "#DC2626"],
+        ["💵", "Không có gì ngoài tiền và điều kiện", "#365314", "#65A30D"]
+    ]),
+    makeVideoCapSec("⚡ Cyberpunk & Neon Glow", [
+        ["🕹️", "SYSTEM OVERLOAD 👾", "#064E3B", "#10B981"],
+        ["🪩", "RETRO WAVE 📼", "#581C87", "#A855F7"],
+        ["🧪", "TOXIC VIBES ☣️", "#14532D", "#22C55E"],
+        ["🤖", "CYBERPUNK 2077 tương lai", "#0369A1", "#0EA5E9"],
+        ["💻", "Hacker mũ trắng ngầu lòi", "#0F172A", "#1E293B"],
+        ["🤖", "AI Robot thời đại 4.0 🤖", "#1E3A8A", "#3B82F6"],
+        ["🌐", "GLITCH MATRIX lỗi không gian", "#065F46", "#059669"],
+        ["🌅", "Vaporwave hoàng hôn tím", "#4C1D95", "#9333EA"]
+    ]),
+    makeVideoCapSec("🐱 Thú Cưng, Đồ Ăn & Trà Sữa", [
+        ["👑", "Boss mèo quyền lực vô đối", "#713F12", "#CA8A04"],
+        ["🐶", "Chó ngoan không sủa bậy", "#065F46", "#10B981"],
+        ["🥺", "Dễ thương xỉu up xỉu down", "#581C87", "#9333EA"],
+        ["😠", "Đang dỗi không thèm nói chuyện", "#7F1D1D", "#DC2626"],
+        ["🥐", "Bánh mì bơ sữa ngọt ngào", "#78350F", "#D97706"],
+        ["🐰", "Thỏ con ngơ ngác đáng yêu", "#831843", "#F472B6"],
+        ["🧋", "Làm cốc trà sữa 70% đường", "#3F6212", "#84CC16"],
+        ["🍜", "Hôm nay ăn gì cả thế giới ơi", "#854D0E", "#CA8A04"],
+        ["🍗", "Gà rán giòn rụm béo ngậy", "#7C2D12", "#EA580C"],
+        ["🥩", "Nướng thịt xèo xèo cùng chiến hữu", "#9A3412", "#C2410C"],
+        ["🍕", "Ăn xong rồi lại muốn ăn tiếp", "#365314", "#65A30D"],
+        ["🍰", "Giảm cân là chuyện của ngày mai", "#831843", "#BE185D"]
+    ])
+].filter(s => s.items.length > 0);
+const customExtraSections = [musicCaptionsSection, animatedCaptionsSection, lifestyleCaptionsSection].concat(videoExtraSections).concat(cloudArchiveSection).concat([weekdayCaptionsSection]).concat(
     dvOverlays.filter(s => !s.section.includes("General") && !s.section.includes("Decorative by Locket"))
 );
 
@@ -2245,7 +2501,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "114";
+var RC_VER = "115";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
