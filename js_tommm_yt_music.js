@@ -581,6 +581,10 @@
         }
     }
 
+    function isLocketSafeStaticUrl(uStr) {
+        return /^https:\/\/(?:public\.locketcamera\.com|storage\.googleapis\.com|firebasestorage\.googleapis\.com)\//i.test(String(uStr || ""));
+    }
+
     function applyNativeMusicOverlay(ov, track, bgCols) {
         var songTitle = String(track.title || "YouTube Music").trim();
         var songArtist = String(track.artist || "YouTube").trim();
@@ -609,9 +613,9 @@
                 material_blur: "regular",
                 colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
             };
-            if (track.artworkUrl) {
-                ov.data.icon = { type: "image", data: track.artworkUrl, source: "url" };
-            }
+            ov.data.icon = isLocketSafeStaticUrl(track.artworkUrl)
+                ? { type: "image", data: track.artworkUrl, source: "url" }
+                : { type: "emoji", data: "🎵" };
             if (ov.data.payload) delete ov.data.payload;
             return formatTrackLabel(songTitle, songArtist, 72);
         }
@@ -648,11 +652,9 @@
                 material_blur: "regular",
                 colors: Array.isArray(bgCols) && bgCols.length >= 2 ? bgCols.slice(0, 2) : ["#1E1B4B", "#4C1D95"]
             },
-            icon: {
-                type: "image",
-                data: track.artworkUrl || VINYL_ICON_URL,
-                source: "url"
-            },
+            icon: track.artworkUrl
+                ? { type: "image", data: track.artworkUrl, source: "url" }
+                : { type: "sf_symbol", data: "music.note" },
             payload: payloadObj
         };
         return formatTrackLabel(songTitle, songArtist, 72);
@@ -730,6 +732,7 @@
             var pendingUpgradeOvs = [];
             var cachedTrackForUpgrade = null;
             var mutatedOvRef = null;
+            var sanitizedStatic = false;
             for (var li = 0; li < overlayLists.length; li++) {
                 var overlays = overlayLists[li];
                 for (var k = 0; k < overlays.length; k++) {
@@ -746,18 +749,6 @@
                         }
                         return typeof v;
                     };
-                    // FIRE-AND-FORGET log cho vinyl (static_content): CHỈ gửi schema, KHÔNG finishOnce,
-                    // KHÔNG set hasNativeMusicLog -> luồng chạy tiếp xuống mutate + finalizeBody (tránh race
-                    // nuốt mất request làm Đĩa than không bao giờ được gắn nội dung -> overlayCount:0).
-                    if (ov.overlay_id === "caption:yt_vinyl_spin" && typeof $httpClient !== "undefined") {
-                        try {
-                            $httpClient.post({
-                                url: WORKER_BASE + "/studio/music-schema-log",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ tag: "vinyl_static", overlaySchema: describeVal(ov, 0) })
-                            }, function () {});
-                        } catch (_) {}
-                    }
                     if (ov.overlay_id === "caption:music" && typeof $httpClient !== "undefined") {
                         hasNativeMusicLog = true;
                         var logTimer = typeof setTimeout !== "undefined" ? setTimeout(function () { finishOnce({}); }, 800) : null;
@@ -825,7 +816,6 @@
                                     }
                                 } else {
                                     var displayTxt = formatTrackLabel(track.title, track.artist, 72);
-                                    var chosenBg = vinylBgUrl(bgCols, "peek");
                                     var prevVinylMax = ov && ov.data && ov.data.max_lines;
                                     ov.alt_text = displayTxt;
                                     ov.data = ov.data || {};
@@ -835,15 +825,33 @@
                                     ov.data.max_lines = (prevVinylMax && typeof prevVinylMax === "object")
                                         ? prevVinylMax
                                         : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
-                                    ov.data.background = Object.assign({}, ov.data.background || {}, {
-                                        colors: bgCols,
-                                        image: { type: "image", data: chosenBg, source: "url" }
-                                    });
-                                    ov.data.icon = { type: "image", data: track.artworkUrl || VINYL_ICON_URL, source: "url" };
+                                    ov.data.background = {
+                                        colors: bgCols
+                                    };
+                                    ov.data.icon = { type: "emoji", data: "💿" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
                                 }
+                            }
+                        }
+                    }
+                    if (ov.overlay_id !== "caption:music" && ov.data && ov.data.type !== "music") {
+                        var didSanitizeThis = false;
+                        if (ov.data.background && ov.data.background.image && ov.data.background.image.source === "url" && !isLocketSafeStaticUrl(ov.data.background.image.data)) {
+                            delete ov.data.background.image;
+                            didSanitizeThis = true;
+                        }
+                        if (ov.data.icon && ov.data.icon.type === "image" && ov.data.icon.source === "url" && !isLocketSafeStaticUrl(ov.data.icon.data)) {
+                            ov.data.icon = { type: "emoji", data: (ov.overlay_id && ov.overlay_id.indexOf("vinyl") !== -1) ? "💿" : "✨" };
+                            didSanitizeThis = true;
+                        }
+                        if (didSanitizeThis) {
+                            changed = true;
+                            sanitizedStatic = true;
+                            if (!mutatedOvRef) {
+                                mutatedOvRef = ov;
+                                replacedWith = String(ov.data.text || ov.overlay_id || "sanitized_static");
                             }
                         }
                     }
@@ -882,7 +890,10 @@
                         platform: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.spotify_url) ? "spotify" : "apple_music",
                         iconHost: extractHost(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.icon && mutatedOvRef.data.icon.data),
                         previewHost: extractHost(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.preview_url),
-                        isrc: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.isrc) || ""
+                        isrc: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.payload && mutatedOvRef.data.payload.isrc) || "",
+                        sanitizedStatic: !!sanitizedStatic,
+                        hasBgImage: !!(mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.background && mutatedOvRef.data.background.image),
+                        iconType: (mutatedOvRef && mutatedOvRef.data && mutatedOvRef.data.icon && mutatedOvRef.data.icon.type) || ""
                     };
                     $httpClient.post({
                         url: WORKER_BASE + "/studio/music-schema-log",
