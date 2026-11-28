@@ -959,6 +959,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                                     }
                                 } else {
                                     var displayTxt = formatTrackLabel(track.title, track.artist, 72);
+                                    var chosenBg = vinylBgUrl(bgCols, "peek");
                                     var prevVinylMax = ov && ov.data && ov.data.max_lines;
                                     ov.alt_text = displayTxt;
                                     ov.data = ov.data || {};
@@ -970,9 +971,11 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                                         : { "@type": "type.googleapis.com/google.protobuf.Int64Value", "value": "1" };
                                     ov.data.background = {
                                         colors: bgCols,
-                                        image: { type: "image", data: "star_sign_background", source: "local" }
+                                        image: { type: "image", data: chosenBg, source: "url" }
                                     };
-                                    ov.data.icon = { type: "emoji", data: "💿" };
+                                    ov.data.icon = track.artworkUrl
+                                        ? { type: "image", data: track.artworkUrl, source: "url" }
+                                        : { type: "emoji", data: "💿" };
                                     replacedWith = displayTxt;
                                     mutatedOvRef = ov;
                                     changed = true;
@@ -980,7 +983,7 @@ const ytMusicJs = `// Tommm Private - Auto YouTube / YT Music -> Locket Music Ca
                             }
                         }
                     }
-                    if (ov.overlay_id !== "caption:music" && ov.data && ov.data.type !== "music") {
+                    if (ov.overlay_id !== "caption:music" && ov.overlay_id !== "caption:yt_vinyl_spin" && ov.data && ov.data.type !== "music") {
                         var didSanitizeThis = false;
                         if (ov.data.background && ov.data.background.image && ov.data.background.image.source === "url" && !isLocketSafeStaticUrl(ov.data.background.image.data)) {
                             var isWinterStatic = /muadong|dong_nho|lanh_|snow/i.test(String(ov.overlay_id || "") + " " + String(ov.data.text || ""));
@@ -1999,7 +2002,7 @@ baseRcEntries["allows_custom_filters"] = "true";
 
 const locketRcJs = `// Tommm1207 Private - Firebase Remote Config (Tự động giữ Caption ngày lễ mới & Filter chính chủ Locket + Gộp bộ Caption mở rộng)
 (function() {
-var RC_VER = "94";
+var RC_VER = "95";
 var rcFinished = false;
 function finishOnce(res) {
     if (rcFinished) return;
@@ -2283,8 +2286,11 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
         if (!amTr && latestTr && !(latestTr.platform === "spotify" || latestTr.spotifyId)) amTr = latestTr;
 
         var vinylColors = (latestTr && Array.isArray(latestTr.colors) && latestTr.colors.length >= 2) ? latestTr.colors.slice(0, 2) : ["#991B1B", "#DC2626"];
-        var vinylIcon = { type: "emoji", data: "💿" };
+        var vinylIcon = (latestTr && latestTr.artworkUrl) ? { type: "image", data: latestTr.artworkUrl, source: "url" } : { type: "emoji", data: "💿" };
         var vinylText = latestTr ? formatRcTrackLabel(latestTr.title, latestTr.artist, 72) : "Đĩa than • Tự gắn bài đang nghe";
+        var vC0 = String(vinylColors[0] || "#991B1B").replace(/[^0-9a-fA-F]/g, "") || "991B1B";
+        var vC1 = String(vinylColors[1] || "#DC2626").replace(/[^0-9a-fA-F]/g, "") || "DC2626";
+        var ytPeekBg = "https://locket-tommm-studio.khoinguyennguyen85.workers.dev/studio/vinyl-bg.gif?c0=" + vC0 + "&c1=" + vC1 + "&mode=peek&v=5";
 
         var spColors = (spTr && Array.isArray(spTr.colors) && spTr.colors.length >= 2) ? spTr.colors.slice(0, 2) : ["#14532D", "#166534"];
         var spIcon = (spTr && spTr.artworkUrl) ? { type: "image", data: spTr.artworkUrl, source: "url" } : { type: "emoji", data: "🎧" };
@@ -2306,7 +2312,7 @@ for (var i = 0; i < EXTRA_SECTIONS.length; i++) {
                     icon: vinylIcon,
                     background: {
                         colors: vinylColors,
-                        image: { type: "image", data: "star_sign_background", source: "local" }
+                        image: { type: "image", data: ytPeekBg, source: "url" }
                     }
                 }
             },
